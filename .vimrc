@@ -1,105 +1,221 @@
-filetype plugin indent on
-set grepprg=grep\ -nH\ $*
-let g:tex_flavor = "latex"
-set runtimepath=~/.vim,$VIM/vimfiles,$VIMRUNTIME,$VIM/vimfiles/after,~/.vim/after
+" Scott's custom .vimrc file
+" ---------------------------------------------------------------------
+" Custom Command List
+" --------------------
+"
+"
+" ---------------------------------------------------------------------
+" This line should not be removed as it ensures that various options are
+" properly set to work with the Vim-related packages available in Debian.
+runtime! debian.vim
 
-autocmd BufNewFile * :call LoadFileTemplate()
-autocmd FileType mma :call SetupMathematica()
+" Use UTF-8 encoding by default
+"  (turn this off if we get weird file saving)
+set enc=utf-8
+set fenc=utf-8
+set termencoding=utf-8
 
-autocmd FileType java set tags=~/.tags
-"au! BufReadPost,BufWritePost * silent loadview
-"au BufWinLeave * mkview
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" File type specific settings
+"  (eg special settings for java files vs makefiles)
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+autocmd FileType c,cpp,h,hpp,slang set cindent
+autocmd FileType java set formatoptions=croql cindent nowrap nofoldenable
+autocmd FileType c    set formatoptions+=ro smartindent
+autocmd FileType perl set smartindent
+autocmd FileType css  set smartindent
+autocmd FileType html set formatoptions+=tl
+autocmd FileType html,css set noexpandtab tabstop=4
+autocmd FileType make set noexpandtab shiftwidth=4
 
+" Python autoindent
+autocmd BufRead *.py set smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class
 
-" Mappings
-map <C-Tab> :tabnext<CR>
-map <C-T> :tabnew<CR>
-map <S-Right> :tabnext<CR>
-map <S-Left> :tabprev<CR>
-nmap <Space> :tabnext<CR>
-nmap nogui  :call NoGUI()<CR>
+" Special file types not normally detected set here
+autocmd! BufRead,BufNewFile *.ics setfiletype icalendar
 
-function! NoGUI()
-    set guioptions-=T
-    set guioptions-=m  "hides menu bar
-    "let do_syntax_sel_menu = 1|runtime! synmenu.vim|aunmenu &Syntax.&Show\ filetypes\ in\ menu
-endfunction
+" Shaders
+au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf glsl
 
-function! SetupMathematica()
-    " Remove GUI Crud
-    set guioptions-=T
-    "set guioptions-=m  "hides menu bar
-    " Mathmatica comments
-    imap (**     (* <ESC>$a *)<ESC>^
-    "delete first (*  then go to end of line a delete last two chars. which should
-    "undo the line above  matches (*<space>blah<space>*)  keeping everything in between and removing the (*<space><space>*) 
-    nmap (dd      :s/\((\* \)\(.*\)\( \*)\)/\2/<CR>
-    nmap (D       :%s/(\*//<CR>  :%s/\*)//<CR>
-endfunction
+" SCons
+au BufNewFile,BufRead SCons* setf python
 
-" Style
-imap {{ {<CR><CR>}<UP><RIGHT>
-set ts=4
-set sw=4
+" In text and LaTeX files, always limit the width of text to 76
+" characters.  Also perform logical wrapping/indenting.
+autocmd BufRead *.txt set tw=76 formatoptions=tcroqn2l
+autocmd BufRead *.tex set tw=76
+
+" Don't expand tabs to spaces in Makefiles
+au BufEnter [Mm]akefile* set noet
+au BufLeave [Mm]akefile* set et
+
+" YAML
+augroup yamlfiles
+  autocmd filetype yaml setlocal   autoindent
+  autocmd filetype yaml setlocal   expandtab
+  autocmd filetype yaml setlocal noignorecase
+  autocmd filetype yaml setlocal   shiftround
+  autocmd filetype yaml setlocal   shiftwidth=4
+  autocmd filetype yaml setlocal   smartindent
+  autocmd filetype yaml setlocal   softtabstop=4
+  autocmd filetype yaml setlocal   tabstop=4
+  autocmd filetype yaml setlocal   textwidth=0
+augroup END
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Misc custom settings
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" We don't need vi compat, since it only emulates old _bugs_
+set nocompatible
+
+" History mode
+set history=1024
+set wildmode=list:longest,full
+
+" Use [RO] instead of [readonly]
+set shortmess+=r
+
+" Disable line wrapping
+set nowrap
+
+" Indenting: automatically indent, and use soft tabs of width 4
 set autoindent
-set smartindent
+set tabstop=4 shiftwidth=4
+set shiftround
 set expandtab
 
-syntax on
-set guifont=Consolas\ 11
-colors fruity
+" Enable line/col position info in status line
+set ruler
 
-function! LoadFileTemplate()
-  silent! 0r ~/.vim/template/%:e.tmpl
-  "syn match vimTemplateMarker "&lt;+.\++&gt;" containedin=ALL
-  "hi vimTemplateMarker guifg=#67a42c guibg=#112300 gui=bold
-endfunction
+" Add line numbers
+set number
 
-" REQUIRED. This makes vim invoke Latex-Suite when you open a tex file.
+" Make vim place back up files in ~/.vim_backup rather than cluttering
+set backup
+set backupdir=~/.vim_backup
+
+" Show matching braces always
+set showmatch
+
+" Assume terminal is of size 80, in case we're editing via SSH
+set textwidth=120
+
+" System bell is pure evil
+set noerrorbells
+
+" Reload vimrc whenever it is edited
+autocmd! bufwritepost vimrc source ~/.vim/vimrc
+
+" have error messages red on white
+highlight ErrorMsg guibg=White guifg=Red
+
+" Uncomment the following lines to turn off backups (since its already in VCS)
+" set nobackup
+" set nowb
+" set noswapfile
+
+" Give a list of basic file types to ignore
+set wildignore=*.dll,*.o,*.obj,*.exe,*.pyc,*.jpg,*.gif,*.png,*.tga,.svn,CVS
+
+" Sexy statusline
+set statusline=%F%m%r%h%w[%L][%{&ff}]%y[%p%%][%04l,%04v]
+"              | | | | |  |   |      |  |     |    |
+"              | | | | |  |   |      |  |     |    + current 
+"              | | | | |  |   |      |  |     |       column
+"              | | | | |  |   |      |  |     +-- current line
+"              | | | | |  |   |      |  +-- current % into file
+"              | | | | |  |   |      +-- current syntax in 
+"              | | | | |  |   |          square brackets
+"              | | | | |  |   +-- current fileformat
+"              | | | | |  +-- number of lines
+"              | | | | +-- preview flag in square brackets
+"              | | | +-- help flag in square brackets
+"              | | +-- readonly flag in square brackets
+"              | +-- rodified flag in square brackets
+"              +-- full path to file in the buffer
+
+" Vim5 and later versions support syntax highlighting. Uncommenting the next
+" line enables syntax highlighting by default.
+set t_Co=256
+
+filetype on
 filetype plugin on
+syntax on
 
-" IMPORTANT: win32 users will need to have 'shellslash' set so that latex
-" can be called correctly.
-set shellslash
+" If using a dark background within the editing area and syntax highlighting
+" turn on this option as well
+set background=dark
+set bg=dark
 
-" IMPORTANT: grep will sometimes skip displaying the file name if you
-" search in a singe file. This will confuse Latex-Suite. Set your grep
-" program to always generate a file-name.
-set grepprg=grep\ -nH\ $*
+" Uncomment the following to have Vim jump to the last position when
+" reopening a file
+if has("autocmd")
+  au BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$")
+    \| exe "normal g'\"" | endif
+endif
 
-" OPTIONAL: This enables automatic indentation as you type.
-filetype indent on
+" Uncomment the following to have Vim load indentation rules according to the
+" detected filetype. Per default Debian Vim only load filetype specific
+" plugins.
+if has("autocmd")
+  filetype indent on
+endif
 
-" OPTIONAL: Starting with Vim 7, the filetype of empty .tex files defaults to
-" 'plaintex' instead of 'tex', which results in vim-latex not being loaded.
-" The following changes the default filetype back to 'tex':
-let g:tex_flavor='latex'
+" The following are commented out as they cause vim to behave a lot
+" differently from regular Vi. They are highly recommended though.
+set showcmd		    " Show (partial) command in status line.
+set showmatch		" Show matching brackets.
+set ignorecase		" Do case insensitive matching
+set smartcase		" Do smart case matching
+set incsearch		" Incremental search
+set autowrite		" Automatically save before commands like :next and :make
+set hidden          " Hide buffers when they are abandoned
+set smartindent
 
-set iskeyword+=:
+map <C-Tab> :tabnext<CR>
 
-function! Mathematica()
-    nmap <F4> :e /Developer/Alpha/Source<CR>
-    nmap <F5> :e /Developer/Alpha/Source/CalculateFormulas/Engineering/<CR>
-    nmap <F6> :e /Developer/Alpha/Source/CalculateData/SupportFunctions<CR>
-    nmap <F7> :e /Developer/Alpha/Source/CalculateScan/FormulaScanner.m<CR>
-endfunction
+" allow <BkSpc> to delete line breaks, start of insertion, and indents 
+set backspace=indent,eol,start      " This fixes it
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Keybindings
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" in normal mode, F2 saves the file
+map <F2> :w<CR>
 
+" in insert mode, F2 exits insert, saves and returns to insert mode
+map <F2> <ESC>:w<CR>i
 
-function! NoMath()
-    unmap <F4> 
-    unmap <F5>
-    unmap <F6>
-endfunction
+" switch between header/source with F4
+map <F4> :e %:p:s,.h$,.X123X,:s,.cpp$,.h,:s,.X123X$,.cpp,<CR>
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Platform specific settings, depending on if we have the GUI running
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+if has("gui_running")
+    " Automatically chdir into the file's directory
+    set autochdir
+    set mouse=a		    " Enable mouse usage (all modes) in terminals
+    set columns=80      " No more, no less
+    colorscheme molokai
 
-nmap <leader>math :call Mathematica()<CR>
-cmap sudow w !sudo tee % > /dev/null
+    " Set a nice font. Note that Consolas isn't available by default on Linux,
+    " but you can easily extract it from Microsoft's PPT installer. Its a nice
+    " font made specifically for programmers!
+    if has("mac")
+        set guifont=Monaco:h10
+    elseif has("unix")
+"        set guifont=Consolas\ 10
+        set guifont=Monospace\ 10
+    elseif has("win32")
+        set guifont=Consolas\ 10
+    endif
+else
+    colorscheme molokai
+endif
 
-"JSON Fix.
-map <leader>jt  <Esc>:%!json_xs -f json -t json-pretty<CR>
-map <leader>xml  <Esc>:%!xmllint --format %<CR>
-
-
-call pathogen#infect()
-
+" Remap apple keys, useful because i always hit apple instead of ctrl
+if has("mac")
+    cmap <D-f> <C-f>
+    cmap <D-b> <C-b>
+endif
