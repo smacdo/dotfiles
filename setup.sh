@@ -15,6 +15,9 @@ ln -s $HOME/bin/.zsh_local
 ln -s $HOME/bin/zsh_functions/generic_functions.zsh  $HOME/bin/.zsh_local/
 ln -s $HOME/bin/zsh_functions/aliases.zsh $HOME/bin/.zsh_local/
 
+echo "Cloning files for oh-my-zsh"
+git clone git://github.com/robbyrussell/oh-my-zsh.git ~/.oh-my-zsh
+
 echo "Creating standard dirs"
 for i in $HOME/projects $HOME/local $HOME/.vim_backup $HOME/.vim_runtime ; do 
    if [ ! -e ${i} ]; then
