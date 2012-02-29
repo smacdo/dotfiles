@@ -271,7 +271,9 @@ endif
 if has("gui_running")
     " Automatically chdir into the file's directory
     set mouse=a		    " Enable mouse usage (all modes) in terminals
-    set columns=80      " No more, no less
+    set lines=36        " A healthy amount, requires a decent gui resolution
+    set columns=88      " Account for column padding
+    set textwidth=80    " No more, or less
     colorscheme molokai
 
     " Set a nice font. Note that Consolas isn't available by default on Linux,
@@ -280,7 +282,8 @@ if has("gui_running")
     if has("mac")
         set guifont=Monaco:h10
     elseif has("unix")
-        set guifont=Ubuntu\ Mono\ 11
+        set guifont=Consolas\ 12
+        "set guifont=Ubuntu\ Mono\ 11
         "set guifont=Liberation\ Mono\ 10
     elseif has("win32")
         set guifont=Consolas\ 10

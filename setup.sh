@@ -49,3 +49,7 @@ cp $bin_dir/fonts/liberation/*.ttf $HOME/.fonts/liberation
 echo "Installing ubuntu fonts..."
 mkdir -pv $HOME/.fonts/ubuntu
 cp $bin_dir/fonts/ubuntu/*.ttf $HOME/.fonts/ubuntu
+
+echo "Installing consola fonts..."
+mkdir -pv $HOME/.fonts/consola
+cp $bin_dir/fonts/consola/*.ttf $HOME/.fonts/consola
