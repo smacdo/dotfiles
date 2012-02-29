@@ -4,6 +4,8 @@
 #  - This script will set up common directories, dot files and other system
 #    settings
 #############################################################################
+bin_dir=$HOME/bin
+
 echo "This script will automatically update your system to use common directories, "
 echo "various dotfiles (zsh, vimrc, etc) and other assorted goodies. "
 echo " "
@@ -15,28 +17,35 @@ then
     exit 1
 fi
 
-exit
+# Create common directories
+echo "Creating common directories..."
 
+mkdir -vp $HOME/.zsh
+mkdir -vp $HOME/.zsh_local
+mkdir -vp $HOME/.vim_runtime/backups
+mkdir -vp $HOME/.vim_runtime/tmp
+mkdir -vp $HOME/projects
 
-rm -frv $HOME/{.zshrc,.aliases,.vim,.vimrc}
-cd $HOME
-ln -s $HOME/bin/.zshrc
-ln -s $HOME/bin/.vim
-ln -s $HOME/bin/.vimrc
-ln -s $HOME/bin/.zsh_local
-ln -s $HOME/bin/zsh_functions/generic_functions.zsh  $HOME/bin/.zsh_local/
-ln -s $HOME/bin/zsh_functions/aliases.zsh $HOME/bin/.zsh_local/
+# Symlink useful dotfiles
+echo "Copying dotfiles..."
 
-echo "Cloning files for oh-my-zsh"
-git clone git://github.com/robbyrussell/oh-my-zsh.git ~/.oh-my-zsh
+rm -i $HOME/.vimrc
+ln -sv $bin_dir/.vimrc $HOME/.vimrc
 
-echo "Creating standard dirs"
-for i in $HOME/projects $HOME/local $HOME/.vim_backup $HOME/.vim_runtime ; do 
-   if [ ! -e ${i} ]; then
-        mkdir $i >& /dev/null
-   fi
-done
+rm -ir $HOME/.vim
+ln -sv $bin_dir/.vim $HOME/.vim
 
-echo "Standard coding projects go in $HOME/projects"
-echo "eclipse code goes in $HOME/workspace"
-echo "any $HOME install goes into $HOME/local and binary is symlinked in $HOME/bin/private"
+rm -i $HOME/.zshrc
+ln -sv $bin_dir/.zshrc $HOME/.zshrc
+
+rm -ir $HOME/.zsh
+ln -sv $bin_dir/zsh_files $HOME/.zsh
+
+# Install fonts
+echo "Installing liberation fonts..."
+mkdir -pv $HOME/.fonts/liberation
+cp $bin_dir/fonts/liberation/*.ttf $HOME/.fonts/liberation
+
+echo "Installing ubuntu fonts..."
+mkdir -pv $HOME/.fonts/ubuntu
+cp $bin_dir/fonts/ubuntu/*.ttf $HOME/.fonts/ubuntu
