@@ -1,6 +1,11 @@
-This is a collection of scripts generic enough that match/setup my environment.
+This is a collection of assorted shell scripts, shell configuration files and
+common application plugins that are replicated across my various linux machines.
 
-checkout this project in $HOME/bin
-then run setup.sh 
+To use:
+    cd ~
+    git clone git://github.com/smacdo/bin-scripts.git bin
+    cd bin
+    ./setup.sh
 
-
+Feel free to contribute ideas and suggestions, or fork this project so it suits
+your needs.

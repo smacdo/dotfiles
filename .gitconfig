@@ -1,0 +1,44 @@
+[user]
+	name = Scott MacDonald
+    email = scott@whitespaceconsideredharmful.com
+
+[core]
+    excludesfile = ~/.gitignore
+    # Two space tabs plz
+    pager = less -FXRS -x2
+
+[push]
+    # git push should only apply to the current branch
+    default = current
+
+[diff]
+    renames = copies
+    mnemonicprefix = true
+
+[color]
+    # make sure color is turned on
+    diff = auto
+    status = auto
+    branch = auto
+    interactive = auto
+    ui = auto
+
+[color "branch"]
+    current = green bold
+    local = blue
+    remote = red bold
+
+[color "diff"]
+    meta = yellow bold
+    frag = magent bold
+    old = red bold
+    new = green bold
+
+[color "status"]
+    added = green bold
+    changed = yellow bold
+    untracked = red
+
+[color "sh"]
+    branch = yellow
+
