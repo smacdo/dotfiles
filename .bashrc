@@ -1,13 +1,26 @@
-# ~/.bashrc: executed by bash(1) for non-login shells.
-# see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
-# for examples
-
+#############################################################################
+# Scott's .bashrc                                                           #
+# ---------------                                                           #
+#   Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>     #
+#   Version   : 1.0                                                         #
+#############################################################################
 # If not running interactively, don't do anything
 [ -z "$PS1" ] && return
 
-# don't put duplicate lines in the history. See bash(1) for more options
-# ... or force ignoredups and ignorespace
-HISTCONTROL=ignoredups:ignorespace
+# Complete hostnames using this file
+export HOSTFILE=~/.ssh/known_hosts
+
+# Readline config
+export INPUTRC=~/.inputrc
+
+# Finally, freedom from the "you have new mail" notification!
+unset MAILCHECK
+
+# List of file types to ignore
+FIGNORE="~:CVS:#:.pyc:.swp:.swa:.o"
+
+# Use a man's editor
+export EDITOR=vim
 
 # append to the history file, don't overwrite it
 shopt -s histappend

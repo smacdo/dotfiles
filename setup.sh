@@ -50,6 +50,9 @@ ln -sv $bin_dir/zsh_files $HOME/.zsh
 rm -i $HOME/.dircolors
 ln -sv $bin_dir/.dircolors $HOME/.dircolors
 
+rm -i $HOME/.inputrc
+ln -sv $bin_dir/.inputrc $HOME/.inputrc
+
 # Install fonts
 echo "Installing liberation fonts..."
 mkdir -pv $HOME/.fonts/liberation

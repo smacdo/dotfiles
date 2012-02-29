@@ -1,18 +1,30 @@
+#############################################################################
+# Scott's zshrc                                                             #
+# -------------                                                             #
+#    Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>    #
+#    Version   : 1.0                                                        #
+#############################################################################
+# Our default is always, and will always, be vi
+export EDITOR=vim
+
+# Make sure we can store a decent amount of history lines
+HISTSIZE=2000
+SAVEHIST=2000
+HISTFILE=~/.history
+setopt APPEND_HISTORY
+
+# Load all extra zsh modules
+for file in ~/.zsh/*.zsh; do
+    . $file
+done
+
 # Path to your oh-my-zsh configuration.
-ZSH=$HOME/.oh-my-zsh
-
-plugins=(git)
-
-source $ZSH/oh-my-zsh.sh
-
 autoload -U compinit promptinit compinit
 promptinit
 setopt COMPLETE_IN_WORD
 
 prompt zefram
 autoload -U colors && colors
-#export RPROMPT="%{$fg[red]%}%m:%{$fg[green]%}%~ %{$reset_color%}%"
-#export PS1='%n %{$fg[yellow]%}%D{%H:%M.%S} %{$reset_color%}% %! %%> '
 function prompt_char {
     git branch >/dev/null 2>/dev/null && echo '±' && return
     hg root >/dev/null 2>/dev/null && echo '☿' && return
@@ -86,11 +98,6 @@ alias -g .....='../../../..'
 alias -g BR='>& /dev/null &|'
 
 setopt EXTENDED_GLOB
-for file in ~/.zsh_local/*.zsh; do
-      . $file
-  done
-#source ~/.zsh_local/*.zsh
-#source ~/.zsh.d/*.zsh
 export PATH=$PATH:$HOME/bin/private
 
 ## vim mode
