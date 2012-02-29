@@ -1,118 +1,136 @@
-" Scott's custom .vimrc file
-" ---------------------------------------------------------------------
-" Custom Command List
-" --------------------
-"
-"
-" ---------------------------------------------------------------------
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Scott's .vimrc                                                          "
+" --------------                                                          "
+"   Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>   "
+"   Version: 2.0                                                          "
+"                                                                         "
+" ----------------------------------------------------------------------- "
+" Custom Command List                                                     "
+" --------------------                                                    "
+"                                                                         "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " This line should not be removed as it ensures that various options are
 " properly set to work with the Vim-related packages available in Debian.
 runtime! debian.vim
-
-" Use UTF-8 encoding by default
-"  (turn this off if we get weird file saving)
-set enc=utf-8
-set fenc=utf-8
-set termencoding=utf-8
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" File type specific settings
-"  (eg special settings for java files vs makefiles)
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-autocmd FileType c,cpp,h,hpp,slang set cindent
-autocmd FileType java set formatoptions=croql cindent nowrap nofoldenable
-autocmd FileType c    set formatoptions+=ro smartindent
-autocmd FileType perl set smartindent
-autocmd FileType css  set smartindent
-autocmd FileType html set formatoptions+=tl
-autocmd FileType html,css set noexpandtab tabstop=4
-autocmd FileType make set noexpandtab shiftwidth=4
-
-" Python autoindent
-autocmd BufRead *.py set smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class
-
-" Special file types not normally detected set here
-autocmd! BufRead,BufNewFile *.ics setfiletype icalendar
-
-" Shaders
-au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf glsl
-
-" SCons
-au BufNewFile,BufRead SCons* setf python
-
-" In text and LaTeX files, always limit the width of text to 76
-" characters.  Also perform logical wrapping/indenting.
-autocmd BufRead *.txt set tw=76 formatoptions=tcroqn2l
-autocmd BufRead *.tex set tw=76
-
-" Don't expand tabs to spaces in Makefiles
-au BufEnter [Mm]akefile* set noet
-au BufLeave [Mm]akefile* set et
-
-" YAML
-augroup yamlfiles
-  autocmd filetype yaml setlocal   autoindent
-  autocmd filetype yaml setlocal   expandtab
-  autocmd filetype yaml setlocal noignorecase
-  autocmd filetype yaml setlocal   shiftround
-  autocmd filetype yaml setlocal   shiftwidth=4
-  autocmd filetype yaml setlocal   smartindent
-  autocmd filetype yaml setlocal   softtabstop=4
-  autocmd filetype yaml setlocal   tabstop=4
-  autocmd filetype yaml setlocal   textwidth=0
-augroup END
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Misc custom settings
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" We don't need vi compat, since it only emulates old _bugs_
 set nocompatible
 
-" History mode
-set history=1024
-set wildmode=list:longest,full
-
-" Use [RO] instead of [readonly]
-set shortmess+=r
-
-" Disable line wrapping
-set nowrap
-
-" Indenting: automatically indent, and use soft tabs of width 4
-set autoindent
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Basic editor settings                                               "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" By default, enable soft tabs which cause \t to expand to four characters
 set tabstop=4 shiftwidth=4
 set shiftround
 set expandtab
+set autoindent
+set smartindent
 
-" Enable line/col position info in status line
-set ruler
+" Automatically switches to the directory that the document is in
+autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
+"set autochdir          " has some CLI weirdness
 
-" Add line numbers
-set number
+" Make backspace act as expected on some weirdly configured platforms
+set backspace=eol,start,indent
 
-" Make vim place back up files in ~/.vim_backup rather than cluttering
-set backup
-set backupdir=~/.vim_backup
+" Enables/disables vim's autopaste ability, which allows us to paste code
+" without having obnoxious indenting applied to it
+nnoremap <F2> :set invpaste paste?<CR>
+set pastetoggle=<F2>
+set showmode
 
-" Show matching braces always
-set showmatch
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Enhanced status line                                                    "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Recalculate the trailing whitespace warning when idle, and after saving
+autocmd cursorhold,bufwritepost * unlet! b:statusline_trailing_space_warning
 
-" Assume terminal is of size 80, in case we're editing via SSH
-set textwidth=120
+" Recalculate the tab warning flag when idle and after writing
+autocmd cursorhold,bufwritepost * unlet! b:statusline_tab_warning
 
-" System bell is pure evil
-set noerrorbells
+" Recalculate the long line warning when idle and after saving
+autocmd cursorhold,bufwritepost * unlet! b:statusline_long_line_warning
 
-" Reload vimrc whenever it is edited
-autocmd! bufwritepost vimrc source ~/.vim/vimrc
+"statusline setup
+set statusline=%f "tail of the filename
+
+"display a warning if fileformat isnt unix
+set statusline+=%#warningmsg#
+set statusline+=%{&ff!='unix'?'['.&ff.']':''}
+set statusline+=%*
+
+"display a warning if file encoding isnt utf-8
+set statusline+=%#warningmsg#
+set statusline+=%{(&fenc!='utf-8'&&&fenc!='')?'['.&fenc.']':''}
+set statusline+=%*
+
+set statusline+=%h "help file flag
+set statusline+=%y "filetype
+set statusline+=%r "read only flag
+set statusline+=%m "modified flag
+
+"display a warning if &et is wrong, or we have mixed-indenting
+set statusline+=%#error#
+set statusline+=%{StatuslineTabWarning()}
+set statusline+=%*
+
+set statusline+=%{StatuslineTrailingSpaceWarning()}
+
+set statusline+=%{StatuslineLongLineWarning()}
+
+set statusline+=%#warningmsg#
+set statusline+=%{SyntasticStatuslineFlag()}
+set statusline+=%*
+
+"display a warning if &paste is set
+set statusline+=%#error#
+set statusline+=%{&paste?'[paste]':''}
+set statusline+=%*
+
+set statusline+=%= "left/right separator
+
+function! SlSpace()
+    if exists("*GetSpaceMovement")
+        return "[" . GetSpaceMovement() . "]"
+    else
+        return ""
+    endif
+endfunc
+set statusline+=%{SlSpace()}
+
+
+set statusline+=%{StatuslineCurrentHighlight()}\ \ "current highlight
+set statusline+=%c, "cursor column
+set statusline+=%l/%L "cursor line/total lines
+set statusline+=\ %P "percent through file
+set laststatus=2
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" User interface settings                                                 "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+set history=1024                    " History shows 1024 entries
+set wildmode=list:longest,full
+set shortmess+=r                    " Use [RO] instead of [readonly]
+set nowrap                          " Disable auto line wrapping
+set ruler                           " Show line/col pos in status line
+set number                          " Display line numbers in left col
+set showmatch                       " Always show matching brace under cursor
+set noerrorbells                    " System bell is pure evil
+set background=dark                 " Set dark background for colors
+set bg=dark                         " Set dark background for colors
+set autoread                        " Set readonly when file is external mod
+
+
+" The following are commented out as they cause vim to behave a lot
+" differently from regular Vi. They are highly recommended though.
+set showcmd		    " Show (partial) command in status line.
+set ignorecase		" Do case insensitive matching
+set smartcase		" Do smart case matching
+set incsearch		" Incremental search
+set autowrite		" Automatically save before commands like :next and :make
+set hidden          " Hide buffers when they are abandoned
 
 " have error messages red on white
 highlight ErrorMsg guibg=White guifg=Red
 
-" Uncomment the following lines to turn off backups (since its already in VCS)
-" set nobackup
-" set nowb
-" set noswapfile
 
 " Give a list of basic file types to ignore
 set wildignore=*.dll,*.o,*.obj,*.exe,*.pyc,*.jpg,*.gif,*.png,*.tga,.svn,CVS
@@ -134,19 +152,6 @@ set statusline=%F%m%r%h%w[%L][%{&ff}]%y[%p%%][%04l,%04v]
 "              | +-- rodified flag in square brackets
 "              +-- full path to file in the buffer
 
-" Vim5 and later versions support syntax highlighting. Uncommenting the next
-" line enables syntax highlighting by default.
-set t_Co=256
-
-filetype on
-filetype plugin on
-syntax on
-
-" If using a dark background within the editing area and syntax highlighting
-" turn on this option as well
-set background=dark
-set bg=dark
-
 " Uncomment the following to have Vim jump to the last position when
 " reopening a file
 if has("autocmd")
@@ -154,47 +159,117 @@ if has("autocmd")
     \| exe "normal g'\"" | endif
 endif
 
-" Uncomment the following to have Vim load indentation rules according to the
-" detected filetype. Per default Debian Vim only load filetype specific
-" plugins.
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" File back up settings                                                    "
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Make vim place back up files in ~/.vim_backup rather than cluttering
+set backup
+set backupdir=~/.vim_runtime/backups
+
+" Uncomment the following lines to if you want to turn off back up support
+" set nobackup
+" set nowb
+" set noswapfile
+
+" Persistent undo
+try
+    if MySys() == "windows"
+        set undodir=C:\Windows\Temp
+    else
+        set undodir=~/.vim_runtime/undo
+    endif
+
+    set undofile
+catch
+endtry
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Misc settings                                                           "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Reload vimrc whenever it is edited
+autocmd! bufwritepost vimrc source ~/.vim/vimrc
+
+" Directory for .swp files
+set directory=~/.vim_runtime/tmp
+
+" If using a dark background within the editing area and syntax highlighting
+" turn on this option as well
+set background=dark
+set bg=dark
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Custom command mappings                                                 "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+map <C-Tab> :tabnext<CR>
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" File-type specific rules and settings                                   "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Vim5 and later versions support syntax highlighting. Uncommenting the next
+" line enables syntax highlighting by default.
+filetype on
+filetype plugin on
+syntax on
+
+" Instructs vim to load indentation rules according to the detected file type
 if has("autocmd")
   filetype indent on
 endif
 
-" The following are commented out as they cause vim to behave a lot
-" differently from regular Vi. They are highly recommended though.
-set showcmd		    " Show (partial) command in status line.
-set showmatch		" Show matching brackets.
-set ignorecase		" Do case insensitive matching
-set smartcase		" Do smart case matching
-set incsearch		" Incremental search
-set autowrite		" Automatically save before commands like :next and :make
-set hidden          " Hide buffers when they are abandoned
-set smartindent
+" Special settings for specific file types
+autocmd FileType c,cpp,h,hpp,slang set cindent
+autocmd FileType java set formatoptions=croql cindent nowrap nofoldenable
+autocmd FileType c    set formatoptions+=ro
+autocmd FileType perl set smartindent
+autocmd FileType css  set smartindent
+autocmd FileType html set formatoptions+=tl
+autocmd FileType html,css set noexpandtab tabstop=4
+autocmd FileType make set noexpandtab shiftwidth=4
 
-map <C-Tab> :tabnext<CR>
+" iCalendar file type
+autocmd! BufRead,BufNewFile *.ics setfiletype icalendar
 
-" allow <BkSpc> to delete line breaks, start of insertion, and indents 
-set backspace=indent,eol,start      " This fixes it
+" Shader file types
+au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf glsl
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Keybindings
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" in normal mode, F2 saves the file
-map <F2> :w<CR>
+" Match doxygen todo
+match Todo /@todo/
 
-" in insert mode, F2 exits insert, saves and returns to insert mode
-map <F2> <ESC>:w<CR>i
+" In text and LaTeX files, always limit the width of text to 76
+" characters.  Also perform logical wrapping/indenting.
+autocmd BufRead *.txt set tw=76 formatoptions=tcroqn2l
+autocmd BufRead *.tex set tw=76
 
-" switch between header/source with F4
-map <F4> :e %:p:s,.h$,.X123X,:s,.cpp$,.h,:s,.X123X$,.cpp,<CR>
+" Don't expand tabs to spaces in Makefiles
+au BufEnter [Mm]akefile* set noet
+au BufLeave [Mm]akefile* set et
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Python specific options                                                 "
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+au FileType python set nocident
+au FileType python syn keyword pythonDecorator True None False self
+
+"Delete trailing white space, useful for Python ;)
+func! DeleteTrailingWS()
+  exe "normal mz"
+  %s/\s\+$//ge
+  exe "normal `z"
+endfunc
+autocmd BufWrite *.py :call DeleteTrailingWS()
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Platform specific settings, depending on if we have the GUI running
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+if has("mac")
+    set shell=/bin/bash
+elseif has("linux")
+    set shell=/bin/bash
+endif
+
 if has("gui_running")
     " Automatically chdir into the file's directory
-    set autochdir
     set mouse=a		    " Enable mouse usage (all modes) in terminals
     set columns=80      " No more, no less
     colorscheme molokai
@@ -205,8 +280,7 @@ if has("gui_running")
     if has("mac")
         set guifont=Monaco:h10
     elseif has("unix")
-"        set guifont=Consolas\ 10
-        set guifont=Monospace\ 10
+        set guifont=Consolas\ 10
     elseif has("win32")
         set guifont=Consolas\ 10
     endif
@@ -219,3 +293,123 @@ if has("mac")
     cmap <D-f> <C-f>
     cmap <D-b> <C-b>
 endif
+
+
+
+
+
+"return '[\s]' if trailing white space is detected
+"return '' otherwise
+function! StatuslineTrailingSpaceWarning()
+    if !exists("b:statusline_trailing_space_warning")
+
+        if !&modifiable
+            let b:statusline_trailing_space_warning = ''
+            return b:statusline_trailing_space_warning
+        endif
+
+        if search('\s\+$', 'nw') != 0
+            let b:statusline_trailing_space_warning = '[\s]'
+        else
+            let b:statusline_trailing_space_warning = ''
+        endif
+    endif
+    return b:statusline_trailing_space_warning
+endfunction
+
+"return the syntax highlight group under the cursor ''
+function! StatuslineCurrentHighlight()
+    let name = synIDattr(synID(line('.'),col('.'),1),'name')
+    if name == ''
+        return ''
+    else
+        return '[' . name . ']'
+    endif
+endfunction
+
+"return '[&et]' if &et is set wrong
+"return '[mixed-indenting]' if spaces and tabs are used to indent
+"return an empty string if everything is fine
+function! StatuslineTabWarning()
+    if !exists("b:statusline_tab_warning")
+        let b:statusline_tab_warning = ''
+
+        if !&modifiable
+            return b:statusline_tab_warning
+        endif
+
+        let tabs = search('^\t', 'nw') != 0
+
+        "find spaces that arent used as alignment in the first indent column
+        let spaces = search('^ \{' . &ts . ',}[^\t]', 'nw') != 0
+
+        if tabs && spaces
+            let b:statusline_tab_warning = '[mixed-indenting]'
+        elseif (spaces && !&et) || (tabs && &et)
+            let b:statusline_tab_warning = '[&et]'
+        endif
+    endif
+    return b:statusline_tab_warning
+endfunction
+
+"return a warning for "long lines" where "long" is either &textwidth or 80 (if
+"no &textwidth is set)
+"
+"return '' if no long lines
+"return '[#x,my,$z] if long lines are found, were x is the number of long
+"lines, y is the median length of the long lines and z is the length of the
+"longest line
+function! StatuslineLongLineWarning()
+    if !exists("b:statusline_long_line_warning")
+
+        if !&modifiable
+            let b:statusline_long_line_warning = ''
+            return b:statusline_long_line_warning
+        endif
+
+        let long_line_lens = s:LongLines()
+
+        if len(long_line_lens) > 0
+            let b:statusline_long_line_warning = "[" .
+                        \ '#' . len(long_line_lens) . "," .
+                        \ 'm' . s:Median(long_line_lens) . "," .
+                        \ '$' . max(long_line_lens) . "]"
+        else
+            let b:statusline_long_line_warning = ""
+        endif
+    endif
+    return b:statusline_long_line_warning
+endfunction
+
+"return a list containing the lengths of the long lines in this buffer
+function! s:LongLines()
+    let threshold = (&tw ? &tw : 80)
+    let spaces = repeat(" ", &ts)
+
+    let long_line_lens = []
+
+    let i = 1
+    while i <= line("$")
+        let len = strlen(substitute(getline(i), '\t', spaces, 'g'))
+        if len > threshold
+            call add(long_line_lens, len)
+        endif
+        let i += 1
+    endwhile
+
+    return long_line_lens
+endfunction
+
+"find the median of the given array of numbers
+function! s:Median(nums)
+    let nums = sort(a:nums)
+    let l = len(nums)
+
+    if l % 2 == 1
+        let i = (l-1) / 2
+        return nums[i]
+    else
+        return (nums[l/2] + nums[(l/2)-1]) / 2
+    endif
+endfunction
+
