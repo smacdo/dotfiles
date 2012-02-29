@@ -280,7 +280,8 @@ if has("gui_running")
     if has("mac")
         set guifont=Monaco:h10
     elseif has("unix")
-        set guifont=Consolas\ 10
+        set guifont=Ubuntu\ Mono\ 11
+        "set guifont=Liberation\ Mono\ 10
     elseif has("win32")
         set guifont=Consolas\ 10
     endif
