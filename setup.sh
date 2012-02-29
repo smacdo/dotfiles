@@ -30,28 +30,28 @@ mkdir -vp $HOME/projects
 echo "Copying dotfiles..."
 
 rm -i $HOME/.vimrc
-ln -sv $bin_dir/.vimrc $HOME/.vimrc
+ln -sv $bin_dir/.vimrc $HOME
 
 rm -ir $HOME/.vim
-ln -sv $bin_dir/.vim $HOME/.vim
+ln -sv $bin_dir/.vim $HOME
 
 rm -i $HOME/.bash_profile
-ln -sv $bin_dir/.bash_profile $HOME/.bash_profile
+ln -sv $bin_dir/.bash_profile $HOME
 
 rm -i $HOME/.bashrc
-ln -sv $bin_dir/.bashrc $HOME/.bashrc
+ln -sv $bin_dir/.bashrc $HOME
 
 rm -i $HOME/.zshrc
-ln -sv $bin_dir/.zshrc $HOME/.zshrc
+ln -sv $bin_dir/.zshrc $HOME
 
 rm -ir $HOME/.zsh
-ln -sv $bin_dir/zsh_files $HOME/.zsh
+ln -sv $bin_dir/zsh_files $HOME
 
 rm -i $HOME/.dircolors
-ln -sv $bin_dir/.dircolors $HOME/.dircolors
+ln -sv $bin_dir/.dircolors $HOME
 
 rm -i $HOME/.inputrc
-ln -sv $bin_dir/.inputrc $HOME/.inputrc
+ln -sv $bin_dir/.inputrc $HOME
 
 # Install fonts
 echo "Installing liberation fonts..."
