@@ -35,11 +35,20 @@ ln -sv $bin_dir/.vimrc $HOME/.vimrc
 rm -ir $HOME/.vim
 ln -sv $bin_dir/.vim $HOME/.vim
 
+rm -i $HOME/.bash_profile
+ln -sv $bin_dir/.bash_profile $HOME/.bash_profile
+
+rm -i $HOME/.bashrc
+ln -sv $bin_dir/.bashrc $HOME/.bashrc
+
 rm -i $HOME/.zshrc
 ln -sv $bin_dir/.zshrc $HOME/.zshrc
 
 rm -ir $HOME/.zsh
 ln -sv $bin_dir/zsh_files $HOME/.zsh
+
+rm -i $HOME/.dircolors
+ln -sv $bin_dir/.dircolors $HOME/.dircolors
 
 # Install fonts
 echo "Installing liberation fonts..."
