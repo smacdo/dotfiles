@@ -20,7 +20,6 @@ fi
 # Create common directories
 echo "Creating common directories..."
 
-mkdir -vp $HOME/.zsh
 mkdir -vp $HOME/.zsh_local
 mkdir -vp $HOME/.vim_runtime/backups
 mkdir -vp $HOME/.vim_runtime/tmp
@@ -45,7 +44,7 @@ rm -i $HOME/.zshrc
 ln -sv $bin_dir/.zshrc $HOME
 
 rm -ir $HOME/.zsh
-ln -sv $bin_dir/zsh_files $HOME
+ln -sv -T $bin_dir/zsh_files $HOME/.zsh
 
 rm -i $HOME/.dircolors
 ln -sv $bin_dir/.dircolors $HOME

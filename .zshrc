@@ -28,7 +28,7 @@ autoload -U colors && colors
 function prompt_char {
     git branch >/dev/null 2>/dev/null && echo '%%' && return
     hg root >/dev/null 2>/dev/null && echo '^' && return
-    echo '\$'
+    echo '$'
 }
 
 ZSH_THEME_GIT_PROMPT_PREFIX="%{$fg[magenta]%}"

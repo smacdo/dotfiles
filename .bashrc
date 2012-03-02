@@ -4,6 +4,11 @@
 #   Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>     #
 #   Version   : 1.0                                                         #
 #############################################################################
+# Notes                                                                     #
+# ---------------                                                           #
+#   If your shell is not displaying a colored prompt, make sure it is set   #
+#   to identify itself as xterm-color                                       #
+#############################################################################
 # If not running interactively, don't do anything
 [ -z "$PS1" ] && return
 
@@ -29,6 +34,23 @@ shopt -s histappend
 HISTSIZE=1000
 HISTFILESIZE=2000
 
+# Aliases
+alias diff='colordiff'
+alias grep='grep --color=auto'
+alias more='less'
+alias df='df -h'
+alias du='du -c -h'
+alias ping='ping -c 5'
+
+alias openports='netstat --all --numeric --programs --inet --inet6'
+alias ll='ls -al'
+alias l='ls'
+
+# Safety
+alias rm='rm -I'
+alias mv='mv -i'
+alias cp='cp -i'
+
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
 shopt -s checkwinsize
@@ -43,6 +65,7 @@ fi
 
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "$TERM" in
+    xterm) color_prompt=yes;;
     xterm-color) color_prompt=yes;;
 esac
 
@@ -63,7 +86,7 @@ if [ -n "$force_color_prompt" ]; then
 fi
 
 if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[00;35m\]\u\[\033[00m\]@\[\033[00;33m\]\h\[\033[00m\]:\[\033[00;32m\]\w\[\033[00m\]\$ '
 else
     PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
