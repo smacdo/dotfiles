@@ -14,6 +14,11 @@ HISTFILE=~/.history
 setopt APPEND_HISTORY
 
 # Load all extra zsh modules
+for file in ~/.zsh/*.zsh; do
+    . $file
+done
+
+# Load local zsh modules
 for file in ~/.zsh_local/*.zsh; do
     . $file
 done
