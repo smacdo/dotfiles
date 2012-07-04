@@ -105,4 +105,9 @@ autoload -Uz edit-command-line
 zle -N edit-command-line 
 bindkey -M vicmd 'v' edit-command-line
 
+# Load any local system zsh settings
+for file in ~/.zsh_local/*.zsh; do
+    . $file
+done
+
 
