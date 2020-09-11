@@ -1,13 +1,5 @@
 #############################################################################
 # Scott's .bashrc                                                           #
-# ---------------                                                           #
-#   Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>     #
-#   Version   : 1.0                                                         #
-#############################################################################
-# Notes                                                                     #
-# ---------------                                                           #
-#   If your shell is not displaying a colored prompt, make sure it is set   #
-#   to identify itself as xterm-color                                       #
 #############################################################################
 # If not running interactively, don't do anything
 [ -z "$PS1" ] && return
