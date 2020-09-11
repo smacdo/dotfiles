@@ -1,3 +1,6 @@
+#############################################################################
+# Scott's zshrc                                                             #
+#############################################################################
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -5,12 +8,6 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-#############################################################################
-# Scott's zshrc                                                             #
-# -------------                                                             #
-#    Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>    #
-#    Version   : 1.0                                                        #
-#############################################################################
 # Our default is always, and will always, be vi
 export EDITOR=vim
 
@@ -51,7 +48,7 @@ autoload -Uz promptinit
 promptinit
 
 zstyle ':completion:*' group-name ''
-zstyle ':completion:*' list-colors ''
+zstyle ':completion:*' list-colors '${(s.:.)LS_COLORS}'
 zstyle ':completion:*' list-prompt %SAt %p: Hit TAB for more, or the character to insert%s
 
 # message formatting
