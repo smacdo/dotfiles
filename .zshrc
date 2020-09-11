@@ -1,3 +1,10 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 #############################################################################
 # Scott's zshrc                                                             #
 # -------------                                                             #
@@ -43,10 +50,6 @@ setopt COMPLETE_ALIASES # autocompletion of cli switches for aliases
 autoload -Uz promptinit
 promptinit
 
-prompt redhat
-bindkey -v  # use vi-style command line editing
-stty -ixon  # disable ^S/^Q (XON/XOFF) flow control
-
 zstyle ':completion:*' group-name ''
 zstyle ':completion:*' list-colors ''
 zstyle ':completion:*' list-prompt %SAt %p: Hit TAB for more, or the character to insert%s
@@ -74,3 +77,9 @@ setopt no_beep               # disable beep on all errors
 setopt EXTENDED_GLOB
 setopt CORRECT_ALL # Suggest corrections to mistyped commands and paths.
 setopt NOMATCH # Turn errors back on for empty globbing with init finished.
+
+# Use the powerlevel10k zsh theme.
+source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
