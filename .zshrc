@@ -7,11 +7,19 @@
 # Our default is always, and will always, be vi
 export EDITOR=vim
 
+# Give me colors on the terminal
+export CLICOLOR=1
+
 # Make sure we can store a decent amount of history lines
 HISTSIZE=2000
 SAVEHIST=2000
-HISTFILE=~/.history
-setopt APPEND_HISTORY
+HISTFILE=~/.zsh_history
+
+setopt SHARE_HISTORY      # Share history across multiple zsh sessions.
+setopt APPEND_HISTORY     # Append to history file instead of overwriting.
+setopt INC_APPEND_HISTORY # Update history after every command.
+setopt HIST_FIND_NO_DUPS  # Ignore duplicates when searching
+setopt HIST_REDUCE_BLANKS # Remove blank lines from history.
 
 # Load all extra zsh modules
 for file in ~/.zsh/*.zsh; do
@@ -19,33 +27,23 @@ for file in ~/.zsh/*.zsh; do
 done
 
 # Load local zsh modules
+setopt null_glob
+
 for file in ~/.zsh_local/*.zsh; do
     . $file
 done
 
-# Path to your oh-my-zsh configuration.
-autoload -U compinit promptinit compinit
+# Load the tab autocompletion system
+autoload -Uz compinit
+compinit
+
+setopt COMPLETE_ALIASES # autocompletion of cli switches for aliases
+
+# 
+autoload -Uz promptinit
 promptinit
-setopt COMPLETE_IN_WORD
 
-prompt zefram
-autoload -U colors && colors
-function prompt_char {
-    git branch >/dev/null 2>/dev/null && echo '%%' && return
-    hg root >/dev/null 2>/dev/null && echo '^' && return
-    echo '$'
-}
-
-ZSH_THEME_GIT_PROMPT_PREFIX="%{$fg[magenta]%}"
-ZSH_THEME_GIT_PROMPT_SUFFIX="%{$reset_color%}"
-ZSH_THEME_GIT_PROMPT_DIRTY="%{$fg[green]%}!"
-ZSH_THEME_GIT_PROMPT_UNTRACKED="%{$fg[green]%}?"
-ZSH_THEME_GIT_PROMPT_CLEAN=""
-
-
-export PROMPT='%{$fg[magenta]%}%n%{$reset_color%}@%{$fg[yellow]%}%m%{$reset_color%}:%{$fg_bold[green]%}${PWD/#$HOME/~}%{$reset_color%} $(prompt_char) '
-export RPROMPT=' $(git_prompt_info) '
-
+prompt redhat
 bindkey -v  # use vi-style command line editing
 stty -ixon  # disable ^S/^Q (XON/XOFF) flow control
 
@@ -68,51 +66,11 @@ zstyle ':completion:*' cache-path ${HOME}/.zsh_cache
 # case-insensitive completion (uppercase from lowercase & underscores from dashes)
 zstyle ':completion:*' matcher-list 'm:{a-z-}={A-Z_}'
 
-# initialize the tab completion system
-autoload -Uz compinit
-compinit
-
 # enable powerful pattern-based renaming
 autoload zmv
 
-
 setopt autocd                # change to a diretory if typed alone
 setopt no_beep               # disable beep on all errors
-alias grep='grep --color=auto'  # show the matching string in color
-
-# web cat
-[[ -x $(which wget) ]] && alias wcat='wget -q -O - '
-
-# ssh and start a screen session on the remote server
-function sshs {
-	if [[ -z $* ]]; then
-		echo 'Usage: sshs [options] [user@]hostname'
-		echo 'SSH and automatically start a GNU screen session on the remote server'
-	else
-		ssh -t $* screen -DRU
-	fi
-}
-
-
-export GDK_NATIVE_WINDOWS=true  ##eclipse bug.
-
-##### Global Aliases
-alias -g ...='../..'
-alias -g ....='../../..'
-alias -g .....='../../../..'
-alias -g BR='>& /dev/null &|'
-
 setopt EXTENDED_GLOB
-export PATH=$PATH:$HOME/bin/private
-
-## vim mode
-autoload -Uz edit-command-line
-zle -N edit-command-line 
-bindkey -M vicmd 'v' edit-command-line
-
-# Load any local system zsh settings
-for file in ~/.zsh_local/*.zsh; do
-    . $file
-done
-
-
+setopt CORRECT_ALL # Suggest corrections to mistyped commands and paths.
+setopt NOMATCH # Turn errors back on for empty globbing with init finished.

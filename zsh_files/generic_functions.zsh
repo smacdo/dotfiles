@@ -1,3 +1,13 @@
+# ssh and start a screen session on the remote server
+function sshs {
+	if [[ -z $* ]]; then
+		echo 'Usage: sshs [options] [user@]hostname'
+		echo 'SSH and automatically start a GNU screen session on the remote server'
+	else
+		ssh -t $* screen -DRU
+	fi
+}
+
 ##single path operation, lets me add/restore a single extra path.
 addPath()
 {

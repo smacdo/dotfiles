@@ -1,9 +1,5 @@
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Scott's .vimrc                                                          "
-" --------------                                                          "
-"   Maintainer: Scott MacDonald <scott@whitespaceconsideredharmful.com>   "
-"   Version: 2.0                                                          "
-"                                                                         "
 " ----------------------------------------------------------------------- "
 " Custom Command List                                                     "
 " --------------------                                                    "
@@ -17,12 +13,14 @@ set nocompatible
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Basic editor settings                                               "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" By default, enable soft tabs which cause \t to expand to four characters
-set tabstop=4 shiftwidth=4
-set shiftround
-set expandtab
-set autoindent
-set smartindent
+set tabstop=4     " Tabs are 4 characters.
+set shiftwidth=4  " Automaticaly indent 4 characters.
+set softtabstop=4 " Treat 4 spaces as a tab when deleting. 
+set shiftround    " Round indent to multiple of shiftwidth ('>', '<').
+set expandtab     " Use spaces instead of hard tab (\t).
+set autoindent    " Copy indent from current line when starting new line.
+set smartindent   " Use smart auto indenting for c like languages.
+set textwidth=100 " Maximum width of text that is being inserted before being broken up.
 
 " Automatically switches to the directory that the document is in
 autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
@@ -52,7 +50,7 @@ autocmd cursorhold,bufwritepost * unlet! b:statusline_long_line_warning
 "statusline setup
 set statusline=%f "tail of the filename
 
-"display a warning if fileformat isnt unix
+"display a warning if file format isnt unix
 set statusline+=%#warningmsg#
 set statusline+=%{&ff!='unix'?'['.&ff.']':''}
 set statusline+=%*
@@ -108,16 +106,14 @@ set laststatus=2
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 set history=1024                    " History shows 1024 entries
 set wildmode=list:longest,full
-set shortmess+=r                    " Use [RO] instead of [readonly]
 set nowrap                          " Disable auto line wrapping
 set ruler                           " Show line/col pos in status line
-set number                          " Display line numbers in left col
+set number                          " Display line numbers in left column.
 set showmatch                       " Always show matching brace under cursor
 set noerrorbells                    " System bell is pure evil
 set background=dark                 " Set dark background for colors
 set bg=dark                         " Set dark background for colors
 set autoread                        " Set readonly when file is external mod
-
 
 " The following are commented out as they cause vim to behave a lot
 " differently from regular Vi. They are highly recommended though.
@@ -130,7 +126,6 @@ set hidden          " Hide buffers when they are abandoned
 
 " have error messages red on white
 highlight ErrorMsg guibg=White guifg=Red
-
 
 " Give a list of basic file types to ignore
 set wildignore=*.dll,*.o,*.obj,*.exe,*.pyc,*.jpg,*.gif,*.png,*.tga,.svn,CVS
@@ -149,7 +144,7 @@ set statusline=%F%m%r%h%w[%L][%{&ff}]%y[%p%%][%04l,%04v]
 "              | | | | +-- preview flag in square brackets
 "              | | | +-- help flag in square brackets
 "              | | +-- readonly flag in square brackets
-"              | +-- rodified flag in square brackets
+"              | +-- modified flag in square brackets
 "              +-- full path to file in the buffer
 
 " Uncomment the following to have Vim jump to the last position when
@@ -202,15 +197,15 @@ set bg=dark
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 map <C-Tab> :tabnext<CR>
 
-
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " File-type specific rules and settings                                   "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Vim5 and later versions support syntax highlighting. Uncommenting the next
 " line enables syntax highlighting by default.
-filetype on
-filetype plugin on
 syntax on
+set filetype=on
+filetype plugin on
+filetype indent on
 
 " Instructs vim to load indentation rules according to the detected file type
 if has("autocmd")
@@ -223,6 +218,7 @@ autocmd FileType java set formatoptions=croql cindent nowrap nofoldenable
 autocmd FileType c    set formatoptions+=ro
 autocmd FileType perl set smartindent
 autocmd FileType css  set smartindent
+autocmd FileType html set textwidth=0
 autocmd FileType html set formatoptions+=tl
 autocmd FileType html,css set noexpandtab tabstop=4
 autocmd FileType make set noexpandtab shiftwidth=4
@@ -263,7 +259,7 @@ autocmd BufWrite *.py :call DeleteTrailingWS()
 " Platform specific settings, depending on if we have the GUI running
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 if has("mac")
-    set shell=/bin/bash
+    set shell=/bin/zsh
 elseif has("linux")
     set shell=/bin/bash
 endif
@@ -273,7 +269,6 @@ if has("gui_running")
     set mouse=a		    " Enable mouse usage (all modes) in terminals
     set lines=36        " A healthy amount, requires a decent gui resolution
     set columns=88      " Account for column padding
-    set textwidth=80    " No more, or less
     colorscheme molokai
 
     " Set a nice font. Note that Consolas isn't available by default on Linux,
@@ -297,10 +292,6 @@ if has("mac")
     cmap <D-f> <C-f>
     cmap <D-b> <C-b>
 endif
-
-
-
-
 
 "return '[\s]' if trailing white space is detected
 "return '' otherwise
