@@ -8,7 +8,7 @@
 " This line should not be removed as it ensures that various options are
 " properly set to work with the Vim-related packages available in Debian.
 runtime! debian.vim
-set nocompatible
+set nocompatible  " Turns off support for legacy vi commands.
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Basic editor settings                                               "
@@ -18,9 +18,30 @@ set shiftwidth=4  " Automaticaly indent 4 characters.
 set softtabstop=4 " Treat 4 spaces as a tab when deleting. 
 set shiftround    " Round indent to multiple of shiftwidth ('>', '<').
 set expandtab     " Use spaces instead of hard tab (\t).
-set autoindent    " Copy indent from current line when starting new line.
+set autoindent    " Minimal auto indent: Copy indent from current line when starting new line.
 set smartindent   " Use smart auto indenting for c like languages.
 set textwidth=100 " Maximum width of text that is being inserted before being broken up.
+set showmode      " Shows mode at bottom (ie --INSERT--).
+set history=10000 " Keep a lot of lines in history.
+set wildmode=list:longest,full " Bash-like tab completion when in conmmand prompt.
+set nowrap        " Disable auto line wrapping
+set ruler         " Show line/col pos in status line
+set number        " Display line numbers in left column.
+set showmatch     " Always show matching brace under cursor
+set noerrorbells  " System bell is pure evil
+set background=dark " Set dark background for colors
+set bg=dark       " Set dark background for colors
+set autoread      " Set readonly when file is external modified.
+set showcmd		  " Show (partial) command in status line.
+set ignorecase    " Do case insensitive matching
+set smartcase     " Do smart case matching
+set incsearch     " Incremental search
+set autowrite     " Automatically save before commands like :next and :make
+set hidden        " Hide buffers when they are abandoned
+set hlsearch      " Highlight all search pattern mathes.
+
+" Directory for .swp files
+set directory=~/.vim_runtime/tmp
 
 " Automatically switches to the directory that the document is in
 autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
@@ -29,11 +50,10 @@ autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
 " Make backspace act as expected on some weirdly configured platforms
 set backspace=eol,start,indent
 
-" Enables/disables vim's autopaste ability, which allows us to paste code
-" without having obnoxious indenting applied to it
+" Enables/disables vim's autopaste ability, which allows us to paste code without having obnoxious
+" indenting applied to it.
 nnoremap <F2> :set invpaste paste?<CR>
 set pastetoggle=<F2>
-set showmode
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Enhanced status line                                                    "
@@ -71,7 +91,6 @@ set statusline+=%{StatuslineTabWarning()}
 set statusline+=%*
 
 set statusline+=%{StatuslineTrailingSpaceWarning()}
-
 set statusline+=%{StatuslineLongLineWarning()}
 
 set statusline+=%#warningmsg#
@@ -100,29 +119,6 @@ set statusline+=%c, "cursor column
 set statusline+=%l/%L "cursor line/total lines
 set statusline+=\ %P "percent through file
 set laststatus=2
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" User interface settings                                                 "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-set history=1024                    " History shows 1024 entries
-set wildmode=list:longest,full
-set nowrap                          " Disable auto line wrapping
-set ruler                           " Show line/col pos in status line
-set number                          " Display line numbers in left column.
-set showmatch                       " Always show matching brace under cursor
-set noerrorbells                    " System bell is pure evil
-set background=dark                 " Set dark background for colors
-set bg=dark                         " Set dark background for colors
-set autoread                        " Set readonly when file is external mod
-
-" The following are commented out as they cause vim to behave a lot
-" differently from regular Vi. They are highly recommended though.
-set showcmd		    " Show (partial) command in status line.
-set ignorecase		" Do case insensitive matching
-set smartcase		" Do smart case matching
-set incsearch		" Incremental search
-set autowrite		" Automatically save before commands like :next and :make
-set hidden          " Hide buffers when they are abandoned
 
 " have error messages red on white
 highlight ErrorMsg guibg=White guifg=Red
@@ -161,11 +157,6 @@ endif
 set backup
 set backupdir=~/.vim_runtime/backups
 
-" Uncomment the following lines to if you want to turn off back up support
-" set nobackup
-" set nowb
-" set noswapfile
-
 " Persistent undo
 try
     if MySys() == "windows"
@@ -182,15 +173,18 @@ endtry
 " Misc settings                                                           "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Reload vimrc whenever it is edited
-autocmd! bufwritepost vimrc source ~/.vim/vimrc
+autocmd! bufwritepost vimrc source ~/.vimrc
 
-" Directory for .swp files
-set directory=~/.vim_runtime/tmp
+" Set guide bar at 100 characters.
+if exists('&colorcolumn')
+    set colorcolumn=100
+    highlight ColorColumn ctermbg=0 guibg=lightgrey
+endif
 
-" If using a dark background within the editing area and syntax highlighting
-" turn on this option as well
-set background=dark
-set bg=dark
+" Case insensitive file name completion.
+if exists('&wildignorecase')
+    set wildignorecase
+endif
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Custom command mappings                                                 "
@@ -200,28 +194,14 @@ map <C-Tab> :tabnext<CR>
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " File-type specific rules and settings                                   "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Vim5 and later versions support syntax highlighting. Uncommenting the next
-" line enables syntax highlighting by default.
+" Enable file type specific indenting, syntax, omnicomplete and more.
+filetype plugin indent on
 syntax on
-set filetype=on
-filetype plugin on
-filetype indent on
 
 " Instructs vim to load indentation rules according to the detected file type
 if has("autocmd")
   filetype indent on
 endif
-
-" Special settings for specific file types
-autocmd FileType c,cpp,h,hpp,slang set cindent
-autocmd FileType java set formatoptions=croql cindent nowrap nofoldenable
-autocmd FileType c    set formatoptions+=ro
-autocmd FileType perl set smartindent
-autocmd FileType css  set smartindent
-autocmd FileType html set textwidth=0
-autocmd FileType html set formatoptions+=tl
-autocmd FileType html,css set noexpandtab tabstop=4
-autocmd FileType make set noexpandtab shiftwidth=4
 
 " iCalendar file type
 autocmd! BufRead,BufNewFile *.ics setfiletype icalendar
@@ -231,29 +211,6 @@ au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf gls
 
 " Match doxygen todo
 match Todo /@todo/
-
-" In text and LaTeX files, always limit the width of text to 76
-" characters.  Also perform logical wrapping/indenting.
-autocmd BufRead *.txt set tw=76 formatoptions=tcroqn2l
-autocmd BufRead *.tex set tw=76
-
-" Don't expand tabs to spaces in Makefiles
-au BufEnter [Mm]akefile* set noet
-au BufLeave [Mm]akefile* set et
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Python specific options                                                 "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-au FileType python set nocident
-au FileType python syn keyword pythonDecorator True None False self
-
-"Delete trailing white space, useful for Python ;)
-func! DeleteTrailingWS()
-  exe "normal mz"
-  %s/\s\+$//ge
-  exe "normal `z"
-endfunc
-autocmd BufWrite *.py :call DeleteTrailingWS()
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Platform specific settings, depending on if we have the GUI running
