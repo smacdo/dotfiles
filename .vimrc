@@ -7,53 +7,63 @@
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " This line should not be removed as it ensures that various options are
 " properly set to work with the Vim-related packages available in Debian.
+" TODO: Only source this on debian, source correct platform specific.
 runtime! debian.vim
-set nocompatible  " Turns off support for legacy vi commands.
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Basic editor settings                                               "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-set tabstop=4     " Tabs are 4 characters.
-set shiftwidth=4  " Automaticaly indent 4 characters.
-set softtabstop=4 " Treat 4 spaces as a tab when deleting. 
+" Use Vim settings rather than vi settings. Avoid side effects if compatible
+" is already reset.
+if &compatible
+    set nocompatible
+endif
+
+" My default editor theme is molkai.
+colorscheme molokai
+
+" Basic editor settings.
+set history=1000  " Keep 100 lines of command history. You know, just in case.
+set expandtab     " Insert $softtabstop amount of spaces when tab is pushed instead of \t.
+set tabstop=4     " Change width of hard tab to 4 spaces.
+set shiftwidth=4  " Use 4 spaces when auto indenting, hitting >> << or ==.
+set softtabstop=4 " Treat 4 spaces as a tab when hitting tab, deleting etc. 
 set shiftround    " Round indent to multiple of shiftwidth ('>', '<').
-set expandtab     " Use spaces instead of hard tab (\t).
-set autoindent    " Minimal auto indent: Copy indent from current line when starting new line.
-set smartindent   " Use smart auto indenting for c like languages.
-set textwidth=100 " Maximum width of text that is being inserted before being broken up.
-set showmode      " Shows mode at bottom (ie --INSERT--).
-set history=10000 " Keep a lot of lines in history.
-set wildmode=list:longest,full " Bash-like tab completion when in conmmand prompt.
-set nowrap        " Disable auto line wrapping
-set ruler         " Show line/col pos in status line
+set autoindent    " Copies indentation from previous line when starting a new line.
+set textwidth=120 " Maximum width of text that is being inserted before being broken up.
 set number        " Display line numbers in left column.
+set showmode      " Shows mode at bottom (ie --INSERT--).
+set wildmode=list:longest,full " Bash-like tab completion when in conmmand prompt.
+set ruler         " Show line/col pos in status line
 set showmatch     " Always show matching brace under cursor
 set noerrorbells  " System bell is pure evil
 set background=dark " Set dark background for colors
 set bg=dark       " Set dark background for colors
 set autoread      " Set readonly when file is external modified.
-set showcmd		  " Show (partial) command in status line.
-set ignorecase    " Do case insensitive matching
-set smartcase     " Do smart case matching
-set incsearch     " Incremental search
-set autowrite     " Automatically save before commands like :next and :make
-set hidden        " Hide buffers when they are abandoned
+set showcmd       " Show (partial) command in status line.
+set ignorecase    " Case insensitive matching.
+set smartcase     " Overrides ignorecase when at least one non-lowercase character is present.
+set incsearch     " Incremental search. Hit `<CR>` to stop.
+set autowrite     " Automatically save before commands like :next, :make etc.
+set hidden        " Possibility to have more than one unsaved buffer.
 set hlsearch      " Highlight all search pattern mathes.
-
-" Directory for .swp files
-set directory=~/.vim_runtime/tmp
+set laststatus=2  " Always draw a status line even if there is only one window.
+set scrolloff=1   " Keep two lines above/below cursor when scrolling up/down.
+set sidescrolloff=5 " Keep five characters to left/right when scrolling horizontally.
+set backup        " Enable automatic backups.
+set backupdir=~/.vim_runtime/backups " Store backups in a central location.
+set directory=~/.vim_runtime/tmp     " Keep .swp files in one out of the way directory.
 
 " Automatically switches to the directory that the document is in
 autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
-"set autochdir          " has some CLI weirdness
 
 " Make backspace act as expected on some weirdly configured platforms
 set backspace=eol,start,indent
 
-" Enables/disables vim's autopaste ability, which allows us to paste code without having obnoxious
-" indenting applied to it.
+" Map <F2> to enable/disable vim's auto ident on paste. This allows us to paste code without
+" having the auto indentation rules applied.
 nnoremap <F2> :set invpaste paste?<CR>
 set pastetoggle=<F2>
+
+" Hit % on a 'if' to jump to the corresponding else.
+runtime macros/matchit.vim
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Enhanced status line                                                    "
@@ -113,12 +123,10 @@ function! SlSpace()
 endfunc
 set statusline+=%{SlSpace()}
 
-
 set statusline+=%{StatuslineCurrentHighlight()}\ \ "current highlight
 set statusline+=%c, "cursor column
 set statusline+=%l/%L "cursor line/total lines
 set statusline+=\ %P "percent through file
-set laststatus=2
 
 " have error messages red on white
 highlight ErrorMsg guibg=White guifg=Red
@@ -150,13 +158,6 @@ if has("autocmd")
     \| exe "normal g'\"" | endif
 endif
 
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" File back up settings                                                    "
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Make vim place back up files in ~/.vim_backup rather than cluttering
-set backup
-set backupdir=~/.vim_runtime/backups
-
 " Persistent undo
 try
     if MySys() == "windows"
@@ -169,12 +170,6 @@ try
 catch
 endtry
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Misc settings                                                           "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Reload vimrc whenever it is edited
-autocmd! bufwritepost vimrc source ~/.vimrc
-
 " Set guide bar at 100 characters.
 if exists('&colorcolumn')
     set colorcolumn=100
@@ -186,25 +181,43 @@ if exists('&wildignorecase')
     set wildignorecase
 endif
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Custom command mappings                                                 "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-map <C-Tab> :tabnext<CR>
-
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" File-type specific rules and settings                                   "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Enable file type specific indenting, syntax, omnicomplete and more.
-filetype plugin indent on
-syntax on
-
-" Instructs vim to load indentation rules according to the detected file type
-if has("autocmd")
-  filetype indent on
+" Enable file detection and turn on automatic syntax highlighting, indenting and other features
+" for files with a detected language.
+if has('autocmd')
+    filetype plugin indent on
 endif
 
-" iCalendar file type
-autocmd! BufRead,BufNewFile *.ics setfiletype icalendar
+if has('syntax') && !exists('g:syntax_on')
+    syntax enable
+endif
+
+" Highlight strings and numbers inside of C comments.
+let c_comment_strings=1
+
+" Set the amount of time for vim to wait to see if a key is part of a multi-key command to
+" 100ms.
+if !has('nvim') && &ttimeoutlen == -1
+    set ttimeout
+    set ttimeoutlen=100
+endif
+
+" Use <C-L> to clear the highlighting from :set hlsearch.
+if maparg('<C-L>', 'n') ==# ''
+    noremap <silent> <C-L> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
+endif
+
+" Don't use Ex mode. Instead use Q for formatting. Revert this wtith ":unma Q"
+map Q qq
+
+" Most modern terminal support the mouse, so lets turn it on. Only xterm can grab the mouse
+" event using the shift key; for other terminals use ":", select the text and press Esc.
+if has('mouse')
+    if &term =~ 'xterm'
+        set mouse=a
+    else
+        set mouse=nvi
+    endif
+endif
 
 " Shader file types
 au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf glsl
@@ -212,21 +225,24 @@ au BufNewFile,BufRead *.frag,*.vert,*.fp,*.vp,*.glsl,*.vs,*.fs,*.shader setf gls
 " Match doxygen todo
 match Todo /@todo/
 
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Platform specific settings, depending on if we have the GUI running
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" Set shell according to platform.
+" TODO: Don't do this.
 if has("mac")
     set shell=/bin/zsh
 elseif has("linux")
     set shell=/bin/bash
 endif
 
+" Apply GUI specific settings.
 if has("gui_running")
-    " Automatically chdir into the file's directory
-    set mouse=a		    " Enable mouse usage (all modes) in terminals
-    set lines=36        " A healthy amount, requires a decent gui resolution
-    set columns=88      " Account for column padding
-    colorscheme molokai
+    " Get rid of the tearoff menu entries in Windows.
+    if has('win32')
+        set guioption-=t
+    endif
+
+    " Show more lines and columns in GUI mode. Assumes GUI running with decent resolution.
+    set lines=36
+    set columns=125
 
     " Set a nice font. Note that Consolas isn't available by default on Linux,
     " but you can easily extract it from Microsoft's PPT installer. Its a nice
@@ -234,6 +250,7 @@ if has("gui_running")
     if has("mac")
         set guifont=Monaco:h10
     elseif has("unix")
+        " TODO: Can we detect which fonts are installed in order of preference?
         set guifont=Consolas\ 12
         "set guifont=Ubuntu\ Mono\ 11
         "set guifont=Liberation\ Mono\ 10
@@ -241,7 +258,7 @@ if has("gui_running")
         set guifont=Consolas\ 10
     endif
 else
-    colorscheme molokai
+    " Settings specific to non-GUI instances.
 endif
 
 " Remap apple keys, useful because i always hit apple instead of ctrl
