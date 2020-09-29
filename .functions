@@ -1,0 +1,107 @@
+# This file contains a set of utility functions usable in all shells.
+### Operating system check functions.
+function is_osx() {
+    [[ "$(uname)" == "Darwin" ]] || return 1
+}
+
+function is_linux() {
+    [[ $(uname -s) == "Linux" ]] || return 1
+}
+
+function is_cygwin() {
+    [[ $(uname -s) =~ ^CYGWIN* ]] || return 1
+}
+
+# Set the terminal title bar (if the terminal emulator supports it).
+function set_titlebar() {
+    echo $'\033]0;'$*$'\007'
+}
+
+# Cd into directory and then ls it.
+cdl() {
+    local dir="$1"
+    local dir="${dir:=$HOME}" # if dir empty then set to $HOME (emulate `cd `)
+    if [[ -d "$dir" ]]; then
+        cd "$dir" >/dev/null
+        if [[ is_osx ]]; then
+            ls -G -lF
+        else
+            ls --color -lF
+        fi
+    else
+        echo "cdl: $dir: Directory not found"
+    fi
+}
+
+# Create a directory and enter it.
+function mkd() {
+    mkdir -p "$@" && cd "$_"
+}
+
+# Create a directory in /tmp and enter it.
+function mkdtmp() {
+    cd $(mktemp -d)
+}
+
+# Use git's colored diff when available.
+hash git &>/dev/null;
+if [ $? -eq 0 ]; then
+    function diff() {
+        git diff --no-index --color-words "$@"
+    }
+fi
+# ssh and start a screen session on the remote server
+function sshs {
+	if [[ -z $* ]]; then
+		echo 'Usage: sshs [options] [user@]hostname'
+		echo 'SSH and automatically start a GNU screen session on the remote server'
+	else
+		ssh -t $* screen -DRU
+	fi
+}
+
+# One function to extract the contents of different archive formats.
+# THIS WILL EXTRACT THE FILES INTO YOUR CURRENT DIRECTORY!
+function extract {
+	if [[ -z $1 ]]; then
+		echo 'Usage: extract ARCHIVE'
+		echo 'Extract files from ARCHIVE to the current directory'
+	elif [[ -r $1 ]]; then
+		case $1 in
+			*.rar)      unrar x $1     ;;
+			*.tar)      tar -xvf $1    ;;
+			*.tar.bz2)  tar -xjvf $1   ;;
+			*.bz2)      bzip2 -d $1    ;;
+			*.tar.gz)   tar -xzvf $1   ;;
+			*.gz)       gunzip -d $1   ;;
+			*.tgz)      tar -xzvf $1   ;;
+			*.Z)        uncompress $1  ;;
+			*.zip)      unzip $1       ;;
+
+			*) echo "ERROR: '$1' is not a known archive type"  ;;
+		esac
+	else
+		echo "ERROR: '$1' is not a valid file"
+	fi
+}
+
+# Recursively search for a file with the named pattern starting in the current directory.
+function ff {
+	if [[ -z $1 ]]; then
+		echo 'Usage: ff PATTERN'
+		echo 'Recursively search for a file named PATTERN in the current directory'
+	else
+		find . -type f -iname $1
+	fi
+}
+
+# Change to the directory containing the given file path.
+function cdf
+{
+	if [[ -z $1 ]]; then
+		echo 'Usage: cdf PATTERN'
+		echo 'cd into the directory basepath of the given file'
+	else
+        cd $(dirname $1)
+	fi
+}

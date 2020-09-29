@@ -1,0 +1,25 @@
+# vi:syntax=sh
+# This file contains export settings common to all shells.
+
+# Make vim the default editor.
+export EDITOR='vim'
+
+# Some programs require this environment variable to show color.
+export CLICOLOR=1
+
+# Hide the “default interactive shell is now zsh” warning on macOS.
+export BASH_SILENCE_DEPRECATION_WARNING=1
+
+# Highlight section titles in manual pages.
+export LESS_TERMCAP_md="${yellow}"
+
+# Adds color highlighting to less (which includes man pages).
+#  http://boredzo.org/blog/archives/2016-08-15/colorized-man-pages-understood-and-customized
+export LESS="-R -q"
+export LESS_TERMCAP_mb=$'\E[1;31m'     # begin blink
+export LESS_TERMCAP_md=$'\E[1;32m'     # begin bold
+export LESS_TERMCAP_me=$'\E[0m'        # reset bold/blink
+export LESS_TERMCAP_so=$'\E[01;44;33m' # begin reverse video
+export LESS_TERMCAP_se=$'\E[0m'        # reset reverse video
+export LESS_TERMCAP_us=$'\E[1;94m'     # begin underline
+export LESS_TERMCAP_ue=$'\E[0m'        # reset underline

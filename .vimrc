@@ -170,3 +170,7 @@ if has("mac")
     cmap <D-f> <C-f>
     cmap <D-b> <C-b>
 endif
+
+" Airline plugin config
+let g:airline_theme='molokai'                " Use molokai theme to match.
+let g:airline#extensions#tabline#enabled = 1 " Display all buffers when one tab open

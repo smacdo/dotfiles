@@ -28,6 +28,7 @@ fi
 # Create common directories
 echo "Creating common directories..."
 
+mkdir -vp $HOME/.shell_profile
 mkdir -vp $HOME/.zsh_local
 mkdir -vp $HOME/.vim_runtime/backups
 mkdir -vp $HOME/.vim_runtime/tmp
@@ -100,14 +101,22 @@ safe_symlink()
 # Symlink useful dotfiles
 echo "Symlinking dotfiles..."
 
+safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
 safe_symlink "$checkout_dir/.vimrc" "$HOME/.vimrc"
 safe_symlink "$checkout_dir/.vim" "$HOME/.vim"
 safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
 safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
 safe_symlink "$checkout_dir/.zshrc" "$HOME/.zshrc"
+safe_symlink "$checkout_dir/.p10k.zsh" "$HOME/.p10k.zsh"
 safe_symlink "$checkout_dir/zsh_files" "$HOME/.zsh"
 safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
 safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
+safe_symlink "$checkout_dir/.aliases" "$HOME/.shell_profile/.aliases"
+safe_symlink "$checkout_dir/.functions" "$HOME/.shell_profile/.functions"
+safe_symlink "$checkout_dir/.exports" "$HOME/.shell_profile/.exports"
+safe_symlink "$checkout_dir/.paths" "$HOME/.shell_profile/.paths"
+
+touch "$HOME/.shell_profile/.private"
 
 # Install fonts
 # TODO: Make this a configurable option.

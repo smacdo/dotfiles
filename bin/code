@@ -1,0 +1,4 @@
+#!/bin/bash
+# vi:syntax=bash
+# TODO: Support linux, windows.
+/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code $@

@@ -8,12 +8,34 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Our default is always, and will always, be vi
-export EDITOR=vim
+#==============================================================================
+# Source shell vendor neutral configuration files. These files are shared
+# between the different shells like bash, and zsh to reduce duplication.
+#
+# If you want to have machine specific stuff the best place to put it is in
+# ~/.shell_local.
+for file in $HOME/.shell_profile/.{path,functions,exports,aliases,private}; do
+    # -r test if FILE exists and is readable.
+    # -f test if FILE exists and is a file.
+    [ -r "$file" ] && [ -f "$file" ] && source "$file"
+done;
+unset file
 
-# Give me colors on the terminal
-export CLICOLOR=1
+# Load .dotfiles shared zsh modules.
+for file in ~/.zsh/*.zsh; do
+    . $file
+done
+unset file
 
+# Load local only zsh moduls.
+setopt null_glob
+
+for file in ~/.zsh_local/*.zsh; do
+    . $file
+done
+unset file
+
+#==============================================================================
 # Make sure we can store a decent amount of history lines
 HISTSIZE=2000
 SAVEHIST=2000
@@ -25,27 +47,11 @@ setopt INC_APPEND_HISTORY # Update history after every command.
 setopt HIST_FIND_NO_DUPS  # Ignore duplicates when searching
 setopt HIST_REDUCE_BLANKS # Remove blank lines from history.
 
-# Load all extra zsh modules
-for file in ~/.zsh/*.zsh; do
-    . $file
-done
-
-# Load local zsh modules
-setopt null_glob
-
-for file in ~/.zsh_local/*.zsh; do
-    . $file
-done
-
 # Load the tab autocompletion system
 autoload -Uz compinit
 compinit
 
 setopt COMPLETE_ALIASES # autocompletion of cli switches for aliases
-
-# 
-autoload -Uz promptinit
-promptinit
 
 zstyle ':completion:*' group-name ''
 zstyle ':completion:*' list-colors '${(s.:.)LS_COLORS}'
@@ -72,8 +78,12 @@ autoload zmv
 setopt autocd                # change to a diretory if typed alone
 setopt no_beep               # disable beep on all errors
 setopt EXTENDED_GLOB
-setopt CORRECT_ALL # Suggest corrections to mistyped commands and paths.
-setopt NOMATCH # Turn errors back on for empty globbing with init finished.
+setopt CORRECT_ALL           # Suggest corrections to mistyped commands and paths.
+setopt NOMATCH               # Turn errors back on for empty globbing with init finished.
+
+# Prevent shell output from overwriting regular files.
+# Use `>|` to override, eg `echo "output" >| file.txt"
+set -o noclobber
 
 # Use the powerlevel10k zsh theme.
 source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme

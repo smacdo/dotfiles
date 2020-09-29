@@ -1,0 +1,3 @@
+#!/bin/bash
+# TODO: Support linux, maybe windows too?
+/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl $@

@@ -1,62 +1,109 @@
-# do not bell on tab-completion
-set bell-style bell
 
+# Briefly highlight the opening parenthsis when you type the closing paren.
+set blink-matching-paren on
+
+# Use a visible flash instead of an audio beep for alerting.
+set bell-style visible
+
+# Show extra file information when completing (eg `ls -F`)
+set visible-stats on
+
+# Allow UTF8 input and output instead of showing stuff like '\0123\0456`
+set input-meta on
+
+# Disable automatic stripping of the 8th bit for ASCII chars.
+# Explanation: https://unix.stackexchange.com/a/266490
+set convert-meta off
+set output-meta on
+
+# Don't expand ~ to its real value.
 set expand-tilde off
-set input-meta off
-set convert-meta on
-set output-meta off
+
+# Force text that is longer than screen width to be on next line.
 set horizontal-scroll-mode off
+
+# Try to keep the cursor in the same position when navigating history commands.
 set history-preserve-point on
+
+# Append a / to the end of completed directory names.
 set mark-directories on
+
+# Immediately add a trailing slash when autocopleting symlinks to directories.
 set mark-symlinked-directories on
+
+# Do not autocomplete hidden files unless the pattern explicitly begins with a
+# dot.
 set match-hidden-files off
 
-# completion settings
+# Show all autocomplete results at once.
 set page-completions off
-set completion-query-items 2000
-set completion-ignore-case off
+
+# If there are morethan 200 possible completions then ask to show them all.
+set completion-query-items 200
+
+# Make tab autocomplete regardless of filename case.
+set completion-ignore-case on
+
+# List all matvhes in case where multiple possible completions are possible.
 set show-all-if-ambiguous on
 set show-all-if-unmodified on
 set completion-prefix-display-length 10
 set print-completions-horizontally off
-
-set editing-mode emacs
-
-# reload file
-"\C-x\C-r": re-read-init-file
 
 C-n: history-search-forward
 C-p: history-search-backward
 
 $if mode=emacs
 
-# make control-tab complete from history
-# C-TAB: dynamic-complete-history
-
+#-------------------------------------------------------------------------------
+# keyboard shortcuts
+#-------------------------------------------------------------------------------
+# up arrow: search history backwards
 "\e[A": history-search-backward
+
+# down arrow: search history forwards
 "\e[B": history-search-forward
 
-# for linux console and RH/Debian xterm
+# TODO: verify these shortcuts.
+# home: move to the beginning of the line.
 "\e[1~": beginning-of-line
+
+# end: move to the end of the line.
 "\e[4~": end-of-line
+
+# ?
 "\e[5~": beginning-of-history
+
+# ?
 "\e[6~": end-of-history
+
+# ?
 "\e[3~": delete-char
+
+# ?
 "\e[2~": quoted-insert
+
+# ?
 "\e[5C": forward-word
+
+# ?
 "\e[5D": backward-word
+
+# ?
 "\e\e[C": forward-word
+
+# ?
 "\e\e[D": backward-word
 
+# ?
 # for rxvt
 "\e[8~": end-of-line
 
+# ?
 # for non RH/Debian xterm, can't hurt for RH/DEbian xterm
 "\eOH": beginning-of-line
-"\eOF": end-of-line
 
-# for freebsd console
-"\e[H": beginning-of-line
-"\e[F": end-of-line
+# ?
+"\eOF": end-of-line
 
 $endif
