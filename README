@@ -1,11 +1,19 @@
+## About
 This is a collection of assorted shell scripts, shell configuration files and
 common application plugins that are replicated across my various linux machines.
+The only notable feature of my dotfile repository is that I strive to add
+comments where appropriate to explain what each configuration setting does, and
+to try to keep this cross platform between OS X, Linux and (where appropriate)
+Windows.
 
-To use:
-    cd ~
-    git clone git://github.com/smacdo/bin-scripts.git bin
-    cd bin
-    ./setup.sh
+Please take anything of value from this repository for use in your own dotfiles.
+Attribution is appreciated but not required. Do not directly copy these dotfiles
+without examining them first!
 
-Feel free to contribute ideas and suggestions, or fork this project so it suits
-your needs.
+## How to use
+```sh
+cd ~
+git clone https://github.com/smacdo/dotfiles.git .dotfiles
+cd .dotfiles
+./setup.sh
+```	
