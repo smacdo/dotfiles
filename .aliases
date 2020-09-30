@@ -8,10 +8,10 @@
 
 ### ls
 if is_osx; then
-    alias='ls -G'
+    alias ls='ls -G'
     ls_color_flag='-G'
 else
-    alias='ls --color'
+    alias ls='ls --color'
     ls_color_flag='--color'
 fi
 
