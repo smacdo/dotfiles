@@ -1,15 +1,117 @@
 # This file contains a set of utility functions usable in all shells.
 ### Operating system check functions.
+# Detect the operating system by checking for the existence of various files.
+# Sadly there does not appear to be a way to uniformly check what operating
+# system and distro we are running (especially without relying on the user to
+# have pre-installed anything), so this is the best solution.
+UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+
+if [[ "$UNAME" == "linux" ]]; then
+    export DOT_OS="linux"
+
+    # Use LSB to identify distribution if installed (it's not always installed
+    # by default).
+    if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
+        export DOT_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'// | tr "[:upper:]" "[:lower:]")
+    elif [ -n "$(uname -a | grep Ubuntu)" ]; then
+        export DOT_DIST="ubuntux"
+    elif [ -f /etc/redhat-release ]; then
+        export DOT_DIST="redhat"
+    elif [ -f /etc/debian_version ]; then
+        export DOT_DIST="debian"
+    else
+        export DOT_DIST="unknown"
+    fi
+elif [ "$UNAME" == "darwin" ]; then
+    export DOT_OS="macos"
+    # TODO: Detect the distribution name (eg catalina), product version and build.
+    export DOT_DIST="osx"
+else
+    # Could not detect the operating system or distro :(
+    export DOT_OS="unknown"
+    export DOT_DIST="unknown"
+fi
+
 function is_osx() {
-    [[ "$(uname)" == "Darwin" ]] || return 1
+    [[ "$DOT_OS" == "macos" ]] || return 1
 }
 
 function is_linux() {
-    [[ $(uname -s) == "Linux" ]] || return 1
+    [[ "$DOT_OS" == "linux" ]] || return 1
+}
+
+function is_redhat() {
+    [[ "$DOT_DIST" == "redhat" ]] || return 1
+}
+
+function is_ubuntu() {
+    [[ "$DOT_DIST" == "ubuntu" ]] || return 1
 }
 
 function is_cygwin() {
+    # TODO: Move platform detection to above code block.
     [[ $(uname -s) =~ ^CYGWIN* ]] || return 1
+}
+
+# Ask user to confirm before continuing. Returns 0 for yes, 1 for no.
+# First parameter is the text to confirm with.
+function prompt_confirm() {
+    while true; do
+        read -r -n 1 -p "${1:-Continue?} [y|n]: " REPLY
+        case $REPLY in
+            [yY]) echo ; return 0 ;;
+            [nN]) echo ; return 1 ;;
+            *) printf "\033[31m %s \n\033[0m" "Unrecognized response"
+        esac
+    done
+}
+
+# Ensure software packages are up to date.
+function update_packages() {
+    if [[ is_ubuntu ]]; then
+        sudo apt update
+    elif [[ is_redhat ]]; then
+        sudo dnf check-update
+    elif [[ is_osx ]]; then
+        echo "TODO: Implement me"
+        return 1
+    else
+        echo "ERROR: Unsupported os/dist"
+        return 1
+    fi
+}
+
+# Update software packages and upgrade to latest version.
+function upgrade_packages() {
+    prompt_confirm "Upgrade all installed packages to latest version?"
+    update_packages || return 1
+
+    if [[ is_ubuntu ]]; then
+        sudo apt upgrade
+    elif [[ is_redhat ]]; then
+        sudo dnf update
+    elif [[ is_osx ]]; then
+        echo "TODO: Implement me"
+        return 1
+    else
+        echo "ERROR: Unsupported os/dist"
+        return 1
+    fi
+}
+
+# Install a specific package name.
+function install_package() {
+    if [[ is_ubuntu ]]; then
+        sudo apt install $*
+    elif [[ is_redhat ]]; then
+        sudo dnf install $*
+    elif [[ is_osx ]]; then
+        echo "TODO: Implement me"
+        return 1
+    else
+        echo "ERROR: Unsupported os/dist"
+        return 1
+    fi
 }
 
 # Set the terminal title bar (if the terminal emulator supports it).

@@ -85,8 +85,15 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 # Use `>|` to override, eg `echo "output" >| file.txt"
 set -o noclobber
 
-# Use the powerlevel10k zsh theme.
-source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
+# Use the powerlevel10k theme or warn if not installed.
+if [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
+elif [[ -f $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme
+else
+    echo "WARNING: powerlevel10k not installed"
+fi
+
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

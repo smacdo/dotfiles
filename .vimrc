@@ -1,20 +1,11 @@
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Scott's .vimrc                                                          "
-" ----------------------------------------------------------------------- "
-" Custom Command List                                                     "
-" --------------------                                                    "
-"                                                                         "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" This line should not be removed as it ensures that various options are
-" properly set to work with the Vim-related packages available in Debian.
-" TODO: Only source this on debian, source correct platform specific.
-runtime! debian.vim
-
 " Use Vim settings rather than vi settings. Avoid side effects if compatible
 " is already reset.
-if &compatible
+"if &compatible
     set nocompatible
-endif
+"endif
 
 " My default editor theme is molkai.
 colorscheme molokai
