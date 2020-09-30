@@ -67,7 +67,7 @@ function set_colored_prompt {
     # \u: The current user name.
     # \h: The machine hostname up to first dot.
     # \w: Current working directory.
-    export PS1="$GRAY[$GREEN\u$GRAY@$GREEN\h$GRAY:$LIGHT_BLUE\w$GRAY]$RESET_COLOR\$ "
+    export PS1="$GREEN\u@\h$GRAY:$LIGHT_BLUE\w$RESET_COLOR\$ "
 }
 
 set_colored_prompt
