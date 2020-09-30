@@ -1,4 +1,5 @@
 *.swp
+*.uuid
 .vim/view
 private
 .zsh_local
