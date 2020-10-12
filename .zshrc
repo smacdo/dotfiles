@@ -86,7 +86,8 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 set -o noclobber
 
 # Use the powerlevel10k zsh theme.
-source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
+[[ ! -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]] || source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+source ~/powerlevel10k/powerlevel10k.zsh-theme
