@@ -48,8 +48,7 @@ alias ..4='../../../..'
 alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
 
 # Get my local IP address.
-# TODO: Does this work correctly on linux boxes? Not sure about en0...
-alias localip='ipconfig getifaddr en0'
+alias localip="ip -o addr show up primary scope global | grep -o 'inet6\? [0-9a-f\.:]*' | cut -f 2 -d ' '"
 
 # Show active network interfaces.
 alias ifactive="ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active'"
@@ -76,7 +75,7 @@ alias mv='mv -i'
 alias cp='cp -i'
 
 # Colorize grep output.
-alias grep='grep --color-auto'
+alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 alias zgrep='zgrep --color=auto'
@@ -95,22 +94,26 @@ alias reloadshell="exec ${SHELL} -l"
 
 # Copy contents to system clipboard.
 if [[ is_osx ]]; then
-    alias clip="tr -d '\n' | pbcopy"
+    alias clip="pbcopy"
+elif [[ is_linux ]]; then
+    alias clip="xclip -select c"
 else
-    alias clip="echo 'TODO: Support me on linux'"
+    alias clip="echo 'TODO: Implement me'"
 fi
 
 # Start the screen saver.
 if [[ is_osx ]]; then
-    alias screensaver="/System/Library/CoreServices/ScreenSaverEngine.app/Contents/MacOS/ScreenSaverEngine"
+    alias lock="/System/Library/CoreServices/ScreenSaverEngine.app/Contents/MacOS/ScreenSaverEngine"
+elif [[ "$XDG_CURRENT_DESKTOP" == "KDE" ]]; then
+    alias lock="qdbus org.freedesktop.ScreenSaver /ScreenSaver Lock"
+elif [[ "$XDG_CURRENT_DESKTOP" == "ubuntu:GNOME" ]]; then
+    alias lock="dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock"
 else
-    alias screensaver="echo 'TODO: Support me on linux'"
+    alias screensaver="echo 'TODO: Implement me'"
 fi 
 
 # Application shortcuts.
 if [[ is_osx ]]; then
     alias chrome='/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome'
     alias safari='/Applications/Safari.app/Contents/MacOS/Safari'
-else
-    alias chrome="echo 'TODO: Support me on linux and windows'"
 fi

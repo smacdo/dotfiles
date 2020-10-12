@@ -152,6 +152,7 @@ if [ $? -eq 0 ]; then
         git diff --no-index --color-words "$@"
     }
 fi
+
 # ssh and start a screen session on the remote server
 function sshs {
 	if [[ -z $* ]]; then
