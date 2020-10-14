@@ -22,7 +22,7 @@ if [[ "$UNAME" == "linux" ]]; then
     else
         export DOT_DIST="unknown"
     fi
-elif [ "$UNAME" == "darwin" ]; then
+elif [[ "$UNAME" == "darwin" ]] ; then
     export DOT_OS="macos"
     # TODO: Detect the distribution name (eg catalina), product version and build.
     export DOT_DIST="osx"
