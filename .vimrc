@@ -43,6 +43,37 @@ set backup        " Enable automatic backups.
 set backupdir=~/.vim_runtime/backups " Store backups in a central location.
 set directory=~/.vim_runtime/tmp     " Keep .swp files in one out of the way directory.
 
+" Configure netrw (builtin file explorer) to show files vertically on the left, without the
+" heading text.
+"
+" CTRL+O will open netrw in a new window, see plugins/FileExplorer.vim for more details.
+let g:netrw_banner=0       " Don't show the header text.
+let g:netrw_liststyle=3    " Tree style view.
+let g:netrw_winsize=25     " Use 25% of the window for view.
+let g:netrw_browse_split=4 " Opn new file in previous window.
+
+" Keep focus in file explorer when opening a new file.
+"autocmd filetype netrw nmap <c-a> <cr>:wincmd W<cr>
+
+" Use CTRL+arrow or CTRLhjkl to move between windows.
+" Applies to normal mode and netrw windows.
+function! ApplyWindowMovementKeybindings()
+    nnoremap <buffer> <C-k> :wincmd k<CR>
+    nnoremap <buffer> <C-j> :wincmd j<CR>
+    nnoremap <buffer> <C-h> :wincmd h<CR>
+    nnoremap <buffer> <C-l> :wincmd l<CR>
+endfunction
+
+" Apply keybindings normally.
+call ApplyWindowMovementKeybindings()
+
+" ... but also apply when netrw is open to override its locally defined keybindings.
+augroup netrw_mapping
+    autocmd!
+    autocmd filetype netrw call ApplyWindowMovementKeybindings()
+augroup END
+
+
 " Automatically switches to the directory that the document is in
 autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
 
@@ -110,9 +141,9 @@ if !has('nvim') && &ttimeoutlen == -1
     set ttimeoutlen=100
 endif
 
-" Use <C-L> to clear the highlighting from :set hlsearch.
-if maparg('<C-L>', 'n') ==# ''
-    noremap <silent> <C-L> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
+" Use <C-M> to clear the highlighting from :set hlsearch.
+if maparg('<C-M>', 'n') ==# ''
+    noremap <silent> <C-M> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
 endif
 
 " Don't use Ex mode. Instead use Q for formatting. Revert this wtith ":unma Q"
