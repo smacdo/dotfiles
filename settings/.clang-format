@@ -1,0 +1,31 @@
+################################################################################
+# This is my default preferred C++ style, based on the style I use at work but
+# with some minor changes mixed in.
+#
+# For reference, see React Native:
+# https://github.com/facebook/react-native/blob/master/.clang-format
+################################################################################
+BasedOnStyle: LLVM
+AccessModifierOffset: -2
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: left
+AlignTrailingComments: true
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: false
+BinPackParameters: false
+BreakConstructorInitializers: BeforeColon
+ColumnLimit: 80
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+IndentWidth: 2
+IndentWrappedFunctionNames: true
+NamespaceIndentation: All
+PointerAlignment: Left
+SortIncludes: true
+SpaceAfterTemplateKeyword: false
+UseTab: Never
