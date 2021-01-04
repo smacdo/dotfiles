@@ -3,12 +3,21 @@
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 " Use Vim settings rather than vi settings. Avoid side effects if compatible
 " is already reset.
+" TODO: Test and re-enable or delete.
 "if &compatible
-    set nocompatible
+"    set nocompatible
 "endif
 
-" My default editor theme is molkai.
-colorscheme molokai
+" Use a true color solarized variant.
+"  'solarized8' is the default theme.
+"  'solarized8_flat' changes the status line / split and bar tab look.
+"
+" Important note! If you are on a terminal that doesn't support true colors, you
+" should instead use `set t_Co=16` (or `let g:solarized_use16=1`) and manually
+" set the Solarized color palette in your terminal.
+set termguicolors
+set background=dark
+colorscheme solarized8
 
 " Basic editor settings.
 set history=1000  " Keep 100 lines of command history. You know, just in case.
