@@ -63,28 +63,16 @@ set directory=~/.vim_runtime/tmp     " Keep .swp files in one out of the way dir
 let g:netrw_banner=0       " Don't show the header text.
 let g:netrw_liststyle=3    " Tree style view.
 let g:netrw_winsize=25     " Use 25% of the window for view.
-let g:netrw_browse_split=4 " Opn new file in previous window.
+let g:netrw_browse_split=3 " Opn new file in previous window.
 
 " Keep focus in file explorer when opening a new file.
 "autocmd filetype netrw nmap <c-a> <cr>:wincmd W<cr>
 
 " Use CTRL+arrow or CTRLhjkl to move between windows.
-" Applies to normal mode and netrw windows.
-function! ApplyWindowMovementKeybindings()
-    nnoremap <buffer> <C-k> :wincmd k<CR>
-    nnoremap <buffer> <C-j> :wincmd j<CR>
-    nnoremap <buffer> <C-h> :wincmd h<CR>
-    nnoremap <buffer> <C-l> :wincmd l<CR>
-endfunction
-
-" Apply keybindings normally.
-call ApplyWindowMovementKeybindings()
-
-" ... but also apply when netrw is open to override its locally defined keybindings.
-augroup netrw_mapping
-    autocmd!
-    autocmd filetype netrw call ApplyWindowMovementKeybindings()
-augroup END
+nnoremap <silent> <C-k> :wincmd k<CR>
+nnoremap <silent> <C-j> :wincmd j<CR>
+nnoremap <silent> <C-h> :wincmd h<CR>
+nnoremap <silent> <C-l> :wincmd l<CR>
 
 " Open and source .vimrc
 :nnoremap <leader>ev :vsplit $MYVIMRC<cr>  " Open .vimrc in a split
