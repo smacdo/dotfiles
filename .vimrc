@@ -19,6 +19,10 @@ set termguicolors
 set background=dark
 colorscheme solarized8
 
+" Leader
+let mapleader = ","
+let maplocalleader = "\\"
+
 " Basic editor settings.
 set history=1000  " Keep 100 lines of command history. You know, just in case.
 set expandtab     " Insert $softtabstop amount of spaces when tab is pushed instead of \t.
