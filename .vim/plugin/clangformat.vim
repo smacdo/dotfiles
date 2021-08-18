@@ -23,12 +23,15 @@ endfunction
 " Run clang format whenever a supported file format is used.
 " (C, C++, C#, Java, JavaScript, Object-C, Object-C++, ProtoBuf)
 if executable('clang-format')
-    autocmd BufWritePre *.h,*.hpp,*.c,*.cpp,*.cc :call ClangFormatBuffer("quiet")
-    autocmd BufWritePre *.vert,*.frag :call ClangFormatBuffer("quiet")
-    autocmd BufWritePre *.cs :call ClangFormatBuffer("quiet")
-    autocmd BufWritePre *.java :call ClangFormatBuffer("quiet")
-    autocmd BufWritePre *.js :call ClangFormatBuffer("quiet")
-    autocmd BufWritePre *.m,*.mm :call ClangFormatBuffer("quiet")
+    augroup clangformat_on_save
+        autocmd!
+        autocmd BufWritePre *.h,*.hpp,*.c,*.cpp,*.cc :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.vert,*.frag :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.cs :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.java :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.js :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.m,*.mm :call ClangFormatBuffer("quiet")
+    augroup END
 endif
 
 " Map CTRL-d (eg visual studio CTRL+K CTRL+D) to format.
