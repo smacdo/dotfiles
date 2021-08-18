@@ -86,6 +86,9 @@ augroup netrw_mapping
     autocmd filetype netrw call ApplyWindowMovementKeybindings()
 augroup END
 
+" Open and source .vimrc
+:nnoremap <leader>ev :vsplit $MYVIMRC<cr>  " Open .vimrc in a split
+:nnoremap <leader>sv :source $MYVIMRC<cr>  " Source .vimrc
 
 " Automatically switches to the directory that the document is in
 autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
