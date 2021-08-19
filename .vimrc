@@ -17,7 +17,8 @@
 " set the Solarized color palette in your terminal.
 set termguicolors
 set background=dark
-colorscheme solarized8
+
+colorscheme solarized
 
 " Leader
 let mapleader = ","
@@ -38,8 +39,6 @@ set wildmode=list:longest,full " Bash-like tab completion when in conmmand promp
 set ruler         " Show line/col pos in status line
 set showmatch     " Always show matching brace under cursor
 set noerrorbells  " System bell is pure evil
-set background=dark " Set dark background for colors
-set bg=dark       " Set dark background for colors
 set autoread      " Set readonly when file is external modified.
 set showcmd       " Show (partial) command in status line.
 set ignorecase    " Case insensitive matching.
@@ -190,6 +189,11 @@ if has("gui_running")
 else
     " Settings specific to non-GUI instances.
 endif
+
+" Support common clipboard shortcuts
+:inoremap <C-v> <ESC>"+pa
+:vnoremap <C-c> "+y
+:vnoremap <C-d> "+d
 
 " Remap apple keys, useful because i always hit apple instead of ctrl
 if has("mac")
