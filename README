@@ -17,3 +17,8 @@ git clone https://github.com/smacdo/dotfiles.git .dotfiles
 cd .dotfiles
 ./setup.sh
 ```	
+
+## Packages
+### Debian
+`sudo apt install curl git htop tmux vim zsh`
+`sudo apt install binutils build-essential clang-format cmake`
