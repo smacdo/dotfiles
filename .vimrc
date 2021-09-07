@@ -16,8 +16,6 @@
 " should instead use `set t_Co=16` (or `let g:solarized_use16=1`) and manually
 " set the Solarized color palette in your terminal.
 set termguicolors
-set background=dark
-
 colorscheme solarized8
 
 " Leader
