@@ -74,3 +74,4 @@ set_colored_prompt
 
 # Make less more friendly for non-text input files, see lesspipe(1).
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+source "$HOME/.cargo/env"
