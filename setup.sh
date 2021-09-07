@@ -126,3 +126,7 @@ mkdir -pv $HOME/.fonts/
 safe_symlink "$checkout_dir/fonts/liberation" "$HOME/.fonts/liberation"
 safe_symlink "$checkout_dir/fonts/ubuntu" "$HOME/.fonts/ubuntu"
 safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
+
+# Clone plugins locally
+echo "Cloning plugins locally..."
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.dotfiles/.repos/zsh-syntax-highlighting"
