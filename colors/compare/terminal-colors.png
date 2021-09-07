@@ -1,0 +1,11 @@
+--2021-09-06 20:52:23--  https://raw.githubusercontent.com/eikenb/terminal-colors/master/screenshots/default.png
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.110.133, 185.199.111.133, 185.199.109.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.110.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 9161 (8.9K) [image/png]
+Saving to: ‘default.png’
+
+     0K ........                                              100% 29.3M=0s
+
+2021-09-06 20:52:26 (29.3 MB/s) - ‘default.png’ saved [9161/9161]
+
