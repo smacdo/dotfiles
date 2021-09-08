@@ -52,7 +52,7 @@ i*86)
     echo "WARN: Could not detect architecture via 'uname -m'!"
     export DOT_ARCH_BITS=0
     export DOT_ARCH=0
-    ;
+    ;;
 esac
 
 function is_osx() {

@@ -1,11 +1,21 @@
-#############################################################################
-# Scott's .bashrc                                                           #
-#############################################################################
-# Bail out if shell is not running interactively.
-[ -z "$PS1" ] && return
+## Author: Scott MacDonald <scott@smacdo.com>
+## Date: 02/29/2012
+################################################################################
+# bashrc is used to configure a user's shell (aliases, functions, settings, etc)
+# intended for use in an interactive shell.
+#
+# Normally bash does not source this file when running as an interactive _login_
+# shell - it will source `.bash_profile` instead. I've modified that file to make
+# it also source this file. That means in all cases involving an interactive
+# bash shell session this file will be loaded!
+#
+# In some circumstances bash will source .bashrc even though it is running as a
+# non-interactive shell (e.g., when using scp). Check for this condition, and
+# return immediately if the shell is not interactive.
+[[ $- != *i* ]] && return
 
 # Source shell vendor neutral configuration files. These files are shared
-# between the different shells like bash, and zsh to  reduce duplication.
+# between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
 # ~/.shell_local.
@@ -33,16 +43,18 @@ shopt -s autocd
 # update LINES, COLUMNS if needed.
 shopt -s checkwinsize
 
-# Append to bash history file rather than overwriting it.
-shopt -s histappend
-
 # Prevent shell output from overwriting regular files
 # Use `>|` to override, eg `echo "output" >| file.txt"
 set -o noclobber
 
-# Set larger history file sizes.
-HISTSIZE=10000
-HISTFILESIZE=20000
+## History
+# Append to bash history file rather than overwriting it.
+shopt -s histappend     # Append to bash history fle rather than overwriting it.
+
+HISTSIZE=10000          # Ten thousand entries for in-memory storage.
+HISTFILESIZE=1000000    # One million entries
+HISTCONTROL=ignoredups  # Do not write duplicate commands to history.
+HISTFILE=~/.bash_history_actual # Use non-standard name to avoid wiping out history file.
 
 # Complete hostnames using this file
 export HOSTFILE=~/.ssh/known_hosts
@@ -74,4 +86,8 @@ set_colored_prompt
 
 # Make less more friendly for non-text input files, see lesspipe(1).
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
-source "$HOME/.cargo/env"
+
+# Add rust cargo to the path (and any other environment changes it wants).
+if [ -f "$HOME/.cargo/env" ]; then
+    source "$HOME/.cargo/env"
+fi

@@ -1,8 +1,22 @@
-# vi:syntax=sh
-# This file contains export settings common to all shells.
-
+## Author: Scott MacDonald <scott@smacdo.com>
+## Date: 09/29/2020
+################################################################################
+# This file defines environment variables that are common to all shell sessions.
+#
+# NOTE: This file might be sourced more than once, especially for interactive
+# login shell session.
+################################################################################
 # Make vim the default editor.
 export EDITOR='vim'
+
+# Add ~/bin and ~/.dotfiles/bin to path
+if [ -d "$HOME/bin" ]; then
+    export PATH=$PATH:$HOME/bin
+fi
+
+if [ -d "$HOME/.dotfiles/bin" ]; then
+    export PATH=$PATH:$HOME/.dotfiles/bin
+fi
 
 # Some programs require this environment variable to show color.
 export CLICOLOR=1
