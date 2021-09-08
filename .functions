@@ -231,3 +231,8 @@ function cdf
         cd $(dirname $1)
 	fi
 }
+
+# Reload/start shell
+reload() {
+    exec "${SHELL}" "$@"
+}
