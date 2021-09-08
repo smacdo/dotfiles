@@ -2,6 +2,15 @@
 # Briefly highlight the opening parenthsis when you type the closing paren.
 set blink-matching-paren on
 
+# Enable colored highlighting of the part you've typed so far in completion
+# results. If you type 'foo' and hit tab, then "foobar" and "foodles"
+# would have the "foo" part highlighted.
+set colored-completion-prefix on
+
+# Allows you to paste blobs of text without characters being interpreted as
+# editing commands, assuming your terminal supports this. (e.g., iTerm).
+set enable-bracketed-paste on
+
 # Use a visible flash instead of an audio beep for alerting.
 set bell-style visible
 
@@ -53,18 +62,17 @@ set print-completions-horizontally off
 C-n: history-search-forward
 C-p: history-search-backward
 
+#-------------------------------------------------------------------------------
+# Custom keyboard shortcuts (only used if emacs mode is set rather than vi).
+#-------------------------------------------------------------------------------
 $if mode=emacs
 
-#-------------------------------------------------------------------------------
-# keyboard shortcuts
-#-------------------------------------------------------------------------------
-# up arrow: search history backwards
+# up arrow: search history backwards all entries that start with what was typed.
 "\e[A": history-search-backward
 
-# down arrow: search history forwards
+# down arrow: search history forwards all entries starting with what was tped.
 "\e[B": history-search-forward
 
-# TODO: verify these shortcuts.
 # home: move to the beginning of the line.
 "\e[1~": beginning-of-line
 
