@@ -1,0 +1,23 @@
+# Gnome Desktop Extensions
+https://extensions.gnome.org/extension/6/applications-menu/
+https://extensions.gnome.org/extension/7/removable-drive-menu/
+https://extensions.gnome.org/extension/517/caffeine/
+https://extensions.gnome.org/extension/750/openweather/
+https://extensions.gnome.org/extension/3088/extension-list/
+
+# Global shortcuts
+## Launch terminal
+```
+Super-Q: gnome-terminal
+super-R: gnome-terminal --window-with-profile=NAME_OF_PROFILE
+```
+
+## Misc
+* Super-W: Launch Web Browser
+
+# Gnome terminal
+## Custom profile settings
+```
+Command -> Command -> 'Run a dustom command instead of my shell'
+Custom command: sh -c "cd /path/to/dir; exec zsh"
+```
