@@ -1,39 +1,73 @@
 #!/bin/bash
-#############################################################################
-# Automated installation script
-#  - This script will set up common directories, dot files and other system
-#    settings
-#############################################################################
+# Author: Scott MacDonald <scott@smacdo.com>
+# 
+# Configures a *nix environment to use the scripts and configuration values
+# contained in this git repository. Once this script is run, further system
+# bootstrapping can be performed with scripts found in `postinit`.
+
+# Check if stdout is a terminal.
+if test -t 1; then
+    # Check if colors are supported.
+    colorCount=$(tput colors)
+
+    if test -n "$colorCount" && test "$colorCount" -ge 0; then
+        bold="$(tput bold)"
+        underline="$(tput smul)"
+        standout="$(tput smso)"
+        normal="$(tput sgr0)"
+        black="$(tput setaf 0)"
+        red="$(tput setaf 1)"
+        green="$(tput setaf 2)"
+        yellow="$(tput setaf 3)"
+        blue="$(tput setaf 4)"
+        magenta="$(tput setaf 5)"
+        cyan="$(tput setaf 6)"
+        white="$(tput setaf 7)"
+    fi
+fi
 
 # Bail out if this doesn't look like the checkout directory.
 if [[ ! -f "./setup.sh" ]] || [[ ! -f "./README" ]]; then
-  echo "Please run this script from the root directory of the git checkout"
+  echo "${red}Please run this script from the root directory of the git " \
+    "checkout${normal}"
   exit 1
 fi
 
 # Ask the user for confirmation before continuing.
 checkout_dir=$PWD
 
-echo "This script will automatically update your system to use common directories, "
-echo "various dotfiles (zsh, vimrc, etc) and other assorted goodies. "
+echo "This script will configure your environment to use the settings and other"
+echo "goodies contained in this dotfiles repository."
 echo " "
-echo "The current directory is: $checkout_dir"
-echo " "
+echo "It looks like the current directory is: $checkout_dir"
 
-read -p "Is this the root directory of the git checkout? (y|n) "
+read -rp "${bold}Is this the root directory of the git checkout? (y|n)${normal} "
+
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
 # Create common directories
-echo "Creating common directories..."
+echo "${magenta}Creating directories...${normal}"
 
-mkdir -vp $HOME/.shell_profile
-mkdir -vp $HOME/.zsh_local
-mkdir -vp $HOME/.vim_runtime/backups
-mkdir -vp $HOME/.vim_runtime/tmp
+mkdir -vp "$HOME/.shell_profile"
+mkdir -vp "$HOME/.zsh_local"
+mkdir -vp "$HOME/.vim_runtime/backups"
+mkdir -vp "$HOME/.vim_runtime/tmp"
 
-# Safely symlink file
+################################################################################
+# Safely symlink a file by checking for potential errors and interactively
+# asking the user how to fix aforementioned bad situations.
+#
+# Globals:
+#
+# Arguments:
+#  1. SOURCE   Path to the source file (the original physical file).
+#  2. TARGET   Path to the target file (a new file that will be a symlink).
+#
+# Outputs:
+#  Zero if the symlink was created, otherwise a non-zero error value.
+################################################################################
 safe_symlink()
 {
     SOURCE=$1
@@ -41,25 +75,25 @@ safe_symlink()
 
     # Make sure source and target were given.
     if [ $# -lt 2 ]; then
-        echo "ERROR: Missing source and or target arguments"
+        echo "${red}ERROR: Missing source and or target arguments${normal}"
         exit 1
     fi
 
     if [ -z "$TARGET" ]; then
-        echo "ERROR: Target argument not given or empty"
+        echo "${red}ERROR: Target argument not given or empty${normal}"
         exit 1
     fi
 
     if [ -z "$SOURCE" ]; then
-        echo "ERROR: Source argument not given or empty"
+        echo "${red}ERROR: Source argument not given or empty${normal}"
         exit 1
     fi
 
     # Check if target already exists before symlinking.
     if [ ! -f "$TARGET" ] && [ ! -d "$TARGET" ]; then
         # Target does not exist, go ahead and symlink.
-        echo "Symlinking $TARGET => $SOURCE"
-        ln -s $SOURCE $TARGET
+        echo "${blue}Symlinking $TARGET => $SOURCE${normal}"
+        ln -s "$SOURCE" "$TARGET"
     else
         # Target file exists. Check for these conditions:
         #  1. Is Symlink => Skip if symlink points to $SOURCE, else error.
@@ -68,38 +102,40 @@ safe_symlink()
         local FOUND_CONDITION=0
 
         if [ "$(readlink -- "$TARGET")" = "$SOURCE" ]; then
-            echo "$TARGET is already symlinked to $SOURCE."
+            echo "${yellow}$TARGET is already symlinked to $SOURCE.${normal}"
             FOUND_CONDITION=1
         fi
 
         if [ ! -e "$TARGET.bak" ] && [ $FOUND_CONDITION -eq 0 ]; then
             # Ask user for permission.
-            read -p "Can I rename $TARGET to $TARGET.bak before symlinking? (y|n) "
+            read -rp "${bold}Can I rename $TARGET to $TARGET.bak before "\
+                "symlinking? (y|n)${normal} "
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
                 exit 1
             fi
 
             # Rename existing target file.
-            echo "Renaming $TARGET to $TARGET.bak"
-            mv $TARGET $TARGET.bak
+            echo "${blue}Renaming $TARGET to $TARGET.bak${normal}"
+            mv "$TARGET" "${TARGET}.bak"
 
             # Now symlink target.
-            echo "Creating symlink $TARGET => $SOURCE"
-            ln -s $SOURCE $TARGET
+            echo "${blue}Creating symlink $TARGET => $SOURCE${normal}"
+            ln -s "$SOURCE" "$TARGET"
 
             FOUND_CONDITION=1
         fi
 
         # If we couldn't handle the $TARGET existing by this point, just error.
         if [ $FOUND_CONDITION -eq 0 ]; then
-            echo "ERROR: $TARGET already exists. Please remove it and re-run the script".
+            echo "${red}ERROR: $TARGET already exists. Please remove it and " \
+                "re-run the script${normal}".
             exit 1
         fi
     fi
 }
 
 # Symlink useful dotfiles
-echo "Symlinking dotfiles..."
+echo "${magenta}Symlinking dotfiles...${normal}"
 
 safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
 safe_symlink "$checkout_dir/.vimrc" "$HOME/.vimrc"
@@ -121,12 +157,12 @@ touch "$HOME/.shell_profile/.private"
 
 # Install fonts
 # TODO: Make this a configurable option.
-mkdir -pv $HOME/.fonts/
+mkdir -pv "$HOME/.fonts/"
 
 safe_symlink "$checkout_dir/fonts/liberation" "$HOME/.fonts/liberation"
 safe_symlink "$checkout_dir/fonts/ubuntu" "$HOME/.fonts/ubuntu"
 safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
 
-# Clone plugins locally
-echo "Cloning plugins locally..."
+# Clone plugins locally (rather than have them checked into the dotfiles repo).
+echo "${magenta}Cloning plugins locally...${normal}"
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.dotfiles/.repos/zsh-syntax-highlighting"
