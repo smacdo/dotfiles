@@ -51,8 +51,8 @@ set scrolloff=1   " Keep two lines above/below cursor when scrolling up/down.
 set sidescrolloff=5 " Keep five characters to left/right when scrolling horizontally.
 set confirm       " Use dialog to ask if save changes instead of error.
 set backup        " Enable automatic backups.
-set backupdir=~/.vim_runtime/backups " Store backups in a central location.
-set directory=~/.vim_runtime/tmp     " Keep .swp files in one out of the way directory.
+let &backupdir=$XDG_STATE_HOME . "/vim/backups" " Store backups in a central location.
+let &directory=$XDG_STATE_HOME . "/vim/tmp"     " Keep .swp files in one out of the way directory.
 
 " Configure netrw (builtin file explorer) to show files vertically on the left, without the
 " heading text.
@@ -203,3 +203,4 @@ endif
 " Airline plugin config
 let g:airline_theme='molokai'                " Use molokai theme to match.
 let g:airline#extensions#tabline#enabled = 1 " Display all buffers when one tab open
+let g:airline_powerline_fonts = 1

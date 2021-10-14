@@ -1,4 +1,0 @@
-These files were grabbed externally and should be ocassionally updated.
-
-powerlevel10k: https://github.com/romkatv/powerlevel10k#manual
-`git clone --depth=1 https://github.com/romkatv/powerlevel10k.git powerlevel10k`

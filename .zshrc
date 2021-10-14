@@ -8,18 +8,27 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
+# Export the dotfiles path as an environment variable to avoid hardcoding
+# paths.
+# TODO: zshenv
+export S_DOTFILE_ROOT="$HOME/.dotfiles"
+
 #==============================================================================
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
-# ~/.shell_local.
-for file in $HOME/.shell_profile/.{path,functions,exports,aliases,private}; do
+# ~/.shell_profile.sh.
+for file in "${S_DOTFILE_ROOT}"/shell_profile/\
+{xdg.sh,path.sh,functions.sh,exports.sh,aliases.sh,private_branch.sh}; do
     # -r test if FILE exists and is readable.
     # -f test if FILE exists and is a file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;
 unset file
+
+[ -r "${HOME}/.shell_profile.sh" ] && [ -f "${HOME}/.shell_profile.sh" ]\
+&& source "${HOME}/.shell_profile.sh"
 
 # Load .dotfiles shared zsh modules.
 for file in ~/.zsh/*.zsh; do
@@ -27,19 +36,11 @@ for file in ~/.zsh/*.zsh; do
 done
 unset file
 
-# Load local only zsh moduls.
-setopt null_glob
-
-for file in ~/.zsh_local/*.zsh; do
-    . $file
-done
-unset file
-
 #==============================================================================
 # Make sure we can store a decent amount of history lines
 HISTSIZE=2000
-SAVEHIST=2000
-HISTFILE=~/.zsh_history
+SAVEHIST=0
+HISTFILE=~/.local/state/zsh_history
 
 setopt SHARE_HISTORY      # Share history across multiple zsh sessions.
 setopt APPEND_HISTORY     # Append to history file instead of overwriting.
@@ -86,18 +87,19 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 set -o noclobber
 
 # Use the powerlevel10k theme or warn if not installed.
-if [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+if [[ -f "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+    source "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme"  
+elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
-elif [[ -f $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme ]]; then
-    source $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme
 else
     echo "WARNING: powerlevel10k not installed"
 fi
 
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+# Load powerlevel10k, a ZSH plugin for making fancy prompts.
+# To customize run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-[[ ! -f ~/powerlevel10k/powerlevel10k.zsh-theme ]] ||  source ~/powerlevel10k/powerlevel10k.zsh-theme
 
 # Load zsh syntax highlighting plugin
-# NOTE: According to install instructions this must be last in the .zshrc file.
-[[ ! -f ~/.dotfiles/.repos/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] || source ~/.dotfiles/.repos/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+# According to install instructions this must be last in the .zshrc file.
+[[ ! -f "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+    || source "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

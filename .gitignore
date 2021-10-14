@@ -6,3 +6,4 @@ private
 *.pyc
 .vim/.netrwhist
 .repos
+.vim/pack
