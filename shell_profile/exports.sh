@@ -1,5 +1,4 @@
-## Author: Scott MacDonald <scott@smacdo.com>
-## Date: 09/29/2020
+#!/bin/sh
 ################################################################################
 # This file defines environment variables that are common to all shell sessions.
 #
@@ -9,13 +8,9 @@
 # Make vim the default editor.
 export EDITOR='vim'
 
-# Add ~/bin and ~/.dotfiles/bin to path
-if [ -d "$HOME/bin" ]; then
-    export PATH=$PATH:$HOME/bin
-fi
-
-if [ -d "$HOME/.dotfiles/bin" ]; then
-    export PATH=$PATH:$HOME/.dotfiles/bin
+# Rust cargo.
+if [ -f "$HOME/.cargo/env" ]; then
+    . "$HOME/.cargo/env"
 fi
 
 # Some programs require this environment variable to show color.
@@ -24,19 +19,24 @@ export CLICOLOR=1
 # Hide the “default interactive shell is now zsh” warning on macOS.
 export BASH_SILENCE_DEPRECATION_WARNING=1
 
-# Highlight section titles in manual pages.
-export LESS_TERMCAP_md="${yellow}"
-
 # Adds color highlighting to less (which includes man pages).
 #  http://boredzo.org/blog/archives/2016-08-15/colorized-man-pages-understood-and-customized
 export LESS="-R -q"
-export LESS_TERMCAP_mb=$'\E[1;31m'     # begin blink
-export LESS_TERMCAP_md=$'\E[1;32m'     # begin bold
-export LESS_TERMCAP_me=$'\E[0m'        # reset bold/blink
-export LESS_TERMCAP_so=$'\E[01;44;33m' # begin reverse video
-export LESS_TERMCAP_se=$'\E[0m'        # reset reverse video
-export LESS_TERMCAP_us=$'\E[1;94m'     # begin underline
-export LESS_TERMCAP_ue=$'\E[0m'        # reset underline
+LESS_TERMCAP_mb=$(printf '\E[1;31m')     # begin blink
+LESS_TERMCAP_md=$(printf '\E[1;32m')     # begin bold
+LESS_TERMCAP_me=$(printf '\E[0m')        # reset bold/blink
+LESS_TERMCAP_so=$(printf '\E[01;44;33m') # begin reverse video
+LESS_TERMCAP_se=$(printf '\E[0m')        # reset reverse video
+LESS_TERMCAP_us=$(printf '\E[1;94m')     # begin underline
+LESS_TERMCAP_ue=$(printf '\E[0m')        # reset underline
+
+export LESS_TERMCAP_mb
+export LESS_TERMCAP_md
+export LESS_TERMCAP_me
+export LESS_TERMCAP_so
+export LESS_TERMCAP_se
+export LESS_TERMCAP_us
+export LESS_TERMCAP_ue
 
 # ls colors (MacOS)
 export CLICOLOR=1

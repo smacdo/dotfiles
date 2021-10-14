@@ -18,13 +18,17 @@
 # between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
-# ~/.shell_local.
-for file in $HOME/.shell_profile/.{paths,functions,exports,aliases,private}; do
+# ~/.shell_profile.sh.
+for file in $S_DOTFILE_ROOT/shell_profile/\
+{xdg.sh,paths.sh,exports.sh,functions.sh,aliases.sh}; do
     # -r test if FILE exists and is readable.
     # -f test if FILE exists and is a file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;
 unset file
+
+[ -r "${HOME}/.shell_profile.sh" ] && [ -f "${HOME}/.shell_profile.sh" ]\
+&& source "${HOME}/.shell_profile.sh"
 
 # Flash the screen instead of playing an audio bell.
 set bell-style visible
@@ -54,7 +58,7 @@ shopt -s histappend     # Append to bash history fle rather than overwriting it.
 HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 HISTFILESIZE=1000000    # One million entries
 HISTCONTROL=ignoredups  # Do not write duplicate commands to history.
-HISTFILE=~/.bash_history_actual # Use non-standard name to avoid wiping out history file.
+HISTFILE=$XDG_STATE_HOME/bash_history_actual # Use non-standard name to avoid wiping out history file.
 
 # Complete hostnames using this file
 export HOSTFILE=~/.ssh/known_hosts
@@ -86,8 +90,3 @@ set_colored_prompt
 
 # Make less more friendly for non-text input files, see lesspipe(1).
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
-
-# Add rust cargo to the path (and any other environment changes it wants).
-if [ -f "$HOME/.cargo/env" ]; then
-    source "$HOME/.cargo/env"
-fi

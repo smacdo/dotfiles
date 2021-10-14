@@ -47,13 +47,14 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
+# Load XDG values prior to setup.
+. "${checkout_dir}/shell_profile/xdg.sh"
+
 # Create common directories
 echo "${magenta}Creating directories...${normal}"
 
-mkdir -vp "$HOME/.shell_profile"
-mkdir -vp "$HOME/.zsh_local"
-mkdir -vp "$HOME/.vim_runtime/backups"
-mkdir -vp "$HOME/.vim_runtime/tmp"
+mkdir -vp "${XDG_STATE_HOME}/vim/backups"
+mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
 
 ################################################################################
 # Safely symlink a file by checking for potential errors and interactively
@@ -148,12 +149,14 @@ safe_symlink "$checkout_dir/zsh_files" "$HOME/.zsh"
 safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
 safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
 safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
-safe_symlink "$checkout_dir/.aliases" "$HOME/.shell_profile/.aliases"
-safe_symlink "$checkout_dir/.functions" "$HOME/.shell_profile/.functions"
-safe_symlink "$checkout_dir/.exports" "$HOME/.shell_profile/.exports"
-safe_symlink "$checkout_dir/.paths" "$HOME/.shell_profile/.paths"
+safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
 
-touch "$HOME/.shell_profile/.private"
+# Create machine local configuration files.
+if [[ -f "${HOME}/.shell_profile.sh" ]]; then
+    echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
+else
+    touch "${HOME}/.shell_profile.sh"
+fi
 
 # Install fonts
 # TODO: Make this a configurable option.

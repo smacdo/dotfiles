@@ -1,4 +1,4 @@
-# vim: set filetype=sh
+##!/bin/sh
 ## Author: Scott MacDonald <scott@smacdo.com
 ## Created: 09/29/2020 
 ## Purpose: Shell functions shared between bash/zsh/etc.
@@ -55,30 +55,30 @@ i*86)
     ;;
 esac
 
-function is_osx() {
+is_osx() {
     [[ "$DOT_OS" == "macos" ]] || return 1
 }
 
-function is_linux() {
+is_linux() {
     [[ "$DOT_OS" == "linux" ]] || return 1
 }
 
-function is_redhat() {
+is_redhat() {
     [[ "$DOT_DIST" == "redhat" ]] || return 1
 }
 
-function is_ubuntu() {
+is_ubuntu() {
     [[ "$DOT_DIST" == "ubuntu" ]] || return 1
 }
 
-function is_cygwin() {
+is_cygwin() {
     # TODO: Move platform detection to above code block.
     [[ $(uname -s) =~ ^CYGWIN* ]] || return 1
 }
 
 # Ask user to confirm before continuing. Returns 0 for yes, 1 for no.
 # First parameter is the text to confirm with.
-function prompt_confirm() {
+prompt_confirm() {
     while true; do
         read -r -n 1 -p "${1:-Continue?} [y|n]: " REPLY
         case $REPLY in
@@ -90,7 +90,7 @@ function prompt_confirm() {
 }
 
 # Ensure software packages are up to date.
-function update_packages() {
+update_packages() {
     if [[ is_ubuntu ]]; then
         sudo apt update
     elif [[ is_redhat ]]; then
@@ -105,7 +105,7 @@ function update_packages() {
 }
 
 # Update software packages and upgrade to latest version.
-function upgrade_packages() {
+upgrade_packages() {
     prompt_confirm "Upgrade all installed packages to latest version?"
     update_packages || return 1
 
@@ -123,7 +123,7 @@ function upgrade_packages() {
 }
 
 # Install a specific package name.
-function install_package() {
+install_package() {
     if [[ is_ubuntu ]]; then
         sudo apt install $*
     elif [[ is_redhat ]]; then
@@ -138,7 +138,7 @@ function install_package() {
 }
 
 # Set the terminal title bar (if the terminal emulator supports it).
-function set_titlebar() {
+set_titlebar() {
     echo $'\033]0;'$*$'\007'
 }
 
@@ -148,7 +148,7 @@ cdl() {
     local dir="${dir:=$HOME}" # if dir empty then set to $HOME (emulate `cd `)
     if [[ -d "$dir" ]]; then
         cd "$dir" >/dev/null
-        if [[ is_osx ]]; then
+        if is_osx ; then
             ls -G -lF
         else
             ls --color -lF
@@ -159,50 +159,42 @@ cdl() {
 }
 
 # Create a directory and enter it.
-function mkd() {
-    mkdir -p "$@" && cd "$_"
+mkd() {
+    mkdir -p "$@" && cd "$_" || return
 }
 
 # Create a directory in /tmp and enter it.
-function mkdtmp() {
-    cd $(mktemp -d)
+mkdtmp() {
+    cd "$(mktemp -d)" || return
 }
 
-# Use git's colored diff when available.
-hash git &>/dev/null;
-if [ $? -eq 0 ]; then
-    function diff() {
-        git diff --no-index --color-words "$@"
-    }
-fi
-
 # ssh and start a screen session on the remote server
-function sshs {
+sshs() {
 	if [[ -z $* ]]; then
 		echo 'Usage: sshs [options] [user@]hostname'
 		echo 'SSH and automatically start a GNU screen session on the remote server'
 	else
-		ssh -t $* screen -DRU
+		ssh -t "$@" screen -DRU
 	fi
 }
 
 # One function to extract the contents of different archive formats.
 # THIS WILL EXTRACT THE FILES INTO YOUR CURRENT DIRECTORY!
-function extract {
+extract() {
 	if [[ -z $1 ]]; then
 		echo 'Usage: extract ARCHIVE'
 		echo 'Extract files from ARCHIVE to the current directory'
 	elif [[ -r $1 ]]; then
 		case $1 in
-			*.rar)      unrar x $1     ;;
-			*.tar)      tar -xvf $1    ;;
-			*.tar.bz2)  tar -xjvf $1   ;;
-			*.bz2)      bzip2 -d $1    ;;
-			*.tar.gz)   tar -xzvf $1   ;;
-			*.gz)       gunzip -d $1   ;;
-			*.tgz)      tar -xzvf $1   ;;
-			*.Z)        uncompress $1  ;;
-			*.zip)      unzip $1       ;;
+			*.rar)      unrar x "$1"     ;;
+			*.tar)      tar -xvf "$1"    ;;
+			*.tar.bz2)  tar -xjvf "$1"   ;;
+			*.bz2)      bzip2 -d "$1"    ;;
+			*.tar.gz)   tar -xzvf "$1"   ;;
+			*.gz)       gunzip -d "$1"   ;;
+			*.tgz)      tar -xzvf "$1"   ;;
+			*.Z)        uncompress "$1"  ;;
+			*.zip)      unzip "$1"       ;;
 
 			*) echo "ERROR: '$1' is not a known archive type"  ;;
 		esac
@@ -212,23 +204,22 @@ function extract {
 }
 
 # Recursively search for a file with the named pattern starting in the current directory.
-function ff {
+ff() {
 	if [[ -z $1 ]]; then
 		echo 'Usage: ff PATTERN'
 		echo 'Recursively search for a file named PATTERN in the current directory'
 	else
-		find . -type f -iname $1
+		find . -type f -iname "$1"
 	fi
 }
 
 # Change to the directory containing the given file path.
-function cdf
-{
-	if [[ -z $1 ]]; then
+cdf() {
+	if [ -z "$1" ]; then
 		echo 'Usage: cdf PATTERN'
 		echo 'cd into the directory basepath of the given file'
 	else
-        cd $(dirname $1)
+        cd "$(dirname "$1")" || return
 	fi
 }
 
