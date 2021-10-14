@@ -208,3 +208,7 @@ fetch_git_tag powerlevel10k "v1.15.0" \
 fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
     "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
     "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
+
+fetch_git_tag VimmFugitive "v3.4" \
+    "https://github.com/tpope/vim-fugitive.git" \
+    "${HOME}/.vim/pack/tpope/start/fugitive"
