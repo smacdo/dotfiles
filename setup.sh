@@ -150,6 +150,7 @@ safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
 safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
 safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
 safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
+safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
 
 # Create machine local configuration files.
 if [[ -f "${HOME}/.shell_profile.sh" ]]; then
