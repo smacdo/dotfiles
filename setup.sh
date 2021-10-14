@@ -168,4 +168,38 @@ safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
 
 # Clone plugins locally (rather than have them checked into the dotfiles repo).
 echo "${magenta}Cloning plugins locally...${normal}"
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.dotfiles/.repos/zsh-syntax-highlighting"
+
+################################################################################
+# Checkout a git repository to a target directory, and update it to point at the
+# given tag.
+#
+# Arguments:
+#  1. NAME     Friendly name of the repository (for pretty printing).
+#  2. TAG      Tag to update the repository to..
+#  3. GIT_URL  URL to clone repository from.
+#  4. DEST     Destination directory to clone repository to.
+################################################################################
+fetch_git_tag() {
+    NAME=$1
+    TAG=$2
+    GIT_URL=$3
+    DEST=$4
+
+    # TODO: Argument validation.
+    
+    # Clone the repository if the directory doesn't already exist.
+    if [ ! -d "$DEST" ]; then
+        echo "${blue}Cloning git repository for $NAME${normal}"
+        git clone "$GIT_URL" "$DEST" || return 1
+    else
+        echo "${yellow}Destination exists, skipping checkout.${normal}"
+    fi
+
+    # Update to the requested tag.
+    echo "${blue}Updating ${NAME} to tag ${TAG}${normal}"
+    (cd "$DEST" && git -c advice.detachedHead=false checkout "tags/${TAG}")
+}
+
+fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
+    "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
+    "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"

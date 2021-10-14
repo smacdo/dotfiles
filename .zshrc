@@ -100,5 +100,6 @@ fi
 [[ ! -f ~/powerlevel10k/powerlevel10k.zsh-theme ]] ||  source ~/powerlevel10k/powerlevel10k.zsh-theme
 
 # Load zsh syntax highlighting plugin
-# NOTE: According to install instructions this must be last in the .zshrc file.
-[[ ! -f ~/.dotfiles/.repos/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] || source ~/.dotfiles/.repos/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+# According to install instructions this must be last in the .zshrc file.
+[[ ! -f "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+    || source "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
