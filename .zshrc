@@ -87,17 +87,17 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 set -o noclobber
 
 # Use the powerlevel10k theme or warn if not installed.
-if [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+if [[ -f "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+    source "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme"  
+elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
-elif [[ -f $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme ]]; then
-    source $HOME/.dotfiles/vendor/powerlevel10k/powerlevel10k.zsh-theme
 else
     echo "WARNING: powerlevel10k not installed"
 fi
 
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+# Load powerlevel10k, a ZSH plugin for making fancy prompts.
+# To customize run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-[[ ! -f ~/powerlevel10k/powerlevel10k.zsh-theme ]] ||  source ~/powerlevel10k/powerlevel10k.zsh-theme
 
 # Load zsh syntax highlighting plugin
 # According to install instructions this must be last in the .zshrc file.

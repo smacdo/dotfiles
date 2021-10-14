@@ -200,6 +200,10 @@ fetch_git_tag() {
     (cd "$DEST" && git -c advice.detachedHead=false checkout "tags/${TAG}")
 }
 
+fetch_git_tag powerlevel10k "v1.15.0" \
+    "https://github.com/romkatv/powerlevel10k.git" \
+    "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
+
 fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
     "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
     "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
