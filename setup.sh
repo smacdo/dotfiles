@@ -7,29 +7,29 @@
 
 # Check if stdout is a terminal.
 if test -t 1; then
-    # Check if colors are supported.
-    colorCount=$(tput colors)
+  # Check if colors are supported.
+  colorCount=$(tput colors)
 
-    if test -n "$colorCount" && test "$colorCount" -ge 0; then
-        bold="$(tput bold)"
-        underline="$(tput smul)"
-        standout="$(tput smso)"
-        normal="$(tput sgr0)"
-        black="$(tput setaf 0)"
-        red="$(tput setaf 1)"
-        green="$(tput setaf 2)"
-        yellow="$(tput setaf 3)"
-        blue="$(tput setaf 4)"
-        magenta="$(tput setaf 5)"
-        cyan="$(tput setaf 6)"
-        white="$(tput setaf 7)"
-    fi
+  if test -n "$colorCount" && test "$colorCount" -ge 0; then
+    bold="$(tput bold)"
+    underline="$(tput smul)"
+    standout="$(tput smso)"
+    normal="$(tput sgr0)"
+    black="$(tput setaf 0)"
+    red="$(tput setaf 1)"
+    green="$(tput setaf 2)"
+    yellow="$(tput setaf 3)"
+    blue="$(tput setaf 4)"
+    magenta="$(tput setaf 5)"
+    cyan="$(tput setaf 6)"
+    white="$(tput setaf 7)"
+  fi
 fi
 
 # Bail out if this doesn't look like the checkout directory.
 if [[ ! -f "./setup.sh" ]] || [[ ! -f "./README" ]]; then
   echo "${red}Please run this script from the root directory of the git " \
-    "checkout${normal}"
+       "checkout${normal}"
   exit 1
 fi
 
@@ -44,7 +44,7 @@ echo "It looks like the current directory is: $checkout_dir"
 read -rp "${bold}Is this the root directory of the git checkout? (y|n)${normal} "
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 1
+  exit 1
 fi
 
 # Load XDG values prior to setup.
@@ -71,68 +71,68 @@ mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
 ################################################################################
 safe_symlink()
 {
-    SOURCE=$1
-    TARGET=$2
+  SOURCE=$1
+  TARGET=$2
 
-    # Make sure source and target were given.
-    if [ $# -lt 2 ]; then
-        echo "${red}ERROR: Missing source and or target arguments${normal}"
+  # Make sure source and target were given.
+  if [ $# -lt 2 ]; then
+    echo "${red}ERROR: Missing source and or target arguments${normal}"
+    exit 1
+  fi
+
+  if [ -z "$TARGET" ]; then
+    echo "${red}ERROR: Target argument not given or empty${normal}"
+    exit 1
+  fi
+
+  if [ -z "$SOURCE" ]; then
+    echo "${red}ERROR: Source argument not given or empty${normal}"
+    exit 1
+  fi
+
+  # Check if target already exists before symlinking.
+  if [ ! -f "$TARGET" ] && [ ! -d "$TARGET" ]; then
+    # Target does not exist, go ahead and symlink.
+    echo "${blue}Symlinking $TARGET => $SOURCE${normal}"
+    ln -s "$SOURCE" "$TARGET"
+  else
+    # Target file exists. Check for these conditions:
+    #  1. Is Symlink => Skip if symlink points to $SOURCE, else error.
+    #  2. Is regular file => Back it up to $TARGET.bak (if $TARGET.bak does not exist).
+    #  3. Else => Error.
+    local FOUND_CONDITION=0
+
+    if [ "$(readlink -- "$TARGET")" = "$SOURCE" ]; then
+      echo "${yellow}$TARGET is already symlinked to $SOURCE.${normal}"
+      FOUND_CONDITION=1
+    fi
+
+    if [ ! -e "$TARGET.bak" ] && [ $FOUND_CONDITION -eq 0 ]; then
+      # Ask user for permission.
+      read -rp "${bold}Can I rename $TARGET to $TARGET.bak before "\
+               "symlinking? (y|n)${normal} "
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
+      fi
+
+      # Rename existing target file.
+      echo "${blue}Renaming $TARGET to $TARGET.bak${normal}"
+      mv "$TARGET" "${TARGET}.bak"
+
+      # Now symlink target.
+      echo "${blue}Creating symlink $TARGET => $SOURCE${normal}"
+      ln -s "$SOURCE" "$TARGET"
+
+      FOUND_CONDITION=1
     fi
 
-    if [ -z "$TARGET" ]; then
-        echo "${red}ERROR: Target argument not given or empty${normal}"
-        exit 1
+    # If we couldn't handle the $TARGET existing by this point, just error.
+    if [ $FOUND_CONDITION -eq 0 ]; then
+      echo "${red}ERROR: $TARGET already exists. Please remove it and " \
+           "re-run the script${normal}".
+      exit 1
     fi
-
-    if [ -z "$SOURCE" ]; then
-        echo "${red}ERROR: Source argument not given or empty${normal}"
-        exit 1
-    fi
-
-    # Check if target already exists before symlinking.
-    if [ ! -f "$TARGET" ] && [ ! -d "$TARGET" ]; then
-        # Target does not exist, go ahead and symlink.
-        echo "${blue}Symlinking $TARGET => $SOURCE${normal}"
-        ln -s "$SOURCE" "$TARGET"
-    else
-        # Target file exists. Check for these conditions:
-        #  1. Is Symlink => Skip if symlink points to $SOURCE, else error.
-        #  2. Is regular file => Back it up to $TARGET.bak (if $TARGET.bak does not exist).
-        #  3. Else => Error.
-        local FOUND_CONDITION=0
-
-        if [ "$(readlink -- "$TARGET")" = "$SOURCE" ]; then
-            echo "${yellow}$TARGET is already symlinked to $SOURCE.${normal}"
-            FOUND_CONDITION=1
-        fi
-
-        if [ ! -e "$TARGET.bak" ] && [ $FOUND_CONDITION -eq 0 ]; then
-            # Ask user for permission.
-            read -rp "${bold}Can I rename $TARGET to $TARGET.bak before "\
-                "symlinking? (y|n)${normal} "
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
-
-            # Rename existing target file.
-            echo "${blue}Renaming $TARGET to $TARGET.bak${normal}"
-            mv "$TARGET" "${TARGET}.bak"
-
-            # Now symlink target.
-            echo "${blue}Creating symlink $TARGET => $SOURCE${normal}"
-            ln -s "$SOURCE" "$TARGET"
-
-            FOUND_CONDITION=1
-        fi
-
-        # If we couldn't handle the $TARGET existing by this point, just error.
-        if [ $FOUND_CONDITION -eq 0 ]; then
-            echo "${red}ERROR: $TARGET already exists. Please remove it and " \
-                "re-run the script${normal}".
-            exit 1
-        fi
-    fi
+  fi
 }
 
 # Symlink useful dotfiles
@@ -154,9 +154,9 @@ safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
 
 # Create machine local configuration files.
 if [[ -f "${HOME}/.shell_profile.sh" ]]; then
-    echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
+  echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
 else
-    touch "${HOME}/.shell_profile.sh"
+  touch "${HOME}/.shell_profile.sh"
 fi
 
 # Install fonts
@@ -181,38 +181,38 @@ echo "${magenta}Cloning plugins locally...${normal}"
 #  4. DEST     Destination directory to clone repository to.
 ################################################################################
 fetch_git_tag() {
-    NAME=$1
-    TAG=$2
-    GIT_URL=$3
-    DEST=$4
+  NAME=$1
+  TAG=$2
+  GIT_URL=$3
+  DEST=$4
 
-    # TODO: Argument validation.
-    
-    # Clone the repository if the directory doesn't already exist.
-    if [ ! -d "$DEST" ]; then
-        echo "${blue}Cloning git repository for $NAME${normal}"
-        git clone "$GIT_URL" "$DEST" || return 1
-    else
-        echo "${yellow}Destination exists, skipping checkout.${normal}"
-    fi
+  # TODO: Argument validation.
+  
+  # Clone the repository if the directory doesn't already exist.
+  if [ ! -d "$DEST" ]; then
+    echo "${blue}Cloning git repository for $NAME${normal}"
+    git clone "$GIT_URL" "$DEST" || return 1
+  else
+    echo "${yellow}Destination exists, skipping checkout.${normal}"
+  fi
 
-    # Update to the requested tag.
-    echo "${blue}Updating ${NAME} to tag ${TAG}${normal}"
-    (cd "$DEST" && git -c advice.detachedHead=false checkout "tags/${TAG}")
+  # Update to the requested tag.
+  echo "${blue}Updating ${NAME} to tag ${TAG}${normal}"
+  (cd "$DEST" && git -c advice.detachedHead=false checkout "tags/${TAG}")
 }
 
 fetch_git_tag powerlevel10k "v1.15.0" \
-    "https://github.com/romkatv/powerlevel10k.git" \
-    "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
+  "https://github.com/romkatv/powerlevel10k.git" \
+  "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
 
 fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
-    "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
-    "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
+  "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
+  "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
 
 fetch_git_tag VimAirline "v0.11" \
-    "https://github.com/vim-airline/vim-airline" \
-    "${HOME}/.vim/pack/dist/start/vim-airline"
+  "https://github.com/vim-airline/vim-airline" \
+  "${HOME}/.vim/pack/dist/start/vim-airline"
 
 fetch_git_tag VimFugitive "v3.4" \
-    "https://github.com/tpope/vim-fugitive.git" \
-    "${HOME}/.vim/pack/tpope/start/fugitive"
+  "https://github.com/tpope/vim-fugitive.git" \
+  "${HOME}/.vim/pack/tpope/start/fugitive"
