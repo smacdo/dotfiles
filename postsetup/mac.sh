@@ -25,7 +25,7 @@ brew doctor
 brew update
 
 # Install common packages for Mac OS
-brew install powerlevel10k
+brew install vim
 brew install htop fzf neovim ripgrep tmux zsh mosh
 brew install zoom
 
