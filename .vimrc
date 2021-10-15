@@ -31,7 +31,7 @@ set shiftwidth=4  " Use 4 spaces when auto indenting, hitting >> << or ==.
 set softtabstop=4 " Treat 4 spaces as a tab when hitting tab, deleting etc. 
 set shiftround    " Round indent to multiple of shiftwidth ('>', '<').
 set autoindent    " Copies indentation from previous line when starting a new line.
-set textwidth=120 " Maximum width of text that is being inserted before being broken up.
+set textwidth=100 " Maximum width of text that is being inserted before being broken up.
 set number        " Display line numbers in left column.
 set showmode      " Shows mode at bottom (ie --INSERT--).
 set wildmode=list:longest,full " Bash-like tab completion when in conmmand prompt.
