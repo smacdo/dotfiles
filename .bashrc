@@ -90,3 +90,9 @@ set_colored_prompt
 
 # Make less more friendly for non-text input files, see lesspipe(1).
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+
+# Load iTerm2 shell integration
+if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
+  source ${S_DOTFILE_ROOT}/vendor/iterm2/bash
+fi
+

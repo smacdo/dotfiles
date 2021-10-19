@@ -99,6 +99,11 @@ fi
 # To customize run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+# Load iTerm2 shell integration script.
+if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
+    source ${S_DOTFILE_ROOT}/vendor/iterm2/zsh
+fi
+
 # Load zsh syntax highlighting plugin
 # According to install instructions this must be last in the .zshrc file.
 [[ ! -f "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
