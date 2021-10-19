@@ -33,6 +33,9 @@ brew install --cask sublime-text
 brew install --cask iterm2
 brew install --cask messenger-native
 
+# also: --cask workplace-chat
+#              microsoft-outlook
+
 # Install developer packages for Mac OS
 #brew install cmake clang-format
 brew install --cask visual-studio-code

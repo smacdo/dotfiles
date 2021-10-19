@@ -18,7 +18,17 @@ cd .dotfiles
 ./setup.sh
 ```	
 
-## Packages
-### Debian
+# Platforms
+## Debian
 `sudo apt install curl git htop tmux vim zsh`
 `sudo apt install binutils build-essential clang-format cmake`
+
+## Mac
+```
+./.dotfiles/postsetup/mac.sh
+# Restart shell session
+
+# Install nerd font support via p10k when running in iTerm
+p10k configure
+
+```
