@@ -1,60 +1,115 @@
-#!/bin/bash
+#!/bin/sh
 # Author: Scott MacDonald <scott@smacdo.com>
-# 
+#-------------------------------------------------------------------------------
 # Configures a *nix environment to use the scripts and configuration values
 # contained in this git repository. Once this script is run, further system
 # bootstrapping can be performed with scripts found in `postinit`.
+#-------------------------------------------------------------------------------
+main() {
+  # Check if stdout is a terminal.
+  if test -t 1; then
+    # Check if colors are supported.
+    colorCount=$(tput colors)
 
-# Check if stdout is a terminal.
-if test -t 1; then
-  # Check if colors are supported.
-  colorCount=$(tput colors)
-
-  if test -n "$colorCount" && test "$colorCount" -ge 0; then
-    bold="$(tput bold)"
-    underline="$(tput smul)"
-    standout="$(tput smso)"
-    normal="$(tput sgr0)"
-    black="$(tput setaf 0)"
-    red="$(tput setaf 1)"
-    green="$(tput setaf 2)"
-    yellow="$(tput setaf 3)"
-    blue="$(tput setaf 4)"
-    magenta="$(tput setaf 5)"
-    cyan="$(tput setaf 6)"
-    white="$(tput setaf 7)"
+    if test -n "$colorCount" && test "$colorCount" -ge 0; then
+      bold="$(tput bold)"
+      underline="$(tput smul)"
+      standout="$(tput smso)"
+      normal="$(tput sgr0)"
+      black="$(tput setaf 0)"
+      red="$(tput setaf 1)"
+      green="$(tput setaf 2)"
+      yellow="$(tput setaf 3)"
+      blue="$(tput setaf 4)"
+      magenta="$(tput setaf 5)"
+      cyan="$(tput setaf 6)"
+      white="$(tput setaf 7)"
+    fi
   fi
-fi
 
-# Bail out if this doesn't look like the checkout directory.
-if [[ ! -f "./setup.sh" ]] || [[ ! -f "./README" ]]; then
-  echo "${red}Please run this script from the root directory of the git " \
-       "checkout${normal}"
-  exit 1
-fi
+  # Bail out if this doesn't look like the checkout directory.
+  if [ ! -f "./setup.sh" ] || [ ! -f "./README" ]; then
+    echo "${red}Please run this script from the root directory of the git " \
+        "checkout${normal}"
+    exit 1
+  fi
 
-# Ask the user for confirmation before continuing.
-checkout_dir=$PWD
+  # Ask the user for confirmation before continuing.
+  checkout_dir=$PWD
 
-echo "This script will configure your environment to use the settings and other"
-echo "goodies contained in this dotfiles repository."
-echo " "
-echo "It looks like the current directory is: $checkout_dir"
+  echo "This script will configure your environment to use the settings and other"
+  echo "goodies contained in this dotfiles repository."
+  echo " "
+  echo "It looks like the current directory is: $checkout_dir"
 
-read -rp "${bold}Is this the root directory of the git checkout? (y|n)${normal} "
+  echo "${bold}Is this the root directory of the git checkout? (y|n) "\
+       "${normal} " >&2
+  read -r REPLY
 
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  exit 1
-fi
+  if [ "${REPLY}" != "Y" ] && [ "${REPLY}" != "y" ]; then
+    exit 1
+  fi
 
-# Load XDG values prior to setup.
-. "${checkout_dir}/shell_profile/xdg.sh"
+  # Load XDG values prior to setup.
+  . "${checkout_dir}/shell_profile/xdg.sh"
 
-# Create common directories
-echo "${magenta}Creating directories...${normal}"
+  # Create common directories
+  echo "${magenta}Creating directories...${normal}"
 
-mkdir -vp "${XDG_STATE_HOME}/vim/backups"
-mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
+  mkdir -vp "${XDG_STATE_HOME}/vim/backups"
+  mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
+
+  # Symlink useful dotfiles
+  echo "${magenta}Symlinking dotfiles...${normal}"
+
+  safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
+  safe_symlink "$checkout_dir/.vimrc" "$HOME/.vimrc"
+  safe_symlink "$checkout_dir/.vim" "$HOME/.vim"
+  safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
+  safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
+  safe_symlink "$checkout_dir/.zshrc" "$HOME/.zshrc"
+  safe_symlink "$checkout_dir/.p10k.zsh" "$HOME/.p10k.zsh"
+  safe_symlink "$checkout_dir/zsh_files" "$HOME/.zsh"
+  safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
+  safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
+  safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
+  safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
+  safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
+
+  # Create machine local configuration files.
+  if [ -f "${HOME}/.shell_profile.sh" ]; then
+    echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
+  else
+    touch "${HOME}/.shell_profile.sh"
+  fi
+
+  # Install fonts
+  # TODO: Make this a configurable option.
+  mkdir -pv "$HOME/.fonts/"
+
+  safe_symlink "$checkout_dir/fonts/liberation" "$HOME/.fonts/liberation"
+  safe_symlink "$checkout_dir/fonts/ubuntu" "$HOME/.fonts/ubuntu"
+  safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
+
+  # Clone plugins locally (rather than have them checked into the dotfiles repo).
+  echo "${magenta}Cloning plugins locally...${normal}"
+
+  fetch_git_tag powerlevel10k "v1.15.0" \
+    "https://github.com/romkatv/powerlevel10k.git" \
+    "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
+
+  fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
+    "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
+    "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
+
+  fetch_git_tag VimAirline "v0.11" \
+    "https://github.com/vim-airline/vim-airline" \
+    "${HOME}/.vim/pack/dist/start/vim-airline"
+
+  fetch_git_tag VimFugitive "v3.4" \
+    "https://github.com/tpope/vim-fugitive.git" \
+    "${HOME}/.vim/pack/tpope/start/fugitive"
+}
 
 ################################################################################
 # Safely symlink a file by checking for potential errors and interactively
@@ -100,7 +155,7 @@ safe_symlink()
     #  1. Is Symlink => Skip if symlink points to $SOURCE, else error.
     #  2. Is regular file => Back it up to $TARGET.bak (if $TARGET.bak does not exist).
     #  3. Else => Error.
-    local FOUND_CONDITION=0
+    FOUND_CONDITION=0
 
     if [ "$(readlink -- "$TARGET")" = "$SOURCE" ]; then
       echo "${yellow}$TARGET is already symlinked to $SOURCE.${normal}"
@@ -109,9 +164,11 @@ safe_symlink()
 
     if [ ! -e "$TARGET.bak" ] && [ $FOUND_CONDITION -eq 0 ]; then
       # Ask user for permission.
-      read -rp "${bold}Can I rename $TARGET to $TARGET.bak before "\
-               "symlinking? (y|n)${normal} "
-      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "${bold}Can I rename $TARGET to $TARGET.bak before symlinking? "\
+               "(y|n)${normal} " >&2
+      read -r REPLY
+
+      if [ "${REPLY}" != "Y" ] && [ "${REPLY}" != "y" ]; then
         exit 1
       fi
 
@@ -135,41 +192,6 @@ safe_symlink()
   fi
 }
 
-# Symlink useful dotfiles
-echo "${magenta}Symlinking dotfiles...${normal}"
-
-safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
-safe_symlink "$checkout_dir/.vimrc" "$HOME/.vimrc"
-safe_symlink "$checkout_dir/.vim" "$HOME/.vim"
-safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
-safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
-safe_symlink "$checkout_dir/.zshrc" "$HOME/.zshrc"
-safe_symlink "$checkout_dir/.p10k.zsh" "$HOME/.p10k.zsh"
-safe_symlink "$checkout_dir/zsh_files" "$HOME/.zsh"
-safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
-safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
-safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
-safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
-safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
-
-# Create machine local configuration files.
-if [[ -f "${HOME}/.shell_profile.sh" ]]; then
-  echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
-else
-  touch "${HOME}/.shell_profile.sh"
-fi
-
-# Install fonts
-# TODO: Make this a configurable option.
-mkdir -pv "$HOME/.fonts/"
-
-safe_symlink "$checkout_dir/fonts/liberation" "$HOME/.fonts/liberation"
-safe_symlink "$checkout_dir/fonts/ubuntu" "$HOME/.fonts/ubuntu"
-safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
-
-# Clone plugins locally (rather than have them checked into the dotfiles repo).
-echo "${magenta}Cloning plugins locally...${normal}"
-
 ################################################################################
 # Checkout a git repository to a target directory, and update it to point at the
 # given tag.
@@ -186,9 +208,26 @@ fetch_git_tag() {
   GIT_URL=$3
   DEST=$4
 
-  # TODO: Argument validation.
-  
+  # Name, url and destination are required.
+  # TODO: Detect when TAG is missing and omit the argument in call to git.
+  if [ -z "${NAME}" ]; then
+    echo "${red}Argument 'NAME' missing for 'fetch_git_tag' call${normal}"
+    exit 1
+  fi
+
+  if [ -z "${GIT_URL}" ]; then
+    echo "${red}Argument 'GIT_URL' missing for 'fetch_git_tag' call${normal}"
+    exit 1
+  fi
+
+  if [ -z "${GIT_URL}" ]; then
+    echo "${red}Argument 'DEST' missing for 'fetch_git_tag' call${normal}"
+    exit 1
+  fi
+
   # Clone the repository if the directory doesn't already exist.
+  # TODO: Can we do a checkout only for that tag? And can we update a prev
+  #       checkout to a different tag?
   if [ ! -d "$DEST" ]; then
     echo "${blue}Cloning git repository for $NAME${normal}"
     git clone "$GIT_URL" "$DEST" || return 1
@@ -201,18 +240,4 @@ fetch_git_tag() {
   (cd "$DEST" && git -c advice.detachedHead=false checkout "tags/${TAG}")
 }
 
-fetch_git_tag powerlevel10k "v1.15.0" \
-  "https://github.com/romkatv/powerlevel10k.git" \
-  "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
-
-fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
-  "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
-  "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
-
-fetch_git_tag VimAirline "v0.11" \
-  "https://github.com/vim-airline/vim-airline" \
-  "${HOME}/.vim/pack/dist/start/vim-airline"
-
-fetch_git_tag VimFugitive "v3.4" \
-  "https://github.com/tpope/vim-fugitive.git" \
-  "${HOME}/.vim/pack/tpope/start/fugitive"
+main "$@"; exit
