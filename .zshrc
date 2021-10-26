@@ -38,8 +38,8 @@ unset file
 
 #==============================================================================
 # Make sure we can store a decent amount of history lines
-HISTSIZE=2000
-SAVEHIST=0
+HISTSIZE=20000
+SAVEHIST=20000
 HISTFILE=~/.local/state/zsh_history
 
 setopt SHARE_HISTORY      # Share history across multiple zsh sessions.
