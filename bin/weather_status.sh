@@ -59,13 +59,15 @@ is_file_newer_than() {
   fi
 
   # Get the number of seconds since file was last modified.
-  FILE_LASTMOD_SEC=$(stat "${FILE_TO_CHECK}" -c %Y)
+  # Ref: https://stackoverflow.com/a/12170291
+  # Ref: https://man7.org/linux/man-pages/man3/strftime.3.html
+  FILE_LASTMOD_SEC=$(stat -f "%Sm" -t "%s" "${FILE_TO_CHECK}")
 
   # Get the current number of seconds.
   NOW_SEC=$(date +%s)
 
   # Find the number of seconds that have elapsed since the file was modified.
-  DELTA_SEC=$(("${NOW_SEC}" - "${FILE_LASTMOD_SEC}"))
+  DELTA_SEC=$((NOW_SEC - FILE_LASTMOD_SEC))
 
   # Return 0 (success) if the last modified time is less than or equal to the
   # requested number of seconds, otherwise return 1 (error).
