@@ -83,14 +83,6 @@ main() {
     touch "${HOME}/.shell_profile.sh"
   fi
 
-  # Install fonts
-  # TODO: Make this a configurable option.
-  mkdir -pv "$HOME/.fonts/"
-
-  safe_symlink "$checkout_dir/fonts/liberation" "$HOME/.fonts/liberation"
-  safe_symlink "$checkout_dir/fonts/ubuntu" "$HOME/.fonts/ubuntu"
-  safe_symlink "$checkout_dir/fonts/consola" "$HOME/.fonts/consola"
-
   # Clone plugins locally (rather than have them checked into the dotfiles repo).
   echo "${magenta}Cloning plugins locally...${normal}"
 
