@@ -20,7 +20,7 @@
 # If you want to have machine specific stuff the best place to put it is in
 # ~/.shell_profile.sh.
 for file in $S_DOTFILE_ROOT/shell_profile/\
-{xdg.sh,paths.sh,exports.sh,functions.sh,aliases.sh}; do
+{xdg.sh,exports.sh,paths.sh,functions.sh,aliases.sh}; do
     # -r test if FILE exists and is readable.
     # -f test if FILE exists and is a file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"

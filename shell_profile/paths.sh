@@ -17,7 +17,8 @@ appendToPath() {
     esac
 }
 
-# TODO: Prepend sbin to path
-appendToPath "/usr/local/sbin"
 appendToPath "$HOME/bin"
-appendToPath "$S_DOTFILE_ROOT/bin"
+
+if [ -n "$S_DOTFILE_ROOT" ]; then 
+  appendToPath "$S_DOTFILE_ROOT/bin"
+fi
