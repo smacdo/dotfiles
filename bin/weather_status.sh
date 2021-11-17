@@ -61,7 +61,11 @@ is_file_newer_than() {
   # Get the number of seconds since file was last modified.
   # Ref: https://stackoverflow.com/a/12170291
   # Ref: https://man7.org/linux/man-pages/man3/strftime.3.html
-  FILE_LASTMOD_SEC=$(stat -f "%Sm" -t "%s" "${FILE_TO_CHECK}")
+  if uname | grep -q "Darwin"; then
+    FILE_LASTMOD_SEC=$(stat -f "%Sm" -t "%s" "${FILE_TO_CHECK}")
+  else
+    FILE_LASTMOD_SEC=$(stat -c "%Y" "${FILE_TO_CHECK}")
+  fi
 
   # Get the current number of seconds.
   NOW_SEC=$(date +%s)
