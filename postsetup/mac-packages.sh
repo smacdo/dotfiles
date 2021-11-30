@@ -1,5 +1,7 @@
 #!/bin/bash
-# Installs Homebrew and adds functions to install recipes.
+# Author: Scott MacDonald
+# Purpose: Installs Homebrew along with commonly used applications.
+#===============================================================================
 if [[ ! is_osx ]]; then
     echo "This script only works on MacOS boxes."
     return 1
@@ -28,7 +30,9 @@ brew update
 brew install vim
 brew install htop fzf neovim ripgrep tmux zsh mosh
 brew install zoom
+brew install git git-lfs
 
+brew install --cask 1password
 brew install --cask sublime-text
 brew install --cask iterm2
 brew install --cask messenger-native
@@ -37,5 +41,5 @@ brew install --cask messenger-native
 #              microsoft-outlook
 
 # Install developer packages for Mac OS
-#brew install cmake clang-format
+brew install cmake clang-format
 brew install --cask visual-studio-code

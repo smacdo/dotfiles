@@ -32,3 +32,5 @@ cd .dotfiles
 p10k configure
 
 ```
+
+* Settings -> Security & Privacy -> Full Disk Access -> + "Visual Studio Code"

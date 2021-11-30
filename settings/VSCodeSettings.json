@@ -1,0 +1,16 @@
+{
+    "editor.suggestSelection": "first",
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modifications",
+    "explorer.confirmDragAndDrop": false,
+    "editor.minimap.enabled": false,
+    "editor.fontFamily": "'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
+    "editor.fontSize": 12,
+    "editor.rulers": [ 80, 100, 120 ],
+    "window.autoDetectColorScheme": true,
+    "explorer.autoReveal": "focusNoScroll",
+    "terminal.external.osxExec": "iTerm.app",
+    "terminal.integrated.copyOnSelection": true,
+    "terminal.integrated.macOptionIsMeta": true
+}
