@@ -144,7 +144,7 @@ do
        ;;
     V) USE_FB=0
        ;;
-    ?) printf "Usage: %s [-v] [-F] [-V] -- vscode args...\n" "$(base "$0")" >&2
+    ?) printf "Usage: %s [-v] [-F] [-V] -- vscode args...\n" "$(basename "$0")" >&2
        exit 2
        ;;
   esac
