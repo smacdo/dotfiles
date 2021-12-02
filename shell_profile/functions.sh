@@ -122,21 +122,6 @@ upgrade_packages() {
     fi
 }
 
-# Install a specific package name.
-install_package() {
-    if [[ is_ubuntu ]]; then
-        sudo apt install $*
-    elif [[ is_redhat ]]; then
-        sudo dnf install $*
-    elif [[ is_osx ]]; then
-        echo "TODO: Implement me"
-        return 1
-    else
-        echo "ERROR: Unsupported os/dist"
-        return 1
-    fi
-}
-
 # Set the terminal title bar (if the terminal emulator supports it).
 set_titlebar() {
     echo $'\033]0;'$*$'\007'
@@ -227,3 +212,19 @@ cdf() {
 reload() {
     exec "${SHELL}" "$@"
 }
+
+################################################################################
+# Fuzzy search current processes and kill selected entries.
+################################################################################
+fkill() {
+  if [ "$UID" != "0" ]; then
+    pid=$(ps -fH -u "$UID" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  else
+    pid=$(ps -efH --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  fi
+
+  if [ -n "$pid" ]; then
+    echo "$pid" | xargs kill -"${1:-9}"
+  fi
+}
+
