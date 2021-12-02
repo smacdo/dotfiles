@@ -17,6 +17,7 @@ if [[ "$UNAME" == "linux" ]]; then
     # by default).
     if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
         export DOT_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'// | tr "[:upper:]" "[:lower:]")
+        export DOT_DIST_VERSION=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'//) 
     elif [ -n "$(uname -a | grep Ubuntu)" ]; then
         export DOT_DIST="ubuntu"
     elif [ -f /etc/redhat-release ]; then
@@ -211,6 +212,15 @@ cdf() {
 # Reload/start shell
 reload() {
     exec "${SHELL}" "$@"
+}
+
+################################################################################
+# Show autodetected OS info
+################################################################################
+osinfo() {
+  echo "DOT_OS          : $DOT_OS"
+  echo "DOT_DIST        : $DOT_DIST"
+  echo "DOT_DIST_VERSION: $DOT_DIST_VERSION"
 }
 
 ################################################################################
