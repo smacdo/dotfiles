@@ -144,6 +144,17 @@ cdl() {
     fi
 }
 
+################################################################################
+# cd to the dotfiles checkout.
+################################################################################
+cdd() {
+  if [ -z "$S_DOTFILE_ROOT" ]; then
+    echo '$S_DOTFILE_ROOT not defined' >&2
+  else
+    cd "$S_DOTFILE_ROOT"
+  fi
+}
+
 # Create a directory and enter it.
 mkd() {
     mkdir -p "$@" && cd "$_" || return
