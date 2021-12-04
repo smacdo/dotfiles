@@ -20,7 +20,7 @@ if [ "$UNAME" = "linux" ]; then
         export DOT_DIST
         DOT_DIST_VERSION=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'//) 
         export DOT_DIST_VERSION
-    elif [ -n "$(uname -a | grep Ubuntu)" ]; then
+    elif uname -a | grep -q Ubuntu ; then
         export DOT_DIST="ubuntu"
     elif [ -f /etc/redhat-release ]; then
         export DOT_DIST="redhat"
@@ -80,8 +80,7 @@ is_ubuntu() {
 }
 
 is_cygwin() {
-    # TODO: Move platform detection to above code block.
-    [ "$(uname -s)" =~ ^CYGWIN* ] || return 1
+    expr "$(uname -s)" : '^CYGWIN*' > /dev/null || return 1
 }
 
 # Ask user to confirm before continuing. Returns 0 for yes, 1 for no.
@@ -230,8 +229,8 @@ osinfo() {
 # Fuzzy search current processes and kill selected entries.
 ################################################################################
 fkill() {
-  if [ "$UID" != "0" ]; then
-    pid=$(ps -fH -u "$UID" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  if [ "$(id -u)" != "0" ]; then
+    pid=$(ps -fH -u "$(id -u)" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
   else
     pid=$(ps -efH --sort -pid | sed 1d | fzf -m | awk '{print $2}')
   fi

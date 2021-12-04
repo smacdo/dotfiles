@@ -30,6 +30,9 @@ lint_shell_script() {
 main() {
   for s in \
         "$(basename "$0")" "setup.sh" \
+        ".bash_profile" \
+        ".bash_rc" \
+        ".zshrc" \
         "bin/code" "bin/delete_dsstore_recursive.sh" "bin/find_todo.sh" \
         "bin/generate-ssh-key.sh" "bin/find_todo.sh" "bin/rgcat.sh" \
         "bin/subl" "bin/weather_status.sh" \
