@@ -1,3 +1,4 @@
+#!/bin/sh
 # Author: Scott MacDonald
 # -----------------------
 # This file contains a set of useful shell aliases that should be included by all interactive
@@ -90,30 +91,30 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 alias printpath='echo -e ${PATH//:\\n}'
 
 # Force shell to reload. This is brute force, not sure if recommended...
-alias reloadshell="exec ${SHELL} -l"
+alias reloadshell="exec \"\${SHELL}\" -l"
 
 # Copy contents to system clipboard.
-if [[ is_osx ]]; then
+if is_osx; then
     alias clip="pbcopy"
-elif [[ is_linux ]]; then
+elif is_linux; then
     alias clip="xclip -select c"
 else
     alias clip="echo 'TODO: Implement me'"
 fi
 
 # Start the screen saver.
-if [[ is_osx ]]; then
+if is_osx; then
     alias lock="/System/Library/CoreServices/ScreenSaverEngine.app/Contents/MacOS/ScreenSaverEngine"
-elif [[ "$XDG_CURRENT_DESKTOP" == "KDE" ]]; then
+elif [ "$XDG_CURRENT_DESKTOP" = "KDE" ]; then
     alias lock="qdbus org.freedesktop.ScreenSaver /ScreenSaver Lock"
-elif [[ "$XDG_CURRENT_DESKTOP" == "ubuntu:GNOME" ]]; then
+elif [ "$XDG_CURRENT_DESKTOP" = "ubuntu:GNOME" ]; then
     alias lock="dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock"
 else
-    alias screensaver="echo 'TODO: Implement me'"
+    alias lock="echo 'TODO: Implement me'"
 fi 
 
 # Application shortcuts.
-if [[ is_osx ]]; then
+if is_osx; then
     alias chrome='/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome'
     alias safari='/Applications/Safari.app/Contents/MacOS/Safari'
 fi

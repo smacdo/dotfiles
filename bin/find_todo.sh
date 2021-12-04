@@ -16,5 +16,5 @@ line=$(echo "$PICK" | cut -d':' -f2)
 # TODO: Don't launch editor if fzf cancelled (error check)
 # TODO: Check file readable
 if [ -n "$file" ]; then
-  $EDITOR +"$line" $file
+  $EDITOR +"$line" "$file"
 fi

@@ -52,7 +52,7 @@ main() {
   fi
 
   # Extract and format lines.
-  sed -n "$line","$(($line + 10))"p "$file" | # Extract 10 lines starting at...
+  sed -n "$line,$((line + 10))"p "$file" | # Extract 10 lines starting at...
     nl -d '\n' -v "$line"                     # Prefix each line with line no.
 }
 

@@ -4,7 +4,8 @@ keyname="id_ed25519"
 
 if [ ! -f "${HOME}/.ssh/${keyname}" ]; then
   echo "No public key found, creating a new one..."
-  read -p "E-mail address: " email
+  printf "E-mail address: "
+  read -r email
   ssh-keygen -t ed25519 -C "${email}" -f "${HOME}/.ssh/${keyname}"
 fi
 
