@@ -19,8 +19,9 @@ check_result() {
 # Run shellcheck for a given script.
 ################################################################################
 lint_shell_script() {
+  # SC1090 - ignore warning for can't follow non-constant source.
   # SC1091 - ignore warning for included files that cannot be found.
-  shellcheck "$1" -e SC1091
+  shellcheck "$1" -e SC1090 -e SC1091
   check_result $? "shellcheck" "$1"
 }
 
@@ -29,10 +30,10 @@ lint_shell_script() {
 ################################################################################
 main() {
   for s in \
-        "$(basename "$0")" "setup.sh" \
+        "$(basename "$0")" \
         ".bash_profile" \
-        ".bash_rc" \
-        ".zshrc" \
+        ".bashrc" \
+        "setup.sh" \
         "bin/code" "bin/delete_dsstore_recursive.sh" "bin/find_todo.sh" \
         "bin/generate-ssh-key.sh" "bin/find_todo.sh" "bin/rgcat.sh" \
         "bin/subl" "bin/weather_status.sh" \

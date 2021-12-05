@@ -1,6 +1,6 @@
-## Author: Scott MacDonald <scott@smacdo.com>
-## Date: 02/29/2012
-################################################################################
+#!/usr/bin/env bash
+# Author: Scott MacDonald <scott@smacdo.com>
+#
 # bash_profile is used to set environment variables and other things that should
 # happen at login. This file is only sourced in login shells (e.g., the shell
 # that was started when you log in via SSH) and not when you create a new
