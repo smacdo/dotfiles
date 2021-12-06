@@ -240,3 +240,27 @@ fkill() {
   fi
 }
 
+################################################################################
+# Colored man pages.
+################################################################################
+man() {
+  # mb: Begin bold; use bold + green fg.
+  # md: Begin blink: use bold + teal fg.
+  # me: End bold/blink: Reset.
+  # so: Begin reverse video: yellow on blue.
+  # se: End reverse video: End standout, reset fg bg color.
+  # us: Start underline, with white fg.
+  # ue: End underline, reset formatting.
+
+  env \
+    LESS_TERMCAP_mb=$(tput bold; tput setaf 2)               \
+    LESS_TERMCAP_md=$(tput bold; tput setaf 6)               \
+    LESS_TERMCAP_me=$(tput sgr0)                             \
+    LESS_TERMCAP_so=$(tput smso; tput setaf 3; tput setab 4) \
+    LESS_TERMCAP_se=$(tput rmso; tput sgr0)                  \
+    LESS_TERMCAP_us=$(tput smul; tput setaf 5)               \
+    LESS_TERMCAP_ue=$(tput rmul; tput sgr0)                  \
+    GROFF_NO_SGR=1                                           \
+    man "$@"
+}
+
