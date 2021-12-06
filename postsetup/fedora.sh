@@ -50,6 +50,9 @@ setup_base() {
 
   # ripgrep is a faster grep./
   dnf -f install ripgrep
+
+  # C++ development
+  dnf -f install make automake gcc gcc-c++
 }
 
 ################################################################################
