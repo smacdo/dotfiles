@@ -34,9 +34,15 @@ main() {
         ".bash_profile" \
         ".bashrc" \
         "setup.sh" \
-        "bin/code" "bin/delete_dsstore_recursive.sh" "bin/find_todo.sh" \
-        "bin/generate-ssh-key.sh" "bin/find_todo.sh" "bin/rgcat.sh" \
-        "bin/subl" "bin/weather_status.sh" \
+        "bin/code" \
+        "bin/colors" \
+        "bin/delete_dsstore_recursive.sh" \
+        "bin/find_todo.sh" \
+        "bin/generate-ssh-key.sh" \
+        "bin/find_todo.sh" \
+        "bin/rgcat.sh" \
+        "bin/subl" \
+        "bin/weather_status.sh" \
         "shell_profile/aliases.sh" \
         "shell_profile/exports.sh" \
         "shell_profile/functions.sh" \
