@@ -1,8 +1,8 @@
 #!/bin/sh
 # Author: Scott MacDonald
-# Purpose: Locate TODO fragments in source code for editing.
+# Purpose: Locate TODO fragments in source code files for editing.
 ################################################################################
-# TODO: Support FIXME
+# TODO: Support FIXME, XXX
 # TODO: Support custom paths, etc
 # TODO: Support grep if rg not found
 # TODO: Support multiple selections.
