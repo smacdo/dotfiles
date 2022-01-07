@@ -1,9 +1,28 @@
 #!/bin/bash
-# Installs Homebrew and adds functions to install recipes.
+# Author: Scott MacDonald
+# Purpose:
+
+# TODO: Rename to macos.sh
+# TODO: Use err
+
+# Double check that this is MacOS before proceeding.
 if [[ ! is_osx ]]; then
     echo "This script only works on MacOS boxes."
     return 1
 fi
+
+if [[ -z "$S_DOTFILE_ROOT" ]]; then
+  echo "$$S_DOTFILE_ROOT is not set - you might need to restart your shell"
+  return 1
+fi
+
+# Install fonts.
+# (Do not overwrite any fonts that already exist in ~/Library/Fonts).
+echo "Installing fonts..."
+
+cp -n "${S_DOTFILE_ROOT}/fonts/consola"/* ~/Library/Fonts
+cp -n "${S_DOTFILE_ROOT}/fonts/hack"/* ~/Library/Fonts
+cp -n "${S_DOTFILE_ROOT}/fonts/jetbrains"/* ~/Library/Fonts
 
 # Install Homebrew if not installed.
 if [[ ! "$(type -p brew)" ]]; then
