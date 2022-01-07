@@ -1,0 +1,57 @@
+{
+	"TODO": {
+		"prefix": [ "TODO:", "TODO(" ],
+		"body": [ "TODO(${1:username}): $0" ],
+		"description": "TODO with author attribution"
+	},
+	"FIXME": {
+		"prefix": [ "FIXME:", "FIXME(" ],
+		"body": [ "FIXME(${1:username}): $0" ],
+		"description": "FIXME with author attribution"
+	},
+	"XXX": {
+		"prefix": [ "XXX:", "XXX(" ],
+		"body": [ "XXX(${1:username}): $0" ],
+		"description": "XXX with author attribution"
+	},
+	"Comment Divider //--": {
+		"scope": "c, cpp, csharp, css, hack, java, javascript, typescript, objective-c, objective-cpp, php, rust, typescript, typescriptreact",
+		"prefix": "//---",
+		"body": [
+			"//------------------------------------------------------------------------------"
+		],
+		"description": "// 80 char comment divider with ---"
+	},
+	"Comment Divider //===": {
+		"scope": "c, cpp, csharp, css, hack, java, javascript, typescript, objective-c, objective-cpp, php, rust, typescript, typescriptreact",
+		"prefix": "//===",
+		"body": [
+			"//=============================================================================="
+		],
+		"description": "// 80 char comment divider with ==="
+	},
+	"Comment Divider ###": {
+		"scope": "makefile, perl, perl6, powershell, python, ruby, shellscript",
+		"prefix": "###",
+		"body": [
+			"################################################################################"
+		],
+		"description": "# 80 char comment divider with ###"
+	},
+	"Comment Divider #---": {
+		"scope": "makefile, perl, perl6, powershell, python, ruby, shellscript",
+		"prefix": "//---",
+		"body": [
+			"#-------------------------------------------------------------------------------"
+		],
+		"description": "# 80 char comment divider with ---"
+	},
+	"Comment Divider #===": {
+		"scope": "makefile, perl, perl6, powershell, python, ruby, shellscript",
+		"prefix": "//===",
+		"body": [
+			"#==============================================================================="
+		],
+		"description": "# 80 char comment divider with ==="
+	},
+}

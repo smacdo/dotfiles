@@ -1,5 +1,6 @@
-## Author: Scott MacDonald <scott@smacdo.com>
-## Date: 02/29/2012
+#!/usr/bin/env bash
+# Author: Scott MacDonald <scott@smacdo.com>
+# Purpose: Scott's bash shell configuration.
 ################################################################################
 # bashrc is used to configure a user's shell (aliases, functions, settings, etc)
 # intended for use in an interactive shell.
@@ -21,8 +22,7 @@
 # ~/.shell_profile.sh.
 for file in $S_DOTFILE_ROOT/shell_profile/\
 {xdg.sh,exports.sh,paths.sh,functions.sh,aliases.sh}; do
-    # -r test if FILE exists and is readable.
-    # -f test if FILE exists and is a file.
+    # -r test if readable, -f is file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;
 unset file
@@ -74,10 +74,9 @@ FIGNORE="~:CVS:#:.pyc:.swp:.swa:.o"
 
 # Simple no-frills colored bash prompt.
 function set_colored_prompt {
-    local        GRAY="\[\033[0;37m\]"
-    local       GREEN="\[\033[0;32m\]"
-    local LIGHT_GREEN="\[\033[1;32m\]"
-    local  LIGHT_BLUE="\[\033[1;34m\]"
+    local GRAY="\[\033[0;37m\]"
+    local GREEN="\[\033[0;32m\]"
+    local LIGHT_BLUE="\[\033[1;34m\]"
     local RESET_COLOR="\[\033[0m\]"
 
     # \u: The current user name.
@@ -93,6 +92,6 @@ set_colored_prompt
 
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
-  source ${S_DOTFILE_ROOT}/vendor/iterm2/bash
+  source "${S_DOTFILE_ROOT}/vendor/iterm2/bash"
 fi
 

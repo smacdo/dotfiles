@@ -1,6 +1,5 @@
-#############################################################################
-# Scott's zshrc                                                             #
-#############################################################################
+# Author: Scott MacDonald <scott@smacdo.com>
+#
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -32,7 +31,7 @@ unset file
 
 # Load .dotfiles shared zsh modules.
 for file in ~/.zsh/*.zsh; do
-    . $file
+    . "$file"
 done
 unset file
 
@@ -68,7 +67,7 @@ zstyle ':completion:*:options' auto-description '%d'
 
 # use completion caching
 zstyle ':completion:*' use-cache on
-zstyle ':completion:*' cache-path ${HOME}/.zsh_cache
+zstyle ':completion:*' cache-path "${HOME}/.zsh_cache"
 
 # case-insensitive completion (uppercase from lowercase & underscores from dashes)
 zstyle ':completion:*' matcher-list 'm:{a-z-}={A-Z_}'
@@ -101,7 +100,7 @@ fi
 
 # Load iTerm2 shell integration script.
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
-    source ${S_DOTFILE_ROOT}/vendor/iterm2/zsh
+    source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
 fi
 
 # Load zsh syntax highlighting plugin

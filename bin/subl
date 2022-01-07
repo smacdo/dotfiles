@@ -1,3 +1,9 @@
-#!/bin/bash
-# TODO: Support linux, maybe windows too?
-/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl $@
+#!/bin/sh
+. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+
+if is_osx ; then
+  /Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl "$@"
+else
+  echo "Sublime shortcut not supported on this platform :("
+  return 1
+fi

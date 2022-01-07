@@ -15,17 +15,17 @@ main() {
       # Remove '_' prefix to start using a variable.
       # (_ tells shellcheck to ignore unused variable).
       bold="$(tput bold)"
-      _underline="$(tput smul)"
-      _standout="$(tput smso)"
+      #underline="$(tput smul)"
+      #standout="$(tput smso)"
       normal="$(tput sgr0)"
-      _black="$(tput setaf 0)"
+      #black="$(tput setaf 0)"
       red="$(tput setaf 1)"
-      _green="$(tput setaf 2)"
+      #green="$(tput setaf 2)"
       yellow="$(tput setaf 3)"
       blue="$(tput setaf 4)"
       magenta="$(tput setaf 5)"
-      _cyan="$(tput setaf 6)"
-      _white="$(tput setaf 7)"
+      #cyan="$(tput setaf 6)"
+      #white="$(tput setaf 7)"
     fi
   fi
 

@@ -1,4 +1,4 @@
-##!/bin/sh
+#!/bin/sh
 ## Author: Scott MacDonald <scott@smacdo.com
 ## Created: 09/29/2020 
 ## Purpose: Shell functions shared between bash/zsh/etc.
@@ -10,29 +10,37 @@
 # have pre-installed anything), so this my attempt at a workable solution.
 UNAME=$(uname | tr "[:upper:]" "[:lower:]")
 
-if [[ "$UNAME" == "linux" ]]; then
+if [ "$UNAME" = "linux" ]; then
     export DOT_OS="linux"
 
     # Use LSB to identify distribution if installed (it's not always installed
     # by default).
-    if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
-        export DOT_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'// | tr "[:upper:]" "[:lower:]")
-    elif [ -n "$(uname -a | grep Ubuntu)" ]; then
+    if [ -f /etc/lsb-release ] || [ -d /etc/lsb-release.d ]; then
+        DOT_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'// | tr "[:upper:]" "[:lower:]")
+        export DOT_DIST
+        DOT_DIST_VERSION=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'//) 
+        export DOT_DIST_VERSION
+    elif uname -a | grep -q Ubuntu ; then
         export DOT_DIST="ubuntu"
     elif [ -f /etc/redhat-release ]; then
         export DOT_DIST="redhat"
     elif [ -f /etc/debian_version ]; then
         export DOT_DIST="debian"
-        export DOT_DIST_VERSION=$(cat /etc/debian_version)
+        DOT_DIST_VERSION=$(cat /etc/debian_version)
+        export DOT_DIST_VERSION
     else
-        export DOT_DIST=$(uname -s | tr "[:upper:]" "[:lower:]")
-        export DOT_DIST_VERSION=$(uname -r)
+        DOT_DIST=$(uname -s | tr "[:upper:]" "[:lower:]")
+        export DOT_DIST
+        DOT_DIST_VERSION=$(uname -r)
+        export DOT_DIST_VERSION
     fi
-elif [[ "$UNAME" == "darwin" ]] ; then
+elif [ "$UNAME" = "darwin" ] ; then
     export DOT_OS="macos"
     export DOT_DIST=$UNAME
-    export DOT_DIST_VERSION=$(sysctl kern.osrelease | cut -c 17- )
-    export DOT_DIST_REVISION=$(sysctl kern.osrevision | cut -c 18- )
+    DOT_DIST_VERSION=$(sysctl kern.osrelease | cut -c 17- )
+    export DOT_DIST_VERSION
+    DOT_DIST_REVISION=$(sysctl kern.osrevision | cut -c 18- )
+    export DOT_DIST_REVISION
 else
     # Could not detect the operating system or distro :(
     export DOT_OS="unknown"
@@ -56,24 +64,23 @@ i*86)
 esac
 
 is_osx() {
-    [[ "$DOT_OS" == "macos" ]] || return 1
+    [ "$DOT_OS" = "macos" ] || return 1
 }
 
 is_linux() {
-    [[ "$DOT_OS" == "linux" ]] || return 1
+    [ "$DOT_OS" = "linux" ] || return 1
 }
 
 is_redhat() {
-    [[ "$DOT_DIST" == "redhat" ]] || return 1
+    [ "$DOT_DIST" = "redhat" ] || return 1
 }
 
 is_ubuntu() {
-    [[ "$DOT_DIST" == "ubuntu" ]] || return 1
+    [ "$DOT_DIST" = "ubuntu" ] || return 1
 }
 
 is_cygwin() {
-    # TODO: Move platform detection to above code block.
-    [[ $(uname -s) =~ ^CYGWIN* ]] || return 1
+    expr "$(uname -s)" : '^CYGWIN*' > /dev/null || return 1
 }
 
 # Ask user to confirm before continuing. Returns 0 for yes, 1 for no.
@@ -91,11 +98,11 @@ prompt_confirm() {
 
 # Ensure software packages are up to date.
 update_packages() {
-    if [[ is_ubuntu ]]; then
+    if is_ubuntu; then
         sudo apt update
-    elif [[ is_redhat ]]; then
+    elif is_redhat; then
         sudo dnf check-update
-    elif [[ is_osx ]]; then
+    elif is_osx; then
         echo "TODO: Implement me"
         return 1
     else
@@ -109,45 +116,25 @@ upgrade_packages() {
     prompt_confirm "Upgrade all installed packages to latest version?"
     update_packages || return 1
 
-    if [[ is_ubuntu ]]; then
+    if is_ubuntu; then
         sudo apt upgrade
-    elif [[ is_redhat ]]; then
+    elif is_redhat; then
         sudo dnf update
-    elif [[ is_osx ]]; then
+    elif is_osx; then
         echo "TODO: Implement me"
         return 1
     else
         echo "ERROR: Unsupported os/dist"
         return 1
     fi
-}
-
-# Install a specific package name.
-install_package() {
-    if [[ is_ubuntu ]]; then
-        sudo apt install $*
-    elif [[ is_redhat ]]; then
-        sudo dnf install $*
-    elif [[ is_osx ]]; then
-        echo "TODO: Implement me"
-        return 1
-    else
-        echo "ERROR: Unsupported os/dist"
-        return 1
-    fi
-}
-
-# Set the terminal title bar (if the terminal emulator supports it).
-set_titlebar() {
-    echo $'\033]0;'$*$'\007'
 }
 
 # Cd into directory and then ls it.
 cdl() {
-    local dir="$1"
-    local dir="${dir:=$HOME}" # if dir empty then set to $HOME (emulate `cd `)
-    if [[ -d "$dir" ]]; then
-        cd "$dir" >/dev/null
+    dir="$1"
+    dir="${dir:=$HOME}" # if dir empty then set to $HOME (emulate `cd `)
+    if [ -d "$dir" ]; then
+        cd "$dir" >/dev/null || return
         if is_osx ; then
             ls -G -lF
         else
@@ -156,6 +143,17 @@ cdl() {
     else
         echo "cdl: $dir: Directory not found"
     fi
+}
+
+################################################################################
+# cd to the dotfiles checkout.
+################################################################################
+cdd() {
+  if [ -z "$S_DOTFILE_ROOT" ]; then
+    echo "\$S_DOTFILE_ROOT not defined" >&2
+  else
+    cd "$S_DOTFILE_ROOT" || return
+  fi
 }
 
 # Create a directory and enter it.
@@ -168,24 +166,14 @@ mkdtmp() {
     cd "$(mktemp -d)" || return
 }
 
-# ssh and start a screen session on the remote server
-sshs() {
-	if [[ -z $* ]]; then
-		echo 'Usage: sshs [options] [user@]hostname'
-		echo 'SSH and automatically start a GNU screen session on the remote server'
-	else
-		ssh -t "$@" screen -DRU
-	fi
-}
-
 # One function to extract the contents of different archive formats.
 # THIS WILL EXTRACT THE FILES INTO YOUR CURRENT DIRECTORY!
 extract() {
-	if [[ -z $1 ]]; then
+	if [ -z "$1" ]; then
 		echo 'Usage: extract ARCHIVE'
 		echo 'Extract files from ARCHIVE to the current directory'
-	elif [[ -r $1 ]]; then
-		case $1 in
+	elif [ -r "$1" ]; then
+		case "$1" in
 			*.rar)      unrar x "$1"     ;;
 			*.tar)      tar -xvf "$1"    ;;
 			*.tar.bz2)  tar -xjvf "$1"   ;;
@@ -205,7 +193,7 @@ extract() {
 
 # Recursively search for a file with the named pattern starting in the current directory.
 ff() {
-	if [[ -z $1 ]]; then
+	if [ -z "$1" ]; then
 		echo 'Usage: ff PATTERN'
 		echo 'Recursively search for a file named PATTERN in the current directory'
 	else
@@ -227,3 +215,52 @@ cdf() {
 reload() {
     exec "${SHELL}" "$@"
 }
+
+################################################################################
+# Show autodetected OS info
+################################################################################
+osinfo() {
+  echo "DOT_OS          : $DOT_OS"
+  echo "DOT_DIST        : $DOT_DIST"
+  echo "DOT_DIST_VERSION: $DOT_DIST_VERSION"
+}
+
+################################################################################
+# Fuzzy search current processes and kill selected entries.
+################################################################################
+fkill() {
+  if [ "$(id -u)" != "0" ]; then
+    pid=$(ps -fH -u "$(id -u)" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  else
+    pid=$(ps -efH --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  fi
+
+  if [ -n "$pid" ]; then
+    echo "$pid" | xargs kill -"${1:-9}"
+  fi
+}
+
+################################################################################
+# Colored man pages.
+################################################################################
+man() {
+  # mb: Begin bold; use bold + green fg.
+  # md: Begin blink: use bold + teal fg.
+  # me: End bold/blink: Reset.
+  # so: Begin reverse video: yellow on blue.
+  # se: End reverse video: End standout, reset fg bg color.
+  # us: Start underline, with white fg.
+  # ue: End underline, reset formatting.
+
+  env \
+    LESS_TERMCAP_mb=$(tput bold; tput setaf 2)               \
+    LESS_TERMCAP_md=$(tput bold; tput setaf 6)               \
+    LESS_TERMCAP_me=$(tput sgr0)                             \
+    LESS_TERMCAP_so=$(tput smso; tput setaf 3; tput setab 4) \
+    LESS_TERMCAP_se=$(tput rmso; tput sgr0)                  \
+    LESS_TERMCAP_us=$(tput smul; tput setaf 5)               \
+    LESS_TERMCAP_ue=$(tput rmul; tput sgr0)                  \
+    GROFF_NO_SGR=1                                           \
+    man "$@"
+}
+

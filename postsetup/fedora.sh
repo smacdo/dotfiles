@@ -43,6 +43,16 @@ setup_base() {
 
   # htop is a nicer terminal process monitor than top.
   dnf -f install htop
+
+  # fzf is a swiss army knife for terminal based selection of lines with
+  # fuzzy searching.
+  dnf -f install fzf
+
+  # ripgrep is a faster grep./
+  dnf -f install ripgrep
+
+  # C++ development
+  dnf -f install make automake gcc gcc-c++
 }
 
 ################################################################################

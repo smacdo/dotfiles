@@ -1,4 +1,156 @@
-#!/bin/bash
-# vi:syntax=bash
-# TODO: Support linux, windows.
-/Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code $@
+#!/bin/sh
+# Author: Scott MacDonald
+# Purpose: Run vscode and variants the same way across multiple platforms.
+#
+# code [-v] [-F|-V] -- vscode args...
+# Arguments:
+#  -v   Enable verbose mode.
+#  -F   Only search code-fb paths.
+#  -V   Only search code paths (e.g., do not use code-fb).
+#
+# This script supports fb-code in addition to vscode, which is a special
+# Facebook maintained fork of Microsoft's vscode. No proprietary informatsion is
+# included in this script. 
+# 
+# You can see more information on this fork here:
+#  https://github.com/facebookexperimental/fb-vscode
+################################################################################
+# TODO: Add Windows path support.
+
+################################################################################
+# Run vscode binary with parameters if the given binary path is executable.
+# 
+# Globals:
+#  VERBOSE
+#
+# Arguments:
+#  $1     path to a potential vscode binary.
+#  $2..N  arguments to pass to the vscode binary, if it exists.
+#
+# Returns 0 if vscode was found and executed successfully, and 0 if the vscode
+# binary was not found. If vscode was found but did not exit succesfully this
+# process will be terminated with the error code returned by vscode.
+################################################################################
+run_if_found() {
+  vscode_path="$1"
+  shift # Remove first argument (vscode path) from arguments list.
+
+  if [ -x "$vscode_path" ]; then
+    if [ "$VERBOSE" = 1 ]; then
+      echo "$vscode_path" "$@"
+    fi
+
+    "$vscode_path" "$@"
+
+    if "$vscode_path" "$@" ; then
+      # Nothing, it worked fine!
+      true # ... but you can't have an empty clause so use 'true'.
+    else
+      echo "ERROR: Got error code $? when launching vscode '$vscode_path'" >&2
+      exit "$?"
+    fi
+
+    return 0
+  elif [ "$VERBOSE" -eq 1 ]; then
+      echo "not found: $vscode_path"
+  fi
+
+  # Not found, return 1 to indicate failure.
+  return 1
+}
+
+################################################################################
+# Try to run vscode-fb with the given parameters by searching commonly used
+# installation locations.
+#
+# Arguments:
+#  $1..N  arguments to pass to the vscode binary.
+#
+# Returns 0 if vscode-fb was found and executed successfully, otherwise 1.
+################################################################################
+run_fbcode() {
+  run_if_found "/usr/bin/code-fb" "$@" && return 0
+  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" ^^ return 0
+
+  # TODO: Windows.
+  return 1
+}
+
+###############################################################################
+# Try to run vscode with the given parameters by searching commonly used
+# installation locations.
+#
+# Arguments:
+#  $1..N  arguments to pass to the vscode binary.
+#
+# Returns 0 if vscode was found and executed successfully, otherwise 1.
+################################################################################
+run_vscode() {
+  run_if_found "/usr/bin/code" "$@" && return 0
+  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+
+  # TODO: Windows.
+  return 1
+}
+
+################################################################################
+# Run vscode-fb/vscode if it exists on the system.
+# 
+# Globals:
+#  VERBOSE
+#
+# Arguments:
+#  $1..N  arguments to pass to the vscode binary.
+#
+# Returns 0 if vscode was found and executed successfully, and 0 if the vscode
+# binary was not found. If vscode was found but did not exit succesfully this
+# process will be terminated with the error code returned by vscode.
+################################################################################
+main() {
+  if [ "$USE_FB" -eq 1 ]; then
+    run_fbcode "$@" && return 0
+  elif [ "$VERBOSE" -eq 1 ]; then
+    echo "Skipping code-fb paths"
+  fi 
+
+  if [ "$USE_MSFT" -eq 1 ]; then
+    run_vscode "$@" && return 0
+  elif [ "$VERBOSE" -eq 1 ]; then
+    echo "Skipping code paths"
+  fi
+
+  # No suitable vscode found.
+  if [ "$VERBOSE" = 1 ]; then
+    echo "No vscode binary was found :(" >&2
+  fi
+
+  return 1
+}
+
+#===============================================================================
+# Script entry point.                                                          #
+#===============================================================================
+# Parse command line arguments.
+VERBOSE=0
+USE_FB=1
+USE_MSFT=1
+
+while getopts 'vFV' OPTION
+do 
+  case "$OPTION" in
+    v) VERBOSE=1
+       ;;
+    F) USE_MSFT=0
+       ;;
+    V) USE_FB=0
+       ;;
+    ?) printf "Usage: %s [-v] [-F] [-V] -- vscode args...\n" "$(basename "$0")" >&2
+       exit 2
+       ;;
+  esac
+done
+
+shift $((OPTIND - 1)) # Remove parsed arguments.
+
+# Now start execution of main.
+main "$@"
