@@ -4,8 +4,19 @@
 " Leader is ,
 "
 " ## Custom shortcuts:
-"  ,sv          Source .vimrc in current session.
-"  ,ev          Edit .vimrc in new split.
+"  ANY MODE
+"   F2           Toggle no indent when pasting mode.
+"   CTRL M       Reset highlighted text.
+"   CTRL hjkl    Switch between split panes.
+"   <leader> sv  Source .vimrc in current session.
+"   <leader> ev  Edit .vimrc in new split.
+"
+"  INSERT MODE
+"   CTRL v       Paste from system clipboard.
+"
+"  VISUAL MODE
+"   CTRL C       Copy selection to system clipboard.
+"   CTRL D       Cut selection to system clipboard.
 "
 " ## Useful shortcuts to remember:
 "  %    - Jump between pairs of characters like {} () [] if/else
@@ -88,7 +99,7 @@ set hidden
 " Use bash-like tab completion when in command prompt.
 set wildmode=list:longest,full
 
-" Make backspace work as expected on some oddly configured platforms.
+" Make backspace work as expected on some oddly configured platforms. 
 " TODO: Which platforms?
 set backspace=eol,start,indent
 
@@ -122,6 +133,11 @@ set pastetoggle=<F2>
 if maparg('<C-M>', 'n') ==# ''
   noremap <silent> <C-M> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
 endif
+
+" Copy/cut/paste from system clipboard.
+:inoremap <C-v> <ESC>"+pa
+:vnoremap <C-c> "+y
+:vnoremap <C-d> "+d
 
 "===============================================================================
 " Plugins
@@ -213,3 +229,28 @@ if !has('nvim') && &ttimeoutlen == -1
   set ttimeoutlen=100
 endif
 
+" Enable mouse support by default since all modern terminals have support for
+" mice.
+if has('mouse')
+  set mouse=a
+endif
+
+" Set a single well known location for vim to store user state (backup, temp,
+" etc) and if those directories don't exist create them.
+" TODO: Probably need different paths for windows.
+" TODO: Create a crontab script to nuke files after ~ 90 days.
+if !isdirectory($HOME."/.local/state/vim/backups")
+  call mkdir($HOME."/.local/state/vim/backups", "p", 0770)
+endif
+
+if !isdirectory($HOME."/.local/state/vim/tmp")
+  call mkdir($HOME."/.local/state/vim/tmp", "p", 0770)
+endif
+
+if !isdirectory($HOME."/.local/state/vim/undo")
+  call mkdir($HOME."/.local/state/vim/undo", "p", 0770)
+endif
+
+set backupdir=$HOME/.local/state/vim/backups  " File back up in case of crash.
+set directory=$HOME/.local/state/vim/tmp      " Stores temporary file state.
+set undodir=$HOME/.local/state/vim/undo       " Stores undo history for files.
