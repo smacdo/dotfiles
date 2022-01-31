@@ -7,6 +7,11 @@
 #
 # TODO: Detect if the shell supports color and only enable color flags if this is true.
 
+# v - Edit a file using the editor specified by the environment var $EDITOR.
+# vi - Same as `v` command
+alias v='/usr/bin/env "$EDITOR"'
+alias v='/usr/bin/env "$EDITOR"'
+
 ### ls
 if is_osx; then
     alias ls='ls -G'
