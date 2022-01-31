@@ -100,9 +100,10 @@ main() {
     "https://github.com/vim-airline/vim-airline" \
     "${HOME}/.vim/pack/dist/start/vim-airline"
 
-  fetch_git_tag VimFugitive "v3.4" \
-    "https://github.com/tpope/vim-fugitive.git" \
-    "${HOME}/.vim/pack/tpope/start/fugitive"
+  # Install vimplug for neovim to manage plugins.
+  # (Does not require neovim to be installed on the system)
+  sh -c 'curl -fLo "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/site/autoload/plug.vim --create-dirs \
+       https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
 }
 
 ################################################################################
