@@ -66,7 +66,7 @@ let g:netrw_browse_split=3 " Opn new file in previous window.
 " Keep focus in file explorer when opening a new file.
 "autocmd filetype netrw nmap <c-a> <cr>:wincmd W<cr>
 
-" Use CTRL+arrow or CTRLhjkl to move between windows.
+" Use CTRL+hjkl to move between windows.
 nnoremap <silent> <C-k> :wincmd k<CR>
 nnoremap <silent> <C-j> :wincmd j<CR>
 nnoremap <silent> <C-h> :wincmd h<CR>
