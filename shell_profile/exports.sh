@@ -5,21 +5,34 @@
 # NOTE: This file might be sourced more than once, especially for interactive
 # login shell session.
 ################################################################################
-# Make vim the default editor.
-export EDITOR='vim'
+# Make neovim -> vim -> nano -> vi the default editor.
+# (Weird note that `nvim -s` is not silent despite the man page on OSX stating
+#  it doesn't print output!)
+if which nvim >/dev/null; then
+  export EDITOR='nvim'
+else
+  if which vim >/dev/null; then
+    export EDITOR='vim'
+  else
+    if which nano >/dev/null; then
+      export EDITOR='nano'
+    else
+      export EDITOR='vi'
+    fi
+  fi
+fi
 
-# Rust cargo.
+# Add rust build tools to the path if rust was installed.
 if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
-# TODO: Move below to interactive shell only exports?  ####
- 
-# Some programs require this environment variable to show color.
-export CLICOLOR=1
-
+### TODO: Only apply these settings for interactive shells. ###
 # Hide the “default interactive shell is now zsh” warning on macOS.
 export BASH_SILENCE_DEPRECATION_WARNING=1
+
+# Some programs require this environment variable to show color.
+export CLICOLOR=1
 
 # ls colors (MacOS)
 export CLICOLOR=1
