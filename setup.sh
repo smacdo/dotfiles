@@ -61,11 +61,15 @@ main() {
   mkdir -vp "${XDG_STATE_HOME}/vim/backups"
   mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
 
+  # Make sure the neovim directory 
+
   # Symlink useful dotfiles
   echo "${magenta}Symlinking dotfiles...${normal}"
 
   safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
-  safe_symlink "$checkout_dir/.vimrc" "$HOME/.vimrc"
+  safe_symlink "$checkout_dir/settings/nvim/init.vim" \
+               "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
+  safe_symlink "$checkout_dir/settings/nvim/init.vim" "$HOME/.vimrc"
   safe_symlink "$checkout_dir/.vim" "$HOME/.vim"
   safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
   safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
@@ -138,6 +142,9 @@ safe_symlink()
     echo "${red}ERROR: Source argument not given or empty${normal}"
     exit 1
   fi
+
+  # Create the directory holding the target if it doesn't exist.
+  mkdir -p $(dirname "$TARGET")
 
   # Check if target already exists before symlinking.
   if [ ! -f "$TARGET" ] && [ ! -d "$TARGET" ]; then

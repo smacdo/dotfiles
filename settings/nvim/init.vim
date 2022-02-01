@@ -151,8 +151,12 @@ if has('nvim')
     Plug 'neovim/nvim-lspconfig'
 endif
 
-" Color scheme.
-Plug 'sainnhe/sonokai'
+" Color scheme: Use sonokai for neovim, and Solarized for vim.
+if has('nvim')
+  Plug 'sainnhe/sonokai'
+else
+
+endif
 
 " Pretty status bar.
 Plug 'vim-airline/vim-airline'
@@ -172,11 +176,18 @@ call plug#end()
 "===============================================================================
 set termguicolors
 
-if &runtimepath =~ 'sonokai'
-  let g:sonokai_enable_italic = 1
-  let g:sonokai_disable_italic_comment = 1
+if has('nvim')
+  " Neovim uses sonokai theme (to distinguish visually from vim).
+  if &runtimepath =~ 'sonokai'
+    let g:sonokai_enable_italic = 1
+    let g:sonokai_disable_italic_comment = 1
 
-  colorscheme sonokai
+    colorscheme sonokai
+  endif
+else
+  " Vim uses my older theme Solarized as a way to distinguish from neovim.
+  set background=dark
+  colorscheme solarized8
 endif
 
 "===============================================================================
