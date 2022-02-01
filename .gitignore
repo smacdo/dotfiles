@@ -1,6 +1,7 @@
 *.swp
 *.uuid
 .vim/view
+.vim/plugged
 private
 .zsh_local
 *.pyc

@@ -1,206 +1,267 @@
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Scott's .vimrc                                                          "
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" Use Vim settings rather than vi settings. Avoid side effects if compatible
-" is already reset.
-" TODO: Test and re-enable or delete.
-"if &compatible
-"    set nocompatible
-"endif
-
-" Use a true color solarized variant.
-"  'solarized8' is the default theme.
-"  'solarized8_flat' changes the status line / split and bar tab look.
+" Scott's vimrc
+"===============================================================================
+" # Notes
+" Leader is ,
 "
-" Important note! If you are on a terminal that doesn't support true colors, you
-" should instead use `set t_Co=16` (or `let g:solarized_use16=1`) and manually
-" set the Solarized color palette in your terminal.
-set termguicolors
-set background=dark
-colorscheme solarized8
+" ## Custom shortcuts:
+"  ANY MODE
+"   F2           Toggle no indent when pasting mode.
+"   CTRL M       Reset highlighted text.
+"   CTRL hjkl    Switch between split panes.
+"   <leader> sv  Source .vimrc in current session.
+"   <leader> ev  Edit .vimrc in new split.
+"
+"  INSERT MODE
+"   CTRL v       Paste from system clipboard.
+"
+"  VISUAL MODE
+"   CTRL C       Copy selection to system clipboard.
+"   CTRL D       Cut selection to system clipboard.
+"
+" ## Useful shortcuts to remember:
+"  %    - Jump between pairs of characters like {} () [] if/else
 
-" Leader
+"===============================================================================
+"  General settings.
+"===============================================================================
+" Command leader.
 let mapleader = ","
 let maplocalleader = "\\"
 
-" Basic editor settings.
-set history=1000  " Keep 100 lines of command history. You know, just in case.
-set expandtab     " Insert $softtabstop amount of spaces when tab is pushed instead of \t.
-set tabstop=4     " Change width of hard tab to 4 spaces.
-set shiftwidth=4  " Use 4 spaces when auto indenting, hitting >> << or ==.
-set softtabstop=4 " Treat 4 spaces as a tab when hitting tab, deleting etc. 
-set shiftround    " Round indent to multiple of shiftwidth ('>', '<').
-set autoindent    " Copies indentation from previous line when starting a new line.
-set textwidth=100 " Maximum width of text that is being inserted before being broken up.
-set number        " Display line numbers in left column.
-set showmode      " Shows mode at bottom (ie --INSERT--).
-set wildmode=list:longest,full " Bash-like tab completion when in conmmand prompt.
-set ruler         " Show line/col pos in status line
-set showmatch     " Always show matching brace under cursor
-set noerrorbells  " System bell is pure evil
-set autoread      " Set readonly when file is external modified.
-set showcmd       " Show (partial) command in status line.
-set ignorecase    " Case insensitive matching.
-set smartcase     " Overrides ignorecase when at least one non-lowercase character is present.
-set incsearch     " Incremental search. Hit `<CR>` to stop.
-set autowrite     " Automatically save before commands like :next, :make etc.
-set hidden        " Possibility to have more than one unsaved buffer.
-set hlsearch      " Highlight all search pattern mathes.
-set laststatus=2  " Always draw a status line even if there is only one window.
-set scrolloff=1   " Keep two lines above/below cursor when scrolling up/down.
-set sidescrolloff=5 " Keep five characters to left/right when scrolling horizontally.
-set confirm       " Use dialog to ask if save changes instead of error.
-set backup        " Enable automatic backups.
-let &backupdir=$XDG_STATE_HOME . "/vim/backups" " Store backups in a central location.
-let &directory=$XDG_STATE_HOME . "/vim/tmp"     " Keep .swp files in one out of the way directory.
+" Language independent tab settings which can be overriden when *vi loads a file
+" with custom rules.
+set tabstop=2     " Insert 2 space characters rather than a hard tab (\t).
+set shiftwidth=2  " Insert 2 spaces when auto indenting or hitting << >> or == .
+set softtabstop=2 " Treat 2 spaces as a tab when hitting tab, deleting, etc.
+set expandtab     " Insert `$softtabstop` # spaces when tab is pushed.
+set shiftround    " Round indentation to multiple of shift width.
+set autoindent    " Copy indentation from previous line when starting new line.
 
-" Configure netrw (builtin file explorer) to show files vertically on the left, without the
-" heading text.
-"
-" CTRL+O will open netrw in a new window, see plugins/FileExplorer.vim for more details.
-let g:netrw_banner=0       " Don't show the header text.
-let g:netrw_liststyle=3    " Tree style view.
-let g:netrw_winsize=25     " Use 25% of the window for view.
-let g:netrw_browse_split=3 " Opn new file in previous window.
+" Set the (default) maximum column to 100, which is sometimes overriden by a
+" file types with custom rules.
+set textwidth=100
 
-" Keep focus in file explorer when opening a new file.
-"autocmd filetype netrw nmap <c-a> <cr>:wincmd W<cr>
+" Show a ruler at column 80, and then a wider ruler at 100-105.
+if exists('&colorcolumn')
+  set colorcolumn=80,100,101,102,103,104,105
+endif
 
-" Use CTRL+hjkl to move between windows.
-nnoremap <silent> <C-k> :wincmd k<CR>
-nnoremap <silent> <C-j> :wincmd j<CR>
-nnoremap <silent> <C-h> :wincmd h<CR>
-nnoremap <silent> <C-l> :wincmd l<CR>
+" Keep NNN lines of command history which persists through editor sessions.
+set history=10000
 
-" Open and source .vimrc
-:nnoremap <leader>ev :vsplit $MYVIMRC<cr>  " Open .vimrc in a split
-:nnoremap <leader>sv :source $MYVIMRC<cr>  " Source .vimrc
+" Show line numbers on the left side of the editor.
+set number
 
-" Automatically switches to the directory that the document is in
-autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
+" Show the matching brace under the curosr.
+set showmatch
 
-" Make backspace act as expected on some weirdly configured platforms
+" Show the partial command in the command bar. Useful when highlighting text
+" in visual mode, as it will show the number of chars / lines highlighted.
+set showcmd
+
+" Use case insensitive matching, but only if all of the characters are
+" lowercase.
+set ignorecase      " Ignore case when matching...
+set smartcase       " ...unless a character is upper case.
+
+" Searching configuration.
+set incsearch  " Use incremental searching. Hit `<CR>` to stop.
+set hlsearch   " Highlight all search patterns.
+
+" Always draw a status line even if there is one window.
+set laststatus=2
+
+" Keep two lines above or below the cursor when scrolling vertically.
+set scrolloff=1
+
+" Keep five characters to the left / right when scrolling horizontally.
+set sidescrolloff=5
+
+" The system bell is never not annoying. Just don't.
+set noerrorbells
+
+" Enable automatic backups.
+set backup
+
+" Use a dialog to confirm changes when saving instead of erroring out.
+set confirm
+
+" Automatically save buffer before commands like :next, :make, etc.
+set autowrite
+
+" Shows the active mode on the status line (ie --INSERT--), which is helpful
+" if the airline plugin is not loaded.
+set showmode
+
+" Allow more than one unsaved buffer.
+set hidden
+
+" Use bash-like tab completion when in command prompt.
+set wildmode=list:longest,full
+
+" Make backspace work as expected on some oddly configured platforms. 
+" TODO: Which platforms?
 set backspace=eol,start,indent
 
-" Map <F2> to enable/disable vim's auto ident on paste. This allows us to paste code without
-" having the auto indentation rules applied.
-nnoremap <F2> :set invpaste paste?<CR>
-set pastetoggle=<F2>
+" Use case insensitive file name completion.
+if exists('&wildignorecase')
+  set wildignorecase
+endif
 
-" Hit % on a 'if' to jump to the corresponding else.
-runtime macros/matchit.vim
- 
-" have error messages red on white
+" Make error messages be red on white.
 highlight ErrorMsg guibg=White guifg=Red
 
-" Uncomment the following to have Vim jump to the last position when
-" reopening a file
-if has("autocmd")
-  au BufReadPost * if line("'\"") > 0 && line("'\"") <= line("$")
-    \| exe "normal g'\"" | endif
-endif
+"===============================================================================
+" Custom shortcuts.
+"===============================================================================
+" Open and source .vimrc file.
+:noremap <leader>ev :vsplit $MYVIMRC<cr>     " Open .vimrc in a split.
+:noremap <leader>sv :source $MYVIMRC<cr>     " Source .vimrc.
 
-" Persistent undo
-try
-    if MySys() == "windows"
-        set undodir=C:\Windows\Temp
-    else
-        set undodir=~/.vim_runtime/undo
-    endif
+" Use CTRL+hjkl to move between window panes (splits).
+noremap <silent> <C-k> :wincmd k<CR>
+noremap <silent> <C-j> :wincmd j<CR>
+noremap <silent> <C-h> :wincmd h<CR>
+noremap <silent> <C-l> :wincmd l<CR>
 
-    set undofile
-catch
-endtry
+" Map <F2> to a toggle switch that enables or disables vim's auto indent on
+" paste. Use this when you want to paste code without applying indent rules.
+noremap <F2> :set invpaste paste?<CR>
+set pastetoggle=<F2>
 
-" Set guide bar at 100 characters.
-if exists('&colorcolumn')
-    set colorcolumn=100
-    highlight ColorColumn ctermbg=0 guibg=lightgrey
-endif
-
-" Case insensitive file name completion.
-if exists('&wildignorecase')
-    set wildignorecase
-endif
-
-" Enable file detection and turn on automatic syntax highlighting, indenting and other features
-" for files with a detected language.
-if has('autocmd')
-    filetype plugin indent on
-endif
-
-if has('syntax') && !exists('g:syntax_on')
-    syntax enable
-endif
-
-" Highlight strings and numbers inside of C comments.
-let c_comment_strings=1
-
-" Set the amount of time for vim to wait to see if a key is part of a multi-key command to
-" 100ms.
-if !has('nvim') && &ttimeoutlen == -1
-    set ttimeout
-    set ttimeoutlen=100
-endif
-
-" Use <C-M> to clear the highlighting from :set hlsearch.
+" Use <C-M> to clear highlighting from :set hlsearch.
 if maparg('<C-M>', 'n') ==# ''
-    noremap <silent> <C-M> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
+  noremap <silent> <C-M> :nohlsearch<C-R>=has('diff')?'<Bar>diffupdate':''<CR><CR><C-L>
 endif
 
-" Don't use Ex mode. Instead use Q for formatting. Revert this wtith ":unma Q"
-map Q qq
-
-" Most modern terminal support the mouse, so lets turn it on. Only xterm can grab the mouse
-" event using the shift key; for other terminals use ":", select the text and press Esc.
-if has('mouse')
-    if &term =~ 'xterm'
-        set mouse=a
-    else
-        set mouse=nvi
-    endif
-endif
-
-" Apply GUI specific settings.
-if has("gui_running")
-    " Get rid of the tearoff menu entries in Windows.
-    if has('win32')
-        set guioption-=t
-    endif
-
-    " Show more lines and columns in GUI mode. Assumes GUI running with decent resolution.
-    set lines=36
-    set columns=125
-
-    " Set a nice font. Note that Consolas isn't available by default on Linux,
-    " but you can easily extract it from Microsoft's PPT installer. Its a nice
-    " font made specifically for programmers!
-    if has("mac")
-        set guifont=Monaco:h10
-    elseif has("unix")
-        " TODO: Can we detect which fonts are installed in order of preference?
-        set guifont=Consolas\ 12
-        "set guifont=Ubuntu\ Mono\ 11
-        "set guifont=Liberation\ Mono\ 10
-    elseif has("win32")
-        set guifont=Consolas\ 10
-    endif
-else
-    " Settings specific to non-GUI instances.
-endif
-
-" Support common clipboard shortcuts
+" Copy/cut/paste from system clipboard.
 :inoremap <C-v> <ESC>"+pa
 :vnoremap <C-c> "+y
 :vnoremap <C-d> "+d
 
-" Remap apple keys, useful because i always hit apple instead of ctrl
-if has("mac")
-    cmap <D-f> <C-f>
-    cmap <D-b> <C-b>
+"===============================================================================
+" Plugins
+"===============================================================================
+" Note to readers: Make sure to call :PlugInstall after updating the plugin
+" list.
+call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
+
+" Language server protocol.
+if has('nvim')
+    Plug 'neovim/nvim-lspconfig'
 endif
 
-" Airline plugin config
-let g:airline_theme='molokai'                " Use molokai theme to match.
-let g:airline#extensions#tabline#enabled = 1 " Display all buffers when one tab open
-let g:airline_powerline_fonts = 1
+" Color scheme: Use sonokai for neovim, and Solarized for vim.
+if has('nvim')
+  Plug 'sainnhe/sonokai'
+else
+
+endif
+
+" Pretty status bar.
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+
+" Show buffers in the command bar.
+Plug 'bling/vim-bufferline'
+
+" Git integration.
+Plug 'tpope/vim-fugitive'
+
+" List ends here. Plugins become visible to Vim after this call.
+call plug#end()
+
+"===============================================================================
+" Colorscheme
+"===============================================================================
+set termguicolors
+
+if has('nvim')
+  " Neovim uses sonokai theme (to distinguish visually from vim).
+  if &runtimepath =~ 'sonokai'
+    let g:sonokai_enable_italic = 1
+    let g:sonokai_disable_italic_comment = 1
+
+    colorscheme sonokai
+  endif
+else
+  " Vim uses my older theme Solarized as a way to distinguish from neovim.
+  set background=dark
+  colorscheme solarized8
+endif
+
+"===============================================================================
+"  Status line
+"===============================================================================
+" Display line and column position in the status line.
+set ruler
+
+" Custom settings for airline theme.
+if &runtimepath =~ 'vim-airline'
+  let g:airline_theme = 'dark'
+
+  " Display all buffers when one tab is open.
+  let g:airline#extensions#tabline#enabled = 1
+
+  " Use fancy font glyphs for the status line. Requires a terminal font that
+  " supports powerline.
+  let g:airline_powerline_fonts = 1
+endif
+
+"===============================================================================
+" Custom behaviors.
+"===============================================================================
+" Automatically switch to the directory that the document is in.
+autocmd BufEnter * execute "chdir ".escape(expand("%:p:h"), ' ')
+
+" Jump from if to corresponding else when using %.
+runtime macros/matchit.vim
+
+" Open file to the last edited position.
+if has("autocmd")
+  au BufReadPost * if line("'\'") > 0 && line("'\"") <= line("$")
+    \| exe "normal g'\"" | endif
+endif
+
+" Turn on automatic syntax highlighting, indenting and other features for files
+" that have a detected language.
+if has('autocmd')
+  filetype plugin indent on
+endif
+
+if has('syntax') && !exists('g:syntax_on')
+  syntax enable
+endif
+
+" Set the amount of time for vim to wait when checking for a multi-key command
+" to 100ms.
+if !has('nvim') && &ttimeoutlen == -1
+  set ttimeout
+  set ttimeoutlen=100
+endif
+
+" Enable mouse support by default since all modern terminals have support for
+" mice.
+if has('mouse')
+  set mouse=a
+endif
+
+" Set a single well known location for vim to store user state (backup, temp,
+" etc) and if those directories don't exist create them.
+" TODO: Probably need different paths for windows.
+" TODO: Create a crontab script to nuke files after ~ 90 days.
+if !isdirectory($HOME."/.local/state/vim/backups")
+  call mkdir($HOME."/.local/state/vim/backups", "p", 0770)
+endif
+
+if !isdirectory($HOME."/.local/state/vim/tmp")
+  call mkdir($HOME."/.local/state/vim/tmp", "p", 0770)
+endif
+
+if !isdirectory($HOME."/.local/state/vim/undo")
+  call mkdir($HOME."/.local/state/vim/undo", "p", 0770)
+endif
+
+set backupdir=$HOME/.local/state/vim/backups  " File back up in case of crash.
+set directory=$HOME/.local/state/vim/tmp      " Stores temporary file state.
+set undodir=$HOME/.local/state/vim/undo       " Stores undo history for files.

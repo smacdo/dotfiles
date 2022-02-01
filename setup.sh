@@ -96,12 +96,11 @@ main() {
     "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
     "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
 
-  fetch_git_tag VimAirline "v0.11" \
-    "https://github.com/vim-airline/vim-airline" \
-    "${HOME}/.vim/pack/dist/start/vim-airline"
-
   # Install vimplug for neovim to manage plugins.
   # (Does not require neovim to be installed on the system)
+  sh -c 'curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
+       https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
+
   sh -c 'curl -fLo "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/site/autoload/plug.vim --create-dirs \
        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
 }
