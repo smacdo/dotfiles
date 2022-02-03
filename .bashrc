@@ -19,7 +19,7 @@
 # between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
-# ~/.shell_profile.sh.
+# ~/.my_shell_profile.sh or ~/.my_bash_rc
 for file in $S_DOTFILE_ROOT/shell_profile/\
 {xdg.sh,exports.sh,paths.sh,functions.sh,aliases.sh}; do
     # -r test if readable, -f is file.
@@ -27,8 +27,11 @@ for file in $S_DOTFILE_ROOT/shell_profile/\
 done;
 unset file
 
-[ -r "${HOME}/.shell_profile.sh" ] && [ -f "${HOME}/.shell_profile.sh" ]\
-&& source "${HOME}/.shell_profile.sh"
+[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
+&& source "${HOME}/.my_shell_profile.sh"
+
+[ -r "${HOME}/.my_bash_rc.sh" ] && [ -f "${HOME}/.my_bash_rc.sh" ]\
+&& source "${HOME}/.my_bash_rc.sh"
 
 # Flash the screen instead of playing an audio bell.
 set bell-style visible
@@ -40,7 +43,10 @@ shopt -s nocaseglob
 shopt -s cdspell
 
 # Automatically 'cd' when entering just a path.
-shopt -s autocd
+# Note this is only supported on bash 4+ which is not shipped by default on Mac.
+if [ "${BASH_VERSINFO:-0}" -ge 4 ]; then
+  shopt -s autocd
+fi
 
 # Sometimes bash doesn't get the resize signal from a terminal emulator after the terminal
 # window is resized. This opton orces bash to recheck the window size after each command and

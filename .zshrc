@@ -17,7 +17,7 @@ export S_DOTFILE_ROOT="$HOME/.dotfiles"
 # between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
-# ~/.shell_profile.sh.
+# ~/.my_shell_profile.sh or ~/.my_zshrc
 for file in "${S_DOTFILE_ROOT}"/shell_profile/\
 {xdg.sh,exports.sh,paths.sh,functions.sh,aliases.sh,private_branch.sh}; do
     # -r test if FILE exists and is readable.
@@ -26,8 +26,11 @@ for file in "${S_DOTFILE_ROOT}"/shell_profile/\
 done;
 unset file
 
-[ -r "${HOME}/.shell_profile.sh" ] && [ -f "${HOME}/.shell_profile.sh" ]\
-&& source "${HOME}/.shell_profile.sh"
+[ -r "${home}/.my_my_shell_profile.sh" ] && [ -f "${home}/.my_shell_profile.sh" ]\
+&& source "${home}/.my_my_shell_profile.sh"
+
+[ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]\
+&& source "${HOME}/.my_zshrc.sh"
 
 # Load .dotfiles shared zsh modules.
 for file in ~/.zsh/*.zsh; do
