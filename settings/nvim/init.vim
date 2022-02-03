@@ -265,3 +265,12 @@ endif
 set backupdir=$HOME/.local/state/vim/backups  " File back up in case of crash.
 set directory=$HOME/.local/state/vim/tmp      " Stores temporary file state.
 set undodir=$HOME/.local/state/vim/undo       " Stores undo history for files.
+
+"===============================================================================
+" Machine local settings.
+"===============================================================================
+let $MY_LOCAL_VIMRC = $HOME . "/.my_vimrc"
+
+if filereadable($MY_LOCAL_VIMRC)
+  source $MY_LOCAL_VIMRC
+endif
