@@ -52,7 +52,6 @@ setopt HIST_REDUCE_BLANKS # Remove blank lines from history.
 
 # Load the tab autocompletion system
 autoload -Uz compinit
-compinit
 
 setopt COMPLETE_ALIASES # autocompletion of cli switches for aliases
 
@@ -110,11 +109,13 @@ fi
 if type brew &>/dev/null; then
   FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
   autoload -Uz compinit
-  compinit
 fi
 
 # Load fzf support.
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Finish zsh auto completion init.
+compinit
 
 # Load zsh syntax highlighting plugin. According to install instructions this
 # line must be last in the .zshrc file.
