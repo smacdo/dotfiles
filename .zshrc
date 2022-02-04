@@ -89,8 +89,8 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 set -o noclobber
 
 # Use the powerlevel10k theme or warn if not installed.
-if [[ -f "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-    source "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k/powerlevel10k.zsh-theme"  
+if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+    source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 else
@@ -116,11 +116,8 @@ fi
 # Load fzf support.
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-# Load zsh syntax highlighting plugin
-# According to install instructions this must be last in the .zshrc file.
-[[ ! -f "$HOME/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
-    || source "$HOME/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-
-[[ ! -f "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
-    || source "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-
+# Load zsh syntax highlighting plugin. According to install instructions this
+# line must be last in the .zshrc file.
+# TODO: Source the correct path on Debian, Fedora, Windows.
+[[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+  || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

@@ -89,19 +89,10 @@ main() {
     touch "${HOME}/.shell_profile.sh"
   fi
 
-  # Clone plugins locally (rather than have them checked into the dotfiles repo).
-  echo "${magenta}Cloning plugins locally...${normal}"
+  # Install plugin managers for vim and neovim.
+  # (Does not require either to be installed for this to work).
+  echo "${magenta}Cloning neovim, vim plugin managers locally...${normal}"
 
-  fetch_git_tag powerlevel10k "v1.15.0" \
-    "https://github.com/romkatv/powerlevel10k.git" \
-    "${XDG_DATA_HOME}/dotfiles/zsh/powerlevel10k"
-
-  fetch_git_tag ZshSyntaxHighlighting "0.7.1" \
-    "https://github.com/zsh-users/zsh-syntax-highlighting.git" \
-    "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting"
-
-  # Install vimplug for neovim to manage plugins.
-  # (Does not require neovim to be installed on the system)
   sh -c 'curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim'
 

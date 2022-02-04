@@ -42,7 +42,8 @@ init_homebrew() {
 install_terminal_core() {
   # Bash and ZSH shells.
   install_pkg_mac bash bash-completion zsh zsh-completions \
-    zsh-syntax-highlighting
+    zsh-syntax-highlighting \
+    romkatv/powerlevel10k/powerlevel10k
 
   # Common command line tools.
   install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux \
