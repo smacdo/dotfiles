@@ -51,29 +51,25 @@ install_terminal_core() {
 
   # TODO: Only run if exists. Run once?
   # TODO: Support system install variant.
-  if [ -d "$HOME/homebrew" ]; then
-    "$HOME"/homebrew/opt/fzf/install
-    # TODO: Only run this if the line does not already exist in .vimrc.
-    echo "set rtp+=$HOME/homebrew/opt/fzf" >> ~/.my_vimrc
+  if [ -f "$(brew --prefix)/opt/fzf/install" ]; then
+    "$(brew --prefix)"/opt/fzf/install
+
+    # Add fzf config to local vimrc.
+    vimrc_fzf_line="set rtp+=$(brew --prefix)/opt/fzf"
+    grep -qxF "$vimrc_fzf_line" ~/.my_vimrc || echo "$vimrc_fzf_line" >> ~/.my_vimrc
   else
     error "implement fzf post init for system wide homebrew install"
   fi
 
   # ZSH completions post-install config:
-  rm -f "$HOME"/.zcompdump; compinit
-  chmod -R go-w "$HOME"/homebrew/share/zsh
+  chmod -R go-w "$(brew --prefix)"/share/zsh
 
   # GNU core utilities to simplify cross platform scripts.
   install_pkg_mac coreutils findutils grep gnu-sed gawk
-
-  # TODO in bash this is hash -r and in zsh it is rehash
-  # TODO move this to the core loop since it has to run more often
-  rehash
-
 }
 
 install_cpp_clang() {
-  install_pkg_mac make cmake
+  install_pkg_mac make cmake llvm clang-format
 }
 
 install_shell_scripting() {
@@ -82,6 +78,12 @@ install_shell_scripting() {
 
 help() {
   echo "--- help ---"
+}
+
+finished() {
+  echo "Finished! You should restart your shell before continuing."
+  echo "  source ~/.bashrc   # bash shell"
+  echo "  source ~/.zshrc    # zsh shell"
 }
 
 usage() {
@@ -111,6 +113,7 @@ start() {
 
   init_homebrew
   install_terminal_core
+  finished
 
   # TODO
   # if no options selected print usage
