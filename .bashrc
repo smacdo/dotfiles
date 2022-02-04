@@ -96,8 +96,15 @@ set_colored_prompt
 # Make less more friendly for non-text input files, see lesspipe(1).
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
+# Load bash auto-completions.
+# TODO: Finish this for system wide homebrew, fedora, debian installs.
+[[ -r "$HOME/homebrew/etc/profile.d/bash_completion.sh" ]] && \
+  . "$HOME/homebrew/etc/profile.d/bash_completion.sh"
+
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
   source "${S_DOTFILE_ROOT}/vendor/iterm2/bash"
 fi
 
+# Load fzf support.
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash

@@ -53,7 +53,7 @@ brew install gnu-sed
 brew install bash bash-completion@2
 
 # Install common packages for Mac OS
-brew install vim git git-lfs htop fzf neovim ripgrep tmux zsh mosh highlight
+brew install vim git git-lfs htop fzf neovim ripgrep tmux zsh mosh highlight gpg
 
 brew install --cask 1password
 brew install --cask sublime-text
