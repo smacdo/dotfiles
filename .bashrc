@@ -97,9 +97,9 @@ set_colored_prompt
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # Load bash auto-completions.
-# TODO: Finish this for system wide homebrew, fedora, debian installs.
-[[ -r "$HOME/homebrew/etc/profile.d/bash_completion.sh" ]] && \
-  . "$HOME/homebrew/etc/profile.d/bash_completion.sh"
+# TODO: Finish this for debian, fedora, windows installs.
+[[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \
+  . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
 
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
