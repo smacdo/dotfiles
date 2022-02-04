@@ -106,7 +106,21 @@ if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
     source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
 fi
 
+# Additional ZSH completions.
+if type brew &>/dev/null; then
+  FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+  autoload -Uz compinit
+  compinit
+fi
+
+# Load fzf support.
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
 # Load zsh syntax highlighting plugin
 # According to install instructions this must be last in the .zshrc file.
+[[ ! -f "$HOME/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+    || source "$HOME/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+
 [[ ! -f "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "${XDG_DATA_HOME}/dotfiles/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+
