@@ -22,11 +22,6 @@ else
   fi
 fi
 
-# Add rust build tools to the path if rust was installed.
-if [ -f "$HOME/.cargo/env" ]; then
-    . "$HOME/.cargo/env"
-fi
-
 ### TODO: Only apply these settings for interactive shells. ###
 # Hide the “default interactive shell is now zsh” warning on macOS.
 export BASH_SILENCE_DEPRECATION_WARNING=1

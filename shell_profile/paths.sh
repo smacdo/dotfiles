@@ -1,7 +1,12 @@
 #!/bin/sh
+# This file configures the $PATH environment variable for a shell session.
+
 ################################################################################
-# Adds a directory to the PATHS environment variable only if it was not already
-# added.
+# Add a new directory to the front of the PATH environment variable if it was
+# not already present.
+#
+# Arguments:
+#  $1: The path to add. If it does not exist it will not be added.
 #
 # Ref: https://unix.stackexchange.com/a/124447
 ################################################################################
@@ -11,37 +16,47 @@ add_path_front() {
         return 1
     fi
 
-    case ":${PATH:=$1}:" in
-        *:"$1":*)   ;;
-        *) PATH="$1:$PATH"   ;;
-    esac
+    if [ -d "$1" ]; then
+      case ":${PATH:=$1}:" in
+          *:"$1":*)   ;;
+          *) PATH="$1:$PATH"   ;;
+      esac
+    fi
 }
 
+################################################################################
+# Add a new directory to the end of the PATH environment variable if it was not
+# already present.
+#
+# Arguments:
+#  $1: The path to add. If it does not exist it will not be added.
+################################################################################
 add_path_back() {
     if [ -z "$1" ]; then
         echo "ERROR: Missing path to add"
         return 1
     fi
-
-    case ":${PATH:=$1}:" in
-        *:"$1":*)   ;;
-        *) PATH="$PATH:$P1"   ;;
-    esac
+    
+    if [ -d "$1" ]; then
+      case ":${PATH:=$1}:" in
+          *:"$1":*)   ;;
+          *) PATH="$PATH:$1"   ;;
+      esac
+    fi
 }
 
+# The rust tool 'cargo' install binaries to the user's home directory.
+# (prepended in case cargo needs to override system installed rustc).
+add_path_back "$HOME/.cargo/bin"
+
 # Support local homebrew installs (~/homebrew)
-if [ -d "$HOME/homebrew/bin" ]; then
-  add_path_front "$HOME/homebrew/bin"
-fi
+add_path_front "$HOME/homebrew/bin"
 
-# Support dotfile scripts (~/.dotfiles/bin)
-if [ -d "$S_DOTFILE_ROOT" ]; then 
-  add_path_front "$S_DOTFILE_ROOT/bin"
-fi
+# Also support scripts from dotfiles (this will override ~/homebrew).
+add_path_back "$S_DOTFILE_ROOT/bin"
 
-# Add dotfile scripts (~/bin)
-if [ -d "$HOME/bin" ]; then
-  add_path_front "$HOME/bin"
-fi
+# Also support scripts in user bin (overriding previous).
+add_path_back "$HOME/bin"
+
 
 

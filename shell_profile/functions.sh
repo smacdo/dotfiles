@@ -83,6 +83,10 @@ is_cygwin() {
     expr "$(uname -s)" : '^CYGWIN*' > /dev/null || return 1
 }
 
+show_path() {
+    echo "$PATH" | tr : '\n'
+}
+
 # Ask user to confirm before continuing. Returns 0 for yes, 1 for no.
 # First parameter is the text to confirm with.
 prompt_confirm() {

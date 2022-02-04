@@ -21,7 +21,7 @@
 # If you want to have machine specific stuff the best place to put it is in
 # ~/.my_shell_profile.sh or ~/.my_bash_rc
 for file in $S_DOTFILE_ROOT/shell_profile/\
-{xdg.sh,exports.sh,paths.sh,functions.sh,aliases.sh}; do
+{xdg.sh,paths.sh,exports.sh,functions.sh,aliases.sh}; do
     # -r test if readable, -f is file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;
