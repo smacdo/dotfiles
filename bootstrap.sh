@@ -61,8 +61,6 @@ main() {
   mkdir -vp "${XDG_STATE_HOME}/vim/backups"
   mkdir -vp "${XDG_STATE_HOME}/vim/tmp"
 
-  # Make sure the neovim directory 
-
   # Symlink useful dotfiles
   echo "${magenta}Symlinking dotfiles...${normal}"
 
@@ -81,13 +79,6 @@ main() {
   safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
   safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
   safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
-
-  # Create machine local configuration files.
-  if [ -f "${HOME}/.shell_profile.sh" ]; then
-    echo "${yellow}${bold}WARNING: ${HOME}/.shell_profile.sh exists!${normal}"
-  else
-    touch "${HOME}/.shell_profile.sh"
-  fi
 
   # Install plugin managers for vim and neovim.
   # (Does not require either to be installed for this to work).
