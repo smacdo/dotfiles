@@ -1,5 +1,5 @@
 #!/bin/sh
-
+USE_LOCAL_BREW=0
 
 # packages include:
 #  gnupg
@@ -25,21 +25,28 @@ install_pkg_mac() {
 }
 
 init_homebrew() {
-  # TODO: Only do this if corp machine, or maybe by option?
-  if [ ! -d "$HOME/homebrew" ] ; then
-    print_action Installing Homebrew
+  # Exit without init if homebrew is already installed.
+  command -v brew >/dev/null 2>&1 ] && return 0
+
+  # Install local homebrew, or system wide homebrew?
+  if [ "$USE_LOCAL_BREW" -eq 1 ]; then
+    # Local homebrew.
+    print_action "Installing Homebrew (user local)"
     mkdir "$HOME"/homebrew && \
       curl -L https://github.com/Homebrew/brew/tarball/master | \
       tar xz --strip 1 -C "$HOME"/homebrew
   else
-    verbose Homebrew already installed, skipping installation
+    # System homebrew install.
+    print_action "Installing Homebrew (global)"
+    /bin/bash -c \
+      "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   fi
 
-  # TODO: Make this permanent
-  export PATH=${HOME}/homebrew/bin:${PATH}
+  # TODO: Needed?
+  # export PATH=${HOME}/homebrew/bin:${PATH}
 }
 
-install_terminal_core() {
+install_core_packages() {
   # Bash and ZSH shells.
   install_pkg_mac bash bash-completion zsh zsh-completions \
     zsh-syntax-highlighting \
@@ -88,31 +95,57 @@ finished() {
 
 usage() {
   echo "Configure and install packages on a machine to fit a given profile"
-  echo "Usage: $0 -hV"
+  echo "Usage: $0 -hV [-t package_name]"
   echo " -h     Show this help message"
+  echo " -H     Install homebrew locally (~/homebrew)"
   echo " -V     Verbose mode"
+  echo
+  echo "Available packages: "
+  echo "  core      Core terminal utiliies for every machine"
+}
+
+install_package() {
+  package="$1"
+
+  # TODO: Only init if mac.
+  init_homebrew
+
+  if [ "$package" == "core" ]; then
+    install_core_packages
+  else
+    error "Unknown package '$package'"
+    exit
+  fi
 }
 
 start() {
-  while getopts ":h:V" opt; do
+  while getopts "hHVp:" opt; do
     case "${opt}" in
       h)
         # ${OPTARG}
         help
+        exit
+        ;;
+      H)
+        USE_LOCAL_BREW=1
         ;;
       V)
         VERBOSE=1
         ;;
+      p)
+        install_package "${OPTARG}"
+        ;;
       *)
+        error "Unknown option"
+        echo
         usage
+        exit
         ;;
     esac
   done
 
   shift $((OPTIND-1))
 
-  init_homebrew
-  install_terminal_core
   finished
 
   # TODO
