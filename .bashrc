@@ -98,8 +98,10 @@ set_colored_prompt
 
 # Load bash auto-completions.
 # TODO: Finish this for debian, fedora, windows installs.
-[[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \
-  . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+if is_osx; then
+  [[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \
+    . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+fi
 
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then

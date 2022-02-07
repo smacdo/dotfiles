@@ -75,6 +75,10 @@ is_redhat() {
     [ "$DOT_DIST" = "redhat" ] || return 1
 }
 
+is_fedora() {
+    [ "$DOT_DIST" = "fedora" ] || return 1
+}
+
 is_ubuntu() {
     [ "$DOT_DIST" = "ubuntu" ] || return 1
 }

@@ -88,8 +88,10 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 set -o noclobber
 
 # Use the powerlevel10k theme or warn if not installed.
-if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-    source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
+if is_osx; then
+  if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+      source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
+  fi
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 else
@@ -106,9 +108,11 @@ if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
 fi
 
 # Additional ZSH completions.
-if type brew &>/dev/null; then
-  FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
-  autoload -Uz compinit
+if is_osx; then
+  if type brew &>/dev/null; then
+    FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+    autoload -Uz compinit
+  fi
 fi
 
 # Load fzf support.
@@ -120,5 +124,7 @@ compinit
 # Load zsh syntax highlighting plugin. According to install instructions this
 # line must be last in the .zshrc file.
 # TODO: Source the correct path on Debian, Fedora, Windows.
-[[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
-  || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+if is_osx; then
+  [[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+    || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
