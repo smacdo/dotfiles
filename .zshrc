@@ -94,6 +94,8 @@ if is_osx; then
   fi
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
+elif [[ -f "$S_DOTFILE_ROOT"/.external/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source "$S_DOTFILE_ROOT"/.external/powerlevel10k/powerlevel10k.zsh-theme
 else
     echo "WARNING: powerlevel10k not installed"
 fi
@@ -127,4 +129,7 @@ compinit
 if is_osx; then
   [[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+else
+  [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+    || source "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi

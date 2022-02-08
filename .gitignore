@@ -1,5 +1,6 @@
 *.swp
 *.uuid
+.external
 .vim/view
 .vim/plugged
 private

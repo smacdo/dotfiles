@@ -103,6 +103,9 @@ if is_osx; then
     . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
 fi
 
+[[ -r "/usr/share/bash-completion/bash_completion" ]] && \
+    . "/usr/share/bash-completion/bash_completion"
+
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
   source "${S_DOTFILE_ROOT}/vendor/iterm2/bash"
