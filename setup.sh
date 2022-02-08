@@ -62,6 +62,15 @@ init_homebrew() {
   # export PATH=${HOME}/homebrew/bin:${PATH}
 }
 
+################################################################################
+# Clones a copy of the zsh powerlevel10k repository to `.dotfiles/.external`.
+#
+# Some distributions of Linux (like Fedora or Debian) lack a package for
+# powerlevel10k so we need to manually install it. Othertimes it makes sense to
+# package up the .dotfiles directory to copy it to a server that doesn't have
+# access to the full internet. In all of those cases it makes sense to install
+# powerlevel10k locally.
+################################################################################
 install_zsh_powerlevel() {
   # Don't proceed without a path to the dotfiles checkout.
   if [ -z "$S_DOTFILE_ROOT" ]; then
@@ -85,6 +94,13 @@ install_zsh_powerlevel() {
   fi
 }
 
+################################################################################
+# Installs basic packages required for all environments including desktops and
+# servers.
+# 
+# Most of the scripts in bin/ as well as vim, tmux configuration expect this
+# core set of packages to be installed.
+################################################################################
 install_core_packages() {
   # Bash and ZSH shells with additional plugins.
   install_pkg_mac \
@@ -102,7 +118,7 @@ install_core_packages() {
   # Common command line tools.
   # TODO: Move terminal-notifier to a desktop package.
   install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux vim wget
-  install_pkg_fedora fzf git-lfs htop neovim ripgrep tmux vim wget
+  install_pkg_fedora fzf git-lfs htop neovim ripgrep tmux vim vim-enhanced wget
 
   # GNU core utilities to simplify cross platform scripts.
   # (Should already be installed on Linux distros).
@@ -126,15 +142,37 @@ install_core_packages() {
     # ZSH completions post-install config:
     chmod -R go-w "$(brew --prefix)"/share/zsh
   fi
-
 }
 
-install_cpp_clang() {
+################################################################################
+# Installs the Visual Studio code program on the local computer.
+# Use `code` to invoke it from the command line.
+################################################################################
+install_vscode() {
+  ## Visual Studio Code
+  # Ref: https://code.visualstudio.com/docs/setup/linux#_rhel-fedora-and-centos-based-distributions
+  print_action "Install Visual Studio Code"
+
+  if is_fedora; then
+    sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+
+    dnf check-update
+    sudo dnf install code
+  fi
+}
+
+install_cpp() {
   install_pkg_mac make cmake llvm clang-format
+  install_pkg_fedora make automake gcc gcc-c++
 }
 
-install_shell_scripting() {
-  install_pkg_mac shellcheck
+################################################################################
+# Change the default gnome settings to the way I like it.
+################################################################################
+apply_settings_gnome() {
+  gsettings set org.gnome.desktop.wm.preferences button-layout ":minimize,maximize,close"
+  echo "Gnome settings applied!"
 }
 
 help() {
@@ -152,28 +190,45 @@ usage() {
   echo "Usage: $0 -hV [-t package_name]"
   echo " -h     Show this help message"
   echo " -H     Install homebrew locally (~/homebrew)"
+  echo " -s x   Apply settings for [x] desktop"
   echo " -V     Verbose mode"
+  echo
+  echo "Available desktops: "
+  echo "  gnome"
   echo
   echo "Available packages: "
   echo "  core      Core terminal utiliies for every machine"
+  echo "  vscode"
 }
 
 install_package() {
   package="$1"
 
-  # TODO: Only init if mac.
   is_osx && init_homebrew
+  is_fedora && dnf update
 
   if [ "$package" == "core" ]; then
     install_core_packages
+  elif [ "$package" == "vscode" ]; then
+    install_vscode
   else
     error "Unknown package '$package'"
     exit
   fi
 }
 
+apply_settings_for() {
+  desktop="$1"
+
+  if [ "$desktop" = "gnome" ]; then
+    apply_settings_gnome
+  else
+    error "Unknown desktop '$desktop'"
+  fi
+}
+
 start() {
-  while getopts "hHVp:" opt; do
+  while getopts "hHVp:s:" opt; do
     case "${opt}" in
       h)
         # ${OPTARG}
@@ -188,6 +243,9 @@ start() {
         ;;
       p)
         install_package "${OPTARG}"
+        ;;
+      s)
+        apply_settings_for "${OPTARG}"
         ;;
       *)
         error "Unknown option"
