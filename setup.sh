@@ -65,7 +65,7 @@ init_homebrew() {
 install_zsh_powerlevel() {
   # Don't proceed without a path to the dotfiles checkout.
   if [ -z "$S_DOTFILE_ROOT" ]; then
-    error "Expected environment variable `S_DOTFILE_ROOT` not set"
+    error "Expected environment variable S_DOTFILE_ROOT not set"
     return 1
   fi
 
@@ -100,12 +100,15 @@ install_core_packages() {
   fi
 
   # Common command line tools.
+  # TODO: Move terminal-notifier to a desktop package.
   install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux vim wget
+  install_pkg_fedora fzf git-lfs htop neovim ripgrep tmux vim wget
 
   # GNU core utilities to simplify cross platform scripts.
+  # (Should already be installed on Linux distros).
   install_pkg_mac coreutils findutils grep gnu-sed gawk
 
-    # Post install configuration for MacOS.
+  # Post install configuration for MacOS.
   if is_osx; then
     # TODO: Only run if exists. Run once?
     # TODO: Support system install variant.
