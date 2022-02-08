@@ -10,7 +10,7 @@
 # v - Edit a file using the editor specified by the environment var $EDITOR.
 # vi - Same as `v` command
 alias v='/usr/bin/env "$EDITOR"'
-alias v='/usr/bin/env "$EDITOR"'
+alias vi='/usr/bin/env "$EDITOR"'
 
 ### ls
 if is_osx; then
