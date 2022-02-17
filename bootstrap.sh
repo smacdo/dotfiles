@@ -30,7 +30,7 @@ main() {
   fi
 
   # Bail out if this doesn't look like the checkout directory.
-  if [ ! -f "./bootstrap.sh" ] || [ ! -f "./README" ]; then
+  if [ ! -f "./bootstrap.sh" ] || [ ! -f "./README.md" ]; then
     echo "${red}Please run this script from the root directory of the git " \
         "checkout${normal}"
     exit 1
