@@ -15,6 +15,9 @@
 # return immediately if the shell is not interactive.
 [[ $- != *i* ]] && return
 
+# Export the dotfiles path as an environment variable to avoid hardcoding paths.
+export S_DOTFILE_ROOT="$HOME/.dotfiles"
+
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 #
