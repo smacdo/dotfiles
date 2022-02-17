@@ -83,8 +83,8 @@ verbose() {
 # Arguments:
 #  $*: Message to show.
 ###############################################################################
-action() {
-  print "$@"
+print_action() {
+  echo "$@"
 }
 
 ###############################################################################
@@ -92,7 +92,7 @@ action() {
 ###############################################################################
 die_if_not_root() {
   if [ "$(id -u)" != 0 ]; then
-    die_error "This script must be run as root (sudo)"
+    exit_with_message 10 "This script must be run as root (sudo)"
   fi
 }
 
