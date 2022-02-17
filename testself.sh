@@ -3,7 +3,6 @@
 # Purpose: Continuous integration script for the dotfiles repository.
 #
 # Working directory must be root of dotfiles.
-# TODO: Shellcheck myself
 
 check_result() {
   # TODO: Make custom continue or abort
@@ -25,14 +24,62 @@ lint_shell_script() {
   check_result $? "shellcheck" "$1"
 }
 
+test_zsh() {
+  old_ZDOTDIR="$ZDOTDIR"
+  # TODO: Make relative.
+  export ZDOTDIR="$HOME/.dotfiles/"
+
+  if [ ! -f "$ZDOTDIR/.zshrc" ]; then
+    echo "ERROR: could not find .zshrc in dotfiles repo"
+    exit 1
+  fi
+
+  output=$(zsh -i -c "echo 'success'; exit 0" 2>&1)
+  
+  if [ "$output" != "success" ]; then
+    echo "ERROR: zsh run failed; expected output 'success' but got '$output'"
+    exit 2
+  else
+    echo "zsh ok"
+  fi
+
+  export ZDOTDIR="$old_ZDOTDIR"
+}
+
+test_bash() {
+  # TODO: Test .bash_profile
+  bashrc_path="$HOME/.dotfiles/.bashrc"
+
+  if [ ! -f "$bashrc_path" ]; then
+    echo "ERROR: could not find .bashrc in dotfiles repo"
+    exit 1
+  fi
+
+  export DOTFILE_CI_TEST_MODE=1
+  output=$(bash --rcfile "$HOME/.dotfiles/.bashrc" --login -c "echo 'success'; exit 0" 2>&1)
+
+  if [ "$output" != "success" ]; then
+    echo "ERROR: bashrc check failed; expected output 'success' but got '$output'"
+    exit 1
+  else
+    echo "bashrc ok"
+  fi
+}
+
+# TODO: test sh
+
 ################################################################################
 # Run shellcheck for a given script.
 ################################################################################
 main() {
+  test_bash
+  test_zsh
+
   for s in \
         "$(basename "$0")" \
         ".bash_profile" \
         ".bashrc" \
+        "bootstrap.sh" \
         "setup.sh" \
         "bin/code" \
         "bin/colors" \
@@ -43,6 +90,7 @@ main() {
         "bin/rgcat.sh" \
         "bin/subl" \
         "bin/weather_status.sh" \
+        "sh/cli.sh" \
         "shell_profile/aliases.sh" \
         "shell_profile/exports.sh" \
         "shell_profile/functions.sh" \
@@ -51,6 +99,9 @@ main() {
         ; do
     lint_shell_script "$s"
   done
+
+  # TODO: Determine if any errors were present when linting (as opposed to
+  # warnings), and print that result down here.
 
   echo "*** SUCCESS! ***"
 }

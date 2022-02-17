@@ -13,7 +13,7 @@
 # In some circumstances bash will source .bashrc even though it is running as a
 # non-interactive shell (e.g., when using scp). Check for this condition, and
 # return immediately if the shell is not interactive.
-[[ $- != *i* ]] && return
+[[ -z "$DOTFILE_CI_TEST_MODE" ]] && [[ $- != *i* ]] && return
 
 # Export the dotfiles path as an environment variable to avoid hardcoding paths.
 export S_DOTFILE_ROOT="$HOME/.dotfiles"
