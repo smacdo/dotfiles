@@ -45,7 +45,7 @@ link standard shell config files (.vimrc, .bashrc, .zshrc etc) to files found in
 this repository.
 
 ```
-git clone https://github.com/smacdo/dotfiles.git ~/.dotfiles
+git clone git@github.com:smacdo/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles && ./bootstrap.sh
 ```	
 
