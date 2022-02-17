@@ -1,7 +1,7 @@
 #!/bin/sh
 USE_LOCAL_BREW=0
 
-# TODO: Check for superuser privs (at least on fedora)
+# TODO: Check for superuser privs (at least on redhat)
 
 # Include local code libs.
 . shell_profile/functions.sh
@@ -27,15 +27,15 @@ install_pkg_mac() {
 }
 
 ################################################################################
-# Installs one or more Fedora packages. Does nothing if the host operating
-# system is not Fedora.
+# Installs one or more Redhat packages. Does nothing if the host operating
+# system is not Redhat.
 #
 # Arguments:
-#  $*: Name of Fedora package(s) to install.
+#  $*: Name of RedHat package(s) to install.
 ################################################################################
-install_pkg_fedora() {
-  # Only run this on Fedora platforms.
-  if is_fedora; then
+install_pkg_redhat() {
+  # Only run this on Redhat platforms.
+  if is_redhat; then
     print_action Installing packages: "$@"
     dnf install "$@"
   fi
@@ -72,7 +72,7 @@ init_homebrew() {
 ################################################################################
 # Clones a copy of the zsh powerlevel10k repository to `.dotfiles/.external`.
 #
-# Some distributions of Linux (like Fedora or Debian) lack a package for
+# Some distributions of Linux (like Redhat or Debian) lack a package for
 # powerlevel10k so we need to manually install it. Othertimes it makes sense to
 # package up the .dotfiles directory to copy it to a server that doesn't have
 # access to the full internet. In all of those cases it makes sense to install
@@ -114,18 +114,18 @@ install_core_packages() {
     bash bash-completion \
     zsh zsh-completions zsh-syntax-highlighting romkatv/powerlevel10k/powerlevel10k
 
-  install_pkg_fedora \
+  install_pkg_redhat \
     bash bash-completion \
     zsh zsh-syntax-highlighting
 
-  if is_fedora; then
+  if is_redhat; then
     install_zsh_powerlevel
   fi
 
   # Common command line tools.
   # TODO: Move terminal-notifier to a desktop package.
   install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux vim wget
-  install_pkg_fedora fzf git-lfs htop neovim ripgrep tmux vim vim-enhanced wget
+  install_pkg_redhat fzf git-lfs htop neovim ripgrep tmux vim vim-enhanced wget
 
   # GNU core utilities to simplify cross platform scripts.
   # (Should already be installed on Linux distros).
@@ -160,7 +160,7 @@ install_vscode() {
   # Ref: https://code.visualstudio.com/docs/setup/linux#_rhel-fedora-and-centos-based-distributions
   print_action "Install Visual Studio Code"
 
-  if is_fedora; then
+  if is_redhat; then
     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
     sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
 
@@ -171,7 +171,7 @@ install_vscode() {
 
 install_cpp() {
   install_pkg_mac make cmake llvm clang-format
-  install_pkg_fedora make automake gcc gcc-c++
+  install_pkg_redhat make automake gcc gcc-c++
 }
 
 ################################################################################
@@ -222,8 +222,10 @@ finished() {
 install_package() {
   package="$1"
 
+  is_osx || die_if_not_root
+
   is_osx && init_homebrew
-  is_fedora && dnf update
+  is_redhat && dnf update
 
   if [ "$package" == "core" ]; then
     install_core_packages
