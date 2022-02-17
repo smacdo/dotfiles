@@ -5,25 +5,19 @@ USE_LOCAL_BREW=0
 
 # Include local code libs.
 . shell_profile/functions.sh
+. sh/cli.sh
 
 # packages include:
 #  gnupg
 #  fzf  htop  mosh neovim  vim
 
-print_action() {
-  echo "$@"
-}
-
-error() {
-  echo "ERROR: $@"
-}
-
-verbose() {
-  if [ -n "$VERBOSE" ]; then
-    echo "$@"
-  fi
-}
-
+################################################################################
+# Installs one or more homebrew packages for MacOS. Does nothing if the host
+# operating system is not MacOS.
+#
+# Arguments:
+#  $*: Name of homebrew package(s) to install.
+################################################################################
 install_pkg_mac() {
   # Only run this on MacOS platforms.
   if is_osx; then
@@ -32,6 +26,13 @@ install_pkg_mac() {
   fi
 }
 
+################################################################################
+# Installs one or more Fedora packages. Does nothing if the host operating
+# system is not Fedora.
+#
+# Arguments:
+#  $*: Name of Fedora package(s) to install.
+################################################################################
 install_pkg_fedora() {
   # Only run this on Fedora platforms.
   if is_fedora; then
@@ -40,6 +41,12 @@ install_pkg_fedora() {
   fi
 }
 
+################################################################################
+# Downloads and installs Homebrew if it is not already installed.
+#
+# Globals:
+#  USE_LOCAL_BREW: Will tell Homebrew to use ~/homebrew if set to 1.
+################################################################################
 init_homebrew() {
   # Exit without init if homebrew is already installed.
   command -v brew >/dev/null 2>&1 ] && return 0
@@ -175,21 +182,17 @@ apply_settings_gnome() {
   echo "Gnome settings applied!"
 }
 
+################################################################################
+# Prints help information to stdout.
+################################################################################
 help() {
-  echo "--- help ---"
-}
-
-finished() {
-  echo "Finished! You should restart your shell before continuing."
-  echo "  source ~/.bashrc   # bash shell"
-  echo "  source ~/.zshrc    # zsh shell"
-}
-
-usage() {
-  echo "Configure and install packages on a machine to fit a given profile"
-  echo "Usage: $0 -hV [-t package_name]"
+  echo "Multipurpose automated machine configuration tool"
+  echo "https://github.com/smacdo/dotfiles"
+  echo
+  echo "Usage: $0 -hV [-p package_name]"
   echo " -h     Show this help message"
   echo " -H     Install homebrew locally (~/homebrew)"
+  echo " -p x   Installs package [x], see section below for a list"
   echo " -s x   Apply settings for [x] desktop"
   echo " -V     Verbose mode"
   echo
@@ -201,6 +204,21 @@ usage() {
   echo "  vscode"
 }
 
+################################################################################
+# Prints helpful instructions to the user after the tool has finished running.
+################################################################################
+finished() {
+  echo "Finished! You should restart your shell before continuing."
+  echo "  source ~/.bashrc   # bash shell"
+  echo "  source ~/.zshrc    # zsh shell"
+}
+
+################################################################################
+# Installs a cross platrform package.
+#
+# Arugments
+#  $1: Name of the package to install.
+################################################################################
 install_package() {
   package="$1"
 
@@ -217,6 +235,12 @@ install_package() {
   fi
 }
 
+################################################################################
+# Configure environment settings.
+#
+# Arguments
+#  $1: Name of the desktop environment to configure.
+################################################################################
 apply_settings_for() {
   desktop="$1"
 
@@ -227,6 +251,10 @@ apply_settings_for() {
   fi
 }
 
+
+################################################################################
+# Script main.
+################################################################################
 start() {
   while getopts "hHVp:s:" opt; do
     case "${opt}" in
@@ -239,7 +267,7 @@ start() {
         USE_LOCAL_BREW=1
         ;;
       V)
-        VERBOSE=1
+        set_verbose
         ;;
       p)
         install_package "${OPTARG}"
@@ -250,18 +278,21 @@ start() {
       *)
         error "Unknown option"
         echo
-        usage
+        help 
         exit
         ;;
     esac
   done
 
+  # Show usage and exit if no options were passed.
+  if [ "$OPTIND" -eq 1 ]; then
+    help
+    exit
+  fi
+
   shift $((OPTIND-1))
 
   finished
-
-  # TODO
-  # if no options selected print usage
 }
 
 start "$@" ;
