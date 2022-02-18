@@ -131,6 +131,10 @@ install_core_packages() {
   # (Should already be installed on Linux distros).
   install_pkg_mac coreutils findutils grep gnu-sed gawk
 
+  # Install shellcheck to verify shell scripts are OK.
+  install_pkg_mac shellcheck
+  install_pkg_redhat ShellCheck
+
   # Post install configuration for MacOS.
   if is_osx; then
     # TODO: Only run if exists. Run once?
