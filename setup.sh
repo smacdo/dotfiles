@@ -49,7 +49,7 @@ install_pkg_redhat() {
 ################################################################################
 init_homebrew() {
   # Exit without init if homebrew is already installed.
-  command -v brew >/dev/null 2>&1 ] && return 0
+  command -v brew >/dev/null 2>&1 && return 0
 
   # Install local homebrew, or system wide homebrew?
   if [ "$USE_LOCAL_BREW" -eq 1 ]; then
@@ -92,7 +92,7 @@ install_zsh_powerlevel() {
   if [ -d "$p10kdir" ]; then
     # Already installed, pull any updates.
     echo "Powerlevel10k installed - will pull updates"
-    current_dir=`pwd`
+    current_dir=$(pwd)
     cd "$p10kdir"
     git pull
     cd "$current_dir"
