@@ -1,5 +1,5 @@
 [user]
-	name = Scott MacDonald
+    name = Scott MacDonald
     email = scott@smacdo.com
 
 [core]
@@ -28,3 +28,5 @@
     changed = green
     untracked = cyan
 
+[include]
+    path = ~/.my_gitconfig
