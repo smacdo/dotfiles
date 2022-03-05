@@ -2,7 +2,35 @@
   name = Scott MacDonald
   email = scott@smacdo.com
 
+[alias]
+  # Show abbreviated hash, description and history graph of last 20 commits.
+  l = log --pretty=oneline -n 20 --graph --abbrev-commit
+
+  # Graph log view
+  sl = log --graph --color --date=human \
+    --pretty=format:"%C(yellow)%h%C(reset)%x20%x20%cd%x20%x20%ce%C(green)%x20%d%C(reset)%n%s%n"
+
+  # Show current working tree status with short format.
+  ss = status -s
+
+  # Show difference between current state and latest commit.
+  d = !"git diff-index --quiet HEAD -- || clear; git --no-pager diff --patch-with-stat"
+
+  # Switch to a branch and create if needed.
+  co = "!f() { git checkout -b \"$1\" 2> /dev/null || git checkout \"$1\"; }; f"
+
+  # Check out a pull request from origin of a github repository.
+  # `git pr <id>`
+  pr = !"pr() { git fetch origin pull/$1/header:pr-$1; git checkout pr-$1; }; pr"
+
+  # Show a list of contributors.
+  contribs = shortlog --summary --numbered
+
 [core]
+  # Automatically fix whitespace issues outlined below:
+  #  - Do not fix indents with non-hard tabs.
+  #  - Ignore carriage return at end of lines.
+  #  - Fix spaces before leading tabs, and empty lines at end of file.
   whitespace=fix,-indent-with-non-tab,trailing-space,cr-at-eol
 
 [log]
@@ -17,16 +45,25 @@
   remote = green
 
 [color "diff"]
-  meta = yellow bold
-  frag = magenta bold
-  old = red bold
-  new = green bold
+  meta = yellow bold  # metadata.
+  frag = magenta bold # line info.
+  old = red bold      # lines deleted.
+  new = green bold    # lines added.
   whitespace = red reverse
 
 [color "status"]
-  added = yellow
-  changed = green
-  untracked = cyan
+  added = yellow      # files added.
+  changed = green     # files changed.
+  untracked = cyan    # file not under version control.
+
+[diff]
+  # Detect copies and renames.
+  renames = copies
+
+[merge]
+  # Include summaries of the merged commits when creating commit messages for
+  # a merge.
+  log = true
 
 [include]
   path = ~/.my_gitconfig
