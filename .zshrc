@@ -50,6 +50,12 @@ setopt INC_APPEND_HISTORY # Update history after every command.
 setopt HIST_FIND_NO_DUPS  # Ignore duplicates when searching
 setopt HIST_REDUCE_BLANKS # Remove blank lines from history.
 
+# Use ctrl-x ctrl-e to edit the command line with $EDITOR (bash emulation).
+autoload -U edit-command-line
+zle -N edit-command-line
+bindkey '^xe' edit-command-line
+bindkey '^x^e' edit-command-line
+
 # Load the tab autocompletion system
 autoload -Uz compinit
 
