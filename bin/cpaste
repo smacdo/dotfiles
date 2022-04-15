@@ -1,0 +1,40 @@
+#!/bin/sh
+# Author: Scott MacDonald
+# Purpose: Cross platform script to paste text from the system clipboard.
+. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+print_help() {
+  echo "Cross platform tool to paste text from the system clipboard to stdout"
+  echo "Usage: $(basename $0) [-V]"
+}
+
+main() {
+  # Tool option parsing.
+  while getopts 'hf:V' opt; do
+    case "$opt" in
+      h) print_help
+         exit
+         ;;
+      V) set_verbose 1
+         ;;
+      ?) print_help
+         exit 2
+         ;;
+    esac
+  done
+
+  # Remove process arguments.
+  shift "$(($OPTIND -1))"
+
+  # Command to copy is different on different platforms.
+  if is_osx ; then
+    pbpaste
+  elif is_linux ; then
+    exit_with_message 2 "Linux support missing"
+  else
+    exit_with_message 2 "This platform is not supported yet"
+  fi
+}
+
+main "$@"
