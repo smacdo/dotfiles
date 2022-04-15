@@ -1,9 +1,37 @@
 #!/bin/sh
+# Author: Scott MacDonald
+# Purpose: Cross platform script to edit a file with Sublime text editor.
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+. "$S_DOTFILE_ROOT"/sh/cli.sh
 
-if is_osx ; then
-  /Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl "$@"
-else
-  echo "Sublime shortcut not supported on this platform :("
-  return 1
-fi
+print_help() {
+  echo "Cross platform script to edit a file with the Sublime text editor"
+  echo "Usage: subl [-h] [-V] path/to/file"
+}
+
+main() {
+  # Add a few custom flags for the utility script.
+  while getopts ':hV' opt; do
+    case "$opt" in
+      h) print_help
+        exit 1
+        ;;
+      V) set_verbose 1
+        shift 1
+        ;;
+    esac
+  done
+
+  # Locate Sublime depending on current platform.
+  if is_osx ; then
+    subl_path=/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl
+  else
+    exit_with_message 2 "Sublime shortcut not supported on this platform :("
+  fi
+
+  # Launch sublime.
+  verbose "subl exe: $subl_path"
+  "$subl_path" "$@"
+}
+
+main "$@"

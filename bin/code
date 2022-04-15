@@ -2,26 +2,34 @@
 # Author: Scott MacDonald
 # Purpose: Run vscode and variants the same way across multiple platforms.
 #
-# code [-v] [-F|-V] -- vscode args...
-# Arguments:
-#  -v   Enable verbose mode.
-#  -F   Only search code-fb paths.
-#  -V   Only search code paths (e.g., do not use code-fb).
-#
-# This script supports fb-code in addition to vscode, which is a special
-# Facebook maintained fork of Microsoft's vscode. No proprietary informatsion is
-# included in this script. 
-# 
-# You can see more information on this fork here:
-#  https://github.com/facebookexperimental/fb-vscode
+# Run with `-h` or see `print_help()` for more information.
 ################################################################################
 # TODO: Add Windows path support.
+. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+################################################################################
+# Print usage (help) text.
+################################################################################
+print_help() {
+  echo "Run vscode and variants the same way across multiple platforms."
+  echo 
+  echo "code [-v] [-F|-V] -- vscode args..."
+  echo " Arguments:"
+  echo "  -h   Show this help text."
+  echo "  -C   Only search code paths (e.g., do not use code-fb)."
+  echo "  -F   Only search code-fb paths."
+  echo "  -V   Enable verbose mode."
+  echo 
+  echo " This script supports fb-code in addition to vscode, which is a special"
+  echo " Facebook maintained fork of Microsoft's vscode. No proprietary"
+  echo " information is included in this script."
+  echo 
+  echo " You can see more information on this fork here:"
+  echo " https://github.com/facebookexperimental/fb-vscode"
+}
 
 ################################################################################
 # Run vscode binary with parameters if the given binary path is executable.
-# 
-# Globals:
-#  VERBOSE
 #
 # Arguments:
 #  $1     path to a potential vscode binary.
@@ -36,9 +44,7 @@ run_if_found() {
   shift # Remove first argument (vscode path) from arguments list.
 
   if [ -x "$vscode_path" ]; then
-    if [ "$VERBOSE" = 1 ]; then
-      echo "$vscode_path" "$@"
-    fi
+    verbose "$vscode_path" "$@"
 
     "$vscode_path" "$@"
 
@@ -46,13 +52,13 @@ run_if_found() {
       # Nothing, it worked fine!
       true # ... but you can't have an empty clause so use 'true'.
     else
-      echo "ERROR: Got error code $? when launching vscode '$vscode_path'" >&2
-      exit "$?"
+      exit_with_message "$?" \
+        "ERROR: Got error code $? when launching vscode '$vscode_path'"
     fi
 
     return 0
-  elif [ "$VERBOSE" -eq 1 ]; then
-      echo "not found: $vscode_path"
+  else
+    verbose "Not found: $vscode_path"
   fi
 
   # Not found, return 1 to indicate failure.
@@ -109,48 +115,43 @@ run_vscode() {
 main() {
   if [ "$USE_FB" -eq 1 ]; then
     run_fbcode "$@" && return 0
-  elif [ "$VERBOSE" -eq 1 ]; then
-    echo "Skipping code-fb paths"
+  else
+    verbose "Skipping code-fb paths"
   fi 
 
   if [ "$USE_MSFT" -eq 1 ]; then
     run_vscode "$@" && return 0
-  elif [ "$VERBOSE" -eq 1 ]; then
-    echo "Skipping code paths"
+  else
+    verbose "Skipping code paths"
   fi
 
   # No suitable vscode found.
-  if [ "$VERBOSE" = 1 ]; then
-    echo "No vscode binary was found :(" >&2
-  fi
-
-  return 1
+  exit_with_message 1 "No vscode binary was found"
 }
 
 #===============================================================================
 # Script entry point.                                                          #
 #===============================================================================
-# Parse command line arguments.
-VERBOSE=0
 USE_FB=1
 USE_MSFT=1
 
-while getopts 'vFV' OPTION
+while getopts ':hVCF' OPTION
 do 
   case "$OPTION" in
-    v) VERBOSE=1
+    h) print_help
+       exit 2
+       ;;
+    V) set_verbose 1
+       shift 1
        ;;
     F) USE_MSFT=0
+       shift 1
        ;;
-    V) USE_FB=0
-       ;;
-    ?) printf "Usage: %s [-v] [-F] [-V] -- vscode args...\n" "$(basename "$0")" >&2
-       exit 2
+    C) USE_FB=0
+       shift 1
        ;;
   esac
 done
-
-shift $((OPTIND - 1)) # Remove parsed arguments.
 
 # Now start execution of main.
 main "$@"
