@@ -11,10 +11,10 @@ print_help() {
 
 main() {
   # Tool option parsing.
-  while getopts 'hf:V' opt; do
+  while getopts 'hV' opt; do
     case "$opt" in
       h) print_help
-         exit
+         exit 1
          ;;
       V) set_verbose 1
          ;;
