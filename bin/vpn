@@ -1,0 +1,315 @@
+#!/bin/sh
+# Author: Scott MacDonald
+# Purpose: Automate connection to VPN endpoints using Cisco AnyClient.
+################################################################################
+. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+anyconnect_bin="/opt/cisco/anyconnect/bin/vpn"
+anyconnect_name="Cisco AnyConnect Secure Mobility Client"
+
+################################################################################
+# Print usage (help) text.
+################################################################################
+print_help() {
+  echo "Wrapper around system VPN client to simplify common operations"
+  echo
+  echo "vpn [connect|disconnect|state] [-h hostname] [-p 2facpassword]"
+  echo " Actions: "
+  echo "  connect, -c      Connect to the VPN endpoint."
+  echo "  disconnect, -d   Disconnect from the VPN endpoint."
+  echo "  state, -s        Print the state of the VPN connection."
+  echo "  list,  -l        List the available VPN endpoints."
+  echo " Arguments: "
+  echo "  -h [host]        Name of the VPN endpoint to use when connecting."
+  echo "  -p [password]    Two factor password to use when connecting."
+  echo "  -f               Force connection even if already connected."
+  echo "  -H               Show help text."
+  echo "  -V               Print verbose messages."
+  echo
+  echo "This tool works with Cisco Anyclient VPN but could be modified in the"
+  echo "future to support more products."
+  echo
+  echo "Set DEFAULT_VPN_HOST to avoid having to pass a host name. If the"
+  echo "password is not passed on as an argument the script will prompt for it."
+}
+
+# TODO:
+# Support action name shortcuts (connect, disconnect, state)
+# Add ability to set a default host, read default host
+# Finish TODOs
+
+################################################################################
+# Print usage (help) text.
+################################################################################
+print_hosts() {
+  all_vpn_hosts=$("$anyconnect_bin" hosts |
+    grep -oE "> .*" |
+    cut -c 3- )
+
+  echo "$all_vpn_hosts"
+}
+
+################################################################################
+# Prompt the user for a two factor token password.
+#
+# GLOBALS:
+#  Sets `VPN_2FAC_PASSWORD` to the user's input.
+################################################################################
+read_2fac() {
+  # TODO: Detect presence of yubiswitch and then use this.
+  #osascript -e 'tell application "yubiswitch" to KeyOn'
+
+  # TODO: Better prompt (same line, maybe colored)
+  echo "Please login with 2factor authentication: "
+  read VPN_2FAC_PASSWORD
+
+  # TODO: Detect presence of yubiswitch and then use this.
+  # Or use &> /dev/null
+  #osascript -e 'tell application "yubiswitch" to KeyOff'
+}
+
+################################################################################
+# Nukes any running instance of AnyConnect VPN because the CLI cannot be used
+# if the GUI is already running.
+################################################################################
+kill_anyconnect() {
+  verbose "Force kill any running instances of AnyConnect VPN GUI"
+  if is_verbose ; then
+    pkill -9 "$anyconnect_name"
+  else
+    pkill -9 "$anyconnect_name" &> /dev/null
+  fi
+}
+
+################################################################################
+# Checks if the VPN is connected to an endpoint.
+#
+# EXIT CODE:
+#  0 - VPN connected
+#  1 - VPN not connected.
+#
+# GLOBALS:
+# Sets VPN_STATE
+################################################################################
+is_connected() {
+  vpn_state
+
+  if [ "$VPN_STATE" = "Connected" ]; then
+    return 0
+  fi
+  return 1
+}
+
+################################################################################
+# Connect to VPN endpoint.
+#
+# Arguments
+#  0 - VPN endpoint name.
+#  1 - VPN two factor token password.
+################################################################################
+connect() {
+  host="$1"
+  password="$2"
+
+  # Double check parameters were given.
+  if [ -z "$host" ]; then
+    exit_with_message 5 "connect() host argument missing"
+  fi
+
+  if [ -z "$password" ]; then
+    exit_with_message 5 "connect() password argument missing"
+  fi
+
+  # Nuke the GUI if it is running (as it prevents the script from using the
+  # command line interface).
+  kill_anyconnect
+
+  # Connect to the VPN using the provided host and two factor password.
+  verbose "Using anyconnect binary: $anyconnect_bin"
+  action "Connecting to VPN... (this might take a second; ignore any prompts)"
+
+  if is_verbose ; then
+    printf "$password\n" | "$anyconnect_bin" -s connect "$host"
+  else
+    printf "$password\n" | "$anyconnect_bin" -s connect "$host" &> /dev/null
+  fi
+
+  # Relaunch the GUI?
+  if is_verbose ; then
+    osascript -e "open app "$anyconnect_name""
+  else
+    osascript -e "open app "$anyconnect_name"" &> /dev/null
+  fi
+
+  # Print new connection state.
+  if is_connected ; then
+    osascript -e "
+      display notification \"Connected to $host\" ¬
+        with title \"VPN\" ¬
+        sound name \"default\"
+    "
+  fi
+
+  echo "Done! New VPN state: $VPN_STATE"
+}
+
+################################################################################
+# Disconnect to VPN endpoint.
+################################################################################
+disconnect() {
+  verbose "Using anyconnect binary: $anyconnect_bin"
+
+  if is_verbose ; then 
+    "$anyconnect_bin" disconnect
+  else
+    "$anyconnect_bin" disconnect &> /dev/null
+  fi
+
+  # Print new connection state.
+  if is_connected ; then
+    osascript -e "
+      display notification \"$VPN_STATE!\" ¬
+        with title \"VPN\" ¬
+        sound name \"default\"
+    "
+  fi
+
+  echo "VPN state: $VPN_STATE"
+}
+
+################################################################################
+# Get the VPN connection state as a string value.
+#
+# GLOBALS:
+#  VPN_STATE - Gets the current state of the VPN connection (`Connected` or
+#              `Disconnected`).
+################################################################################
+vpn_state() {
+  VPN_STATE=$(
+    "$anyconnect_bin" state |
+      grep -oE ">> state: .*" |
+      tail -n 1 |
+      cut -d ' ' -f 3)
+}
+
+################################################################################
+# Script entry point.
+################################################################################
+main() {
+  # Read command line to figure out what action to take.
+  do_connect=0
+  do_disconnect=0
+  do_state=0
+  do_list=0
+  any_action=0
+  force=0
+
+  while getopts ':cdslhf:p:HV' opt; do
+    case "$opt" in
+      c) do_connect=1
+         any_action=1
+         ;;
+      d) do_disconnect=1
+         any_action=1
+         ;;
+      s) do_state=1
+         any_action=1
+         ;;
+      l) do_list=1
+         any_action=1
+         ;;
+      f) force=1
+         ;;
+      h) VPN_HOSTNAME="$OPTARG"
+         ;;
+      p) VPN_PASSWORD="$OPTARG"
+         ;;
+      V) set_verbose 1
+         ;;
+      H) print_help
+         exit 
+         ;;
+      ?) print_help
+         exit
+         ;;
+    esac
+  done
+
+  # Only one instance of the script may be running at the same time.
+  lock_file="/tmp/scott-dotfiles-vpn.lock"
+
+  if [ -e "$lock_file" ]; then
+    exit_with_message 2 "another instance of this tool is already running"
+  fi
+
+  # Make sure the lock file is deleted when this script terminates prior to
+  # creating the lock.
+  verbose "Creating temporary lockfile: $lock_file"
+
+  trap 'rm -f "$lock_file"' EXIT INT TERM
+  touch "$lock_file"
+
+  # Connect to the VPN?
+  if [ "$do_connect" = "1" ]; then
+    verbose "Starting connection to VPN endpoint"
+
+    # Don't connect if already connected.
+    if is_connected ; then 
+      if [ "$force" = 0 ]; then
+        exit_with_message 3 "already connected to VPN"
+      else
+        verbose "Already connected, but will try again due to force option"
+      fi
+    fi
+
+    # Fallback to default vpn host if provided.
+    if [ -z "$VPN_HOSTNAME" ]; then
+      verbose \
+        "No hostname provided; will use DEFAULT_VPN_HOST: $DEFAULT_VPN_HOST"
+
+      if [ -z "$DEFAULT_VPN_HOST" ]; then
+        exit_with_message 2 "No VPN host or default vpn host given"
+      fi
+
+      VPN_HOSTNAME="$DEFAULT_VPN_HOST"
+    fi
+
+    # Prompt for a password if it wasn't provided.
+    if [ -z "$VPN_PASSWORD" ]; then
+      verbose "No password provided on command line, will prompt instead"
+      read_2fac
+      VPN_PASSWORD="$VPN_2FAC_PASSWORD"
+    fi
+
+    # Exit if there is still no password given to us.
+    if [ -z "$VPN_PASSWORD" ]; then
+      exit_with_message 2 "No password provided"
+    fi
+
+    connect "$VPN_HOSTNAME" "$VPN_PASSWORD"
+  fi
+
+  # Disconnect from the VPN?
+  if [ "$do_disconnect" = "1" ]; then
+    disconnect
+  fi
+
+  # Print current state?
+  if [ "$do_state" = "1" ]; then
+    vpn_state
+    echo "$VPN_STATE"
+  fi
+
+  # List the endpoints?
+  if [ "$do_list" = "1" ]; then
+    print_hosts
+  fi
+
+  # ... otherwise if no action specified print the state of the VPN connection.
+  if [ "$any_action" = "0" ]; then
+    vpn_state
+    echo "$VPN_STATE"
+  fi
+}
+
+main "$@" ;
