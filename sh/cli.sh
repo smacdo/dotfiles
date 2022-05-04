@@ -63,6 +63,19 @@ set_verbose() {
 }
 
 ###############################################################################
+# Exit with error code zero if verbose mode enabled, otherwise non-zero.
+#
+# Globals:
+#  VERBOSE:
+###############################################################################
+is_verbose() {
+  if [ "$VERBOSE" = "1" ]; then
+    return 0
+  fi
+
+  return 1
+}
+###############################################################################
 # Print verbose text (if enabled) to stdout.
 #
 # Arguments:

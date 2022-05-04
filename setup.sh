@@ -242,6 +242,23 @@ install_package() {
 }
 
 ################################################################################
+# Compile any platform specific tools contained in the tools folder in this
+# repository.
+################################################################################
+install_dotfiles_tools() {
+  # TODO: Verify clang/gcc is installed.
+  # TODO: Verify core libraries are installed.
+  if is_osx ; then
+    # Mac lock tool.
+    verbose "Build and install tools/lock-mac"
+    pushd "${S_DOTFILE_ROOT:?S_DOTFILE_ROOT must be set}"/tools/lock-mac
+    make || exit_with_message 2 "Failed to build lock-mac"
+    ln -s "$S_DOTFILE_ROOT"/tools/lock-mac/lock-mac "$S_DOTFILE_ROOT"/bin/lock-mac
+    popd
+  fi
+}
+
+################################################################################
 # Configure environment settings.
 #
 # Arguments
@@ -257,13 +274,15 @@ apply_settings_for() {
   fi
 }
 
-
 ################################################################################
 # Script main.
 ################################################################################
 start() {
-  while getopts "hHVp:s:" opt; do
+  while getopts "chHVp:s:" opt; do
     case "${opt}" in
+      c)
+        install_dotfiles_tools
+        ;;
       h)
         # ${OPTARG}
         help

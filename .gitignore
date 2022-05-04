@@ -10,3 +10,4 @@ private
 .vim/.netrwhist
 .repos
 .vim/pack
+bin/lock-mac

@@ -1,0 +1,50 @@
+#!/bin/sh
+# Author: Scott MacDonald
+# Purpose: Lock the screen.
+# Purpose: Turn the display off and maybe lock the screen.
+. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+print_help() {
+  echo "Cross platform tool to lock the current desktop session."
+  echo "Usage: $(basename $0) [-V]"
+}
+
+main() {
+  # Tool option parsing.
+  while getopts 'hV' opt; do
+    case "$opt" in
+      h) print_help
+         exit 1
+         ;;
+      V) set_verbose 1
+         ;;
+      ?) print_help
+         exit 2
+         ;;
+     esac
+  done
+
+  if is_osx ; then
+    # Try to use the dotfiles lock mac tool (if present) which can call the
+    # actual screen lock API function instead of emulating it.
+    if [ -x "$S_DOTFILE_ROOT"/bin/lock-mac ]; then
+      verbose "Using lock-mac to lock the screen"
+      "$S_DOTFILE_ROOT"/bin/lock-mac
+    else
+      # Emulate a screen lock by telling the display to go to sleep. If the
+      # password prompt is not displayed, set the lock timeout to zero in
+      # System Preferences -> Security & Privacy -> General
+      #
+      # Ref: https://apple.stackexchange.com/q/80058
+      # Can also use `pmset displaysleepnow` but unsure of technical differences.
+      verbose "Using fallback emulation"
+      pmset sleepnow
+    fi
+  else
+    # TODO: Implement Linux, Windows.
+    exit_with_message 2 "This platform is not supported yet"
+  fi
+}
+
+main "$@"
