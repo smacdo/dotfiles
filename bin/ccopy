@@ -46,7 +46,7 @@ main() {
       verbose "Using command args as input source: $*"
       echo "$*" | pbcopy
     else
-      verbose "Using stdin as iput source"
+      verbose "Using stdin as input source"
       pbcopy
     fi
   elif is_linux ; then
