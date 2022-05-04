@@ -26,8 +26,8 @@ for file in "${S_DOTFILE_ROOT}"/shell_profile/\
 done;
 unset file
 
-[ -r "${home}/.my_my_shell_profile.sh" ] && [ -f "${home}/.my_shell_profile.sh" ]\
-&& source "${home}/.my_my_shell_profile.sh"
+[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
+&& source "${HOME}/.my_shell_profile.sh"
 
 [ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]\
 && source "${HOME}/.my_zshrc.sh"
