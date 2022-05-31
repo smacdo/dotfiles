@@ -242,6 +242,40 @@ install_package() {
 }
 
 ################################################################################
+# Configure a machine to build native binaries for C, C++, and Rust.
+################################################################################
+install_build_tools() {
+  # Install C and C++ build tools for the platform.
+  if is_osx; then
+    # MacOS: Install XCode binaries via the command line.
+    print_action "Installing XCode binaries..."
+
+    if [ ! -d "$('xcode-select' -print-path 2>/dev/null)" ]; then
+      sudo xcode-select -switch /Library/Developer/CommandLineTools
+    fi
+  elif is_redhat; then
+    install_pkg_redhat make automake gcc gcc-c++
+  else
+    error "install_build_tools lacks support for this platform"
+    exit
+  fi
+
+  # Install Rust via rustup web script. This is officially maintained by the
+  # Rust foundation so it should be safe to trust...
+  # TODO: Can we silence the text about env var path not being set up?
+  if is_osx || is_redhat; then
+    print_action "Installing Rust..."
+
+    if ! command -v rustup &> /dev/null; then
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+    fi
+  else
+    error "install_rust support missing for this platform"
+    exit
+  fi
+}
+
+################################################################################
 # Compile any platform specific tools contained in the tools folder in this
 # repository.
 ################################################################################
@@ -278,10 +312,13 @@ apply_settings_for() {
 # Script main.
 ################################################################################
 start() {
-  while getopts "chHVp:s:" opt; do
+  while getopts "bchHVp:s:" opt; do
     case "${opt}" in
       c)
         install_dotfiles_tools
+        ;;
+      b)
+        install_build_tools
         ;;
       h)
         # ${OPTARG}
