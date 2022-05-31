@@ -6,3 +6,6 @@
 - Write CI check to make sure checked in version still works on major distros?
 - [x] Replace occurrences of .dotfiles with a environment variable
 - bin/backup - Simple script that creates foo.bak_N while avoiding race conditions
+
+# Bugs
+- neovim not detecting BUCK file type
