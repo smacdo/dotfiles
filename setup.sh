@@ -135,6 +135,8 @@ install_core_packages() {
   install_pkg_mac shellcheck
   install_pkg_redhat ShellCheck
 
+  # TODO: Install screenlocker.
+
   # Post install configuration for MacOS.
   if is_osx; then
     # TODO: Only run if exists. Run once?
@@ -231,6 +233,8 @@ install_package() {
   is_osx && init_homebrew
   is_redhat && dnf update
 
+  install_build_tools
+
   if [ "$package" == "core" ]; then
     install_core_packages
   elif [ "$package" == "vscode" ]; then
@@ -248,12 +252,15 @@ install_build_tools() {
   # Install C and C++ build tools for the platform.
   if is_osx; then
     # MacOS: Install XCode binaries via the command line.
-    print_action "Installing XCode binaries..."
-
     if [ ! -d "$('xcode-select' -print-path 2>/dev/null)" ]; then
+      print_action "installing XCode binaries..."
       sudo xcode-select -switch /Library/Developer/CommandLineTools
+    else
+      # TODO: Verbose only
+      echo "xcode binaries already installed"
     fi
   elif is_redhat; then
+    # TODO: Query if installed
     install_pkg_redhat make automake gcc gcc-c++
   else
     error "install_build_tools lacks support for this platform"
@@ -264,31 +271,17 @@ install_build_tools() {
   # Rust foundation so it should be safe to trust...
   # TODO: Can we silence the text about env var path not being set up?
   if is_osx || is_redhat; then
-    print_action "Installing Rust..."
 
     if ! command -v rustup &> /dev/null; then
+      print_action "installing rust..."
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+    else
+      # TODO: Verbose only.
+      echo "rust already installed"
     fi
   else
     error "install_rust support missing for this platform"
     exit
-  fi
-}
-
-################################################################################
-# Compile any platform specific tools contained in the tools folder in this
-# repository.
-################################################################################
-install_dotfiles_tools() {
-  # TODO: Verify clang/gcc is installed.
-  # TODO: Verify core libraries are installed.
-  if is_osx ; then
-    # Mac lock tool.
-    verbose "Build and install tools/lock-mac"
-    pushd "${S_DOTFILE_ROOT:?S_DOTFILE_ROOT must be set}"/tools/lock-mac
-    make || exit_with_message 2 "Failed to build lock-mac"
-    ln -s "$S_DOTFILE_ROOT"/tools/lock-mac/lock-mac "$S_DOTFILE_ROOT"/bin/lock-mac
-    popd
   fi
 }
 
@@ -312,11 +305,8 @@ apply_settings_for() {
 # Script main.
 ################################################################################
 start() {
-  while getopts "bchHVp:s:" opt; do
+  while getopts "bhHVp:s:" opt; do
     case "${opt}" in
-      c)
-        install_dotfiles_tools
-        ;;
       b)
         install_build_tools
         ;;
