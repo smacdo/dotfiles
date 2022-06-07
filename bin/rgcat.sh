@@ -14,6 +14,7 @@
 # Prints usage information to stderr and then exits the process.
 ################################################################################
 usage_and_die() {
+  printf "Pretty print several lines of a file (ripgrep cat)"
   printf "Usage: %s path/to/file:line_number\n" "$(basename "$0")" >&2
   exit 2
 }
@@ -40,6 +41,7 @@ main() {
   file=$(echo "$1" | cut -d':' -f1)
   line=$(echo "$1" | cut -d':' -f2)
 
+  # Make sure the file is readable
   if [ ! -r "$file" ]; then
     err "Could not read file '$file'"
     usage_and_die
@@ -51,9 +53,14 @@ main() {
     usage_and_die
   fi
 
+  # Grab escape codes for bold / unbold to aid in highlighting the current line.
+  hl_s=$'\033[1m'
+  hl_e=$'\033[0m'
+
   # Extract and format lines.
   sed -n "$line,$((line + 10))"p "$file" | # Extract 10 lines starting at...
-    nl -d '\n' -v "$line"                     # Prefix each line with line no.
+    nl -d '\n' -v "$line" |                # Prefix each line with line no.
+    sed -E "s/^([[:space:]]*$line)(.*)$/$hl_s\1\2$hl_e/"
 }
 
 main "$@"
