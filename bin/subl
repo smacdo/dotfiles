@@ -1,20 +1,29 @@
 #!/bin/sh
 # Author: Scott MacDonald
 # Purpose: Cross platform script to edit a file with Sublime text editor.
+#
+# Run with `-h` or see `print_help()` for more information.
+################################################################################
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
+################################################################################
+# Print usage (help) text.
+################################################################################
 print_help() {
   echo "Cross platform script to edit a file with the Sublime text editor"
-  echo "Usage: subl [-h] [-V] path/to/file"
+  echo "Usage: subl [-h] [-V] sublime args..."
 }
 
+################################################################################
+# Script main function.
+################################################################################
 main() {
   # Add a few custom flags for the utility script.
   while getopts ':hV' opt; do
     case "$opt" in
       h) print_help
-        exit 1
+        exit 2
         ;;
       V) set_verbose 1
         shift 1
@@ -30,8 +39,13 @@ main() {
   fi
 
   # Launch sublime.
-  verbose "subl exe: $subl_path"
-  "$subl_path" "$@"
+  verbose "sublime path: $subl_path"
+
+  if [ -x "$subl_path" ]; then
+    "$subl_path" "$@"
+  else 
+    exit_with_error 1 "path to sublime editor does not exist"
+  fi
 }
 
 main "$@"

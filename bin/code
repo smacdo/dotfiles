@@ -4,7 +4,6 @@
 #
 # Run with `-h` or see `print_help()` for more information.
 ################################################################################
-# TODO: Add Windows path support.
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
 ################################################################################
@@ -44,7 +43,7 @@ run_if_found() {
   shift # Remove first argument (vscode path) from arguments list.
 
   if [ -x "$vscode_path" ]; then
-    verbose "$vscode_path" "$@"
+    verbose "run: " "$vscode_path" "$@"
 
     "$vscode_path" "$@"
 
@@ -76,9 +75,12 @@ run_if_found() {
 ################################################################################
 run_fbcode() {
   run_if_found "/usr/bin/code-fb" "$@" && return 0
-  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" ^^ return 0
+  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" && return 0
 
-  # TODO: Windows.
+  # TODO: Windows?
+
+  verbose "fb vscode binaries not found"
+
   return 1
 }
 
@@ -93,9 +95,12 @@ run_fbcode() {
 ################################################################################
 run_vscode() {
   run_if_found "/usr/bin/code" "$@" && return 0
-  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" && return 0
 
-  # TODO: Windows.
+  # TODO: Windows?
+
+  verbose "vscode binaries not found"
+
   return 1
 }
 
