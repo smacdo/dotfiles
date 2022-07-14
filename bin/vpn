@@ -126,7 +126,7 @@ connect() {
 
   # Connect to the VPN using the provided host and two factor password.
   verbose "Using anyconnect binary: $anyconnect_bin"
-  action "Connecting to VPN... (this might take a second; ignore any prompts)"
+  print_action "Connecting to VPN... (this might take a second; ignore any prompts)"
 
   if is_verbose ; then
     printf "$password\n" | "$anyconnect_bin" -s connect "$host"
