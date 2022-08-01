@@ -184,7 +184,10 @@ install_cpp() {
 # Change the default gnome settings to the way I like it.
 ################################################################################
 apply_settings_gnome() {
+  # Gnome window buttons.
   gsettings set org.gnome.desktop.wm.preferences button-layout ":minimize,maximize,close"
+  # Gnome dark mode.
+  gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
   echo "Gnome settings applied!"
 }
 
