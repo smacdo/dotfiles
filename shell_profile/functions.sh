@@ -79,6 +79,10 @@ is_fedora() {
     [ "$DOT_DIST" = "fedora" ] || return 1
 }
 
+is_dnf() {
+    is_redhat || is_fedora || return 1
+}
+
 is_ubuntu() {
     [ "$DOT_DIST" = "ubuntu" ] || return 1
 }
@@ -102,39 +106,6 @@ prompt_confirm() {
             *) printf "\033[31m %s \n\033[0m" "Unrecognized response"
         esac
     done
-}
-
-# Ensure software packages are up to date.
-update_packages() {
-    if is_ubuntu; then
-        sudo apt update
-    elif is_redhat; then
-        sudo dnf check-update
-    elif is_osx; then
-        echo "TODO: Implement me"
-        return 1
-    else
-        echo "ERROR: Unsupported os/dist"
-        return 1
-    fi
-}
-
-# Update software packages and upgrade to latest version.
-upgrade_packages() {
-    prompt_confirm "Upgrade all installed packages to latest version?"
-    update_packages || return 1
-
-    if is_ubuntu; then
-        sudo apt upgrade
-    elif is_redhat; then
-        sudo dnf update
-    elif is_osx; then
-        echo "TODO: Implement me"
-        return 1
-    else
-        echo "ERROR: Unsupported os/dist"
-        return 1
-    fi
 }
 
 # Cd into directory and then ls it.
