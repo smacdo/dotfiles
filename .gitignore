@@ -10,4 +10,5 @@ private
 .vim/.netrwhist
 .repos
 .vim/pack
+.vim/autoload/plug.vim
 bin/lock-mac
