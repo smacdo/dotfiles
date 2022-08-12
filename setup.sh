@@ -1,7 +1,7 @@
 #!/bin/sh
 USE_LOCAL_BREW=0
 
-# TODO: Check for superuser privs (at least on redhat)
+# TODO: Warn if running as root.
 
 # Include local code libs.
 . shell_profile/functions.sh
@@ -37,7 +37,7 @@ install_pkg_redhat() {
   # Only run this on Redhat platforms.
   if is_redhat; then
     print_action Installing packages: "$@"
-    dnf install "$@"
+    sudo dnf install "$@"
   fi
 }
 
@@ -67,6 +67,12 @@ init_homebrew() {
 
   # TODO: Needed?
   # export PATH=${HOME}/homebrew/bin:${PATH}
+}
+
+update_package_manager() {
+  # TODO: Print message showing actions
+  is_osx && init_homebrew
+  is_redhat && sudo dnf update
 }
 
 ################################################################################
@@ -135,7 +141,8 @@ install_core_packages() {
   install_pkg_mac shellcheck
   install_pkg_redhat ShellCheck
 
-  # TODO: Install screenlocker.
+  # TODO: Install screenlocker on GUI systems.
+  # cargo install screenlocker
 
   # Post install configuration for MacOS.
   if is_osx; then
@@ -170,7 +177,7 @@ install_vscode() {
     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
     sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
 
-    dnf check-update
+    sudo dnf check-update
     sudo dnf install code
   fi
 }
@@ -231,11 +238,7 @@ finished() {
 install_package() {
   package="$1"
 
-  is_osx || die_if_not_root
-
-  is_osx && init_homebrew
-  is_redhat && dnf update
-
+  update_package_manager
   install_build_tools
 
   if [ "$package" == "core" ]; then
@@ -274,7 +277,6 @@ install_build_tools() {
   # Rust foundation so it should be safe to trust...
   # TODO: Can we silence the text about env var path not being set up?
   if is_osx || is_redhat; then
-
     if ! command -v rustup &> /dev/null; then
       print_action "installing rust..."
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
