@@ -1,7 +1,3 @@
-[user]
-  name = Scott MacDonald
-  email = scott@smacdo.com
-
 [alias]
   # Show abbreviated hash, description and history graph of last 20 commits.
   l = log --pretty=oneline -n 20 --graph --abbrev-commit

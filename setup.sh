@@ -307,10 +307,31 @@ apply_settings_for() {
 }
 
 ################################################################################
+# Configure local settings for dotfiles.
+################################################################################
+configure_local_configs() {
+  # Configure local version control values.
+  printf "Name for version control: "
+  read VC_USERNAME
+
+  printf "Email for version control: "
+  read VC_EMAIL
+
+  VC_EMAIL=$(printf "$VC_EMAIL" | sed 's/@/\\@/')
+
+  # TODO: Confirm before applying.
+
+  # Apply name and email settings to local version control configs.
+  # TODO: Verify file exists first? Warn if not?
+  perl -pi -e "s/^\s+name = .*$/  name = $VC_USERNAME/" ~/.my_gitconfig
+  perl -pi -e "s/^\s+email = .*$/  email = $VC_EMAIL/" ~/.my_gitconfig
+}
+
+################################################################################
 # Script main.
 ################################################################################
 start() {
-  while getopts "bhHVp:s:" opt; do
+  while getopts "bhlHVp:s:" opt; do
     case "${opt}" in
       b)
         install_build_tools
@@ -319,6 +340,9 @@ start() {
         # ${OPTARG}
         help
         exit
+        ;;
+      l)
+        configure_local_configs
         ;;
       H)
         USE_LOCAL_BREW=1

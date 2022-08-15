@@ -66,6 +66,8 @@ main() {
   echo "${magenta}Symlinking dotfiles...${normal}"
 
   safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
+  make_local_config "$checkout_dir/settings/localdots/my_gitconfig" \
+                    "$HOME/.my_gitconfig"
   safe_symlink "$checkout_dir/settings/nvim/init.vim" \
                "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
   safe_symlink "$checkout_dir/settings/nvim/init.vim" "$HOME/.vimrc"
@@ -173,6 +175,47 @@ safe_symlink()
            "re-run the script${normal}".
       exit 1
     fi
+  fi
+}
+
+################################################################################
+# Create a .local config file by using a template if file doesn't already exist.
+#
+# Globals:
+#
+# Arguments:
+#  1. SOURCE   Path to the source file (the original physical file).
+#  2. TARGET   Path to the target file (a new file that will be copied).
+################################################################################
+make_local_config()
+{
+  SOURCE=$1
+  TARGET=$2
+
+  # Make sure source and target were given.
+  if [ $# -lt 2 ]; then
+    echo "${red}ERROR: Missing source and or target arguments${normal}"
+    exit 1
+  fi
+
+  if [ -z "$TARGET" ]; then
+    echo "${red}ERROR: Target argument not given or empty${normal}"
+    exit 1
+  fi
+
+  if [ -z "$SOURCE" ]; then
+    echo "${red}ERROR: Source argument not given or empty${normal}"
+    exit 1
+  fi
+
+  # Create the directory holding the target if it doesn't exist.
+  mkdir -p "$(dirname "$TARGET")"
+
+  # Only copy the template file if the source doesn't already exist.
+  if [ ! -f "$TARGET" ] && [ ! -d "$TARGET" ]; then
+    # Target does not exist, go ahead and copy.
+    echo "${blue}Creating $TARGET => $SOURCE${normal}"
+    cp "$SOURCE" "$TARGET"
   fi
 }
 
