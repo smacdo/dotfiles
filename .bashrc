@@ -33,8 +33,8 @@ unset file
 [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
 && source "${HOME}/.my_shell_profile.sh"
 
-[ -r "${HOME}/.my_bash_rc.sh" ] && [ -f "${HOME}/.my_bash_rc.sh" ]\
-&& source "${HOME}/.my_bash_rc.sh"
+[ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]\
+&& source "${HOME}/.my_bashrc.sh"
 
 # Flash the screen instead of playing an audio bell.
 set bell-style visible
