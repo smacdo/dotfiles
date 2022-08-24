@@ -6,6 +6,9 @@
   sl = log --graph --color --date=human \
     --pretty=format:"%C(yellow)%h%C(reset)%x20%x20%cd%x20%x20%ce%C(green)%x20%d%C(reset)%n%s%n"
 
+  # Shorthand for status
+  s = status
+
   # Show current working tree status with short format.
   ss = status -s
 
