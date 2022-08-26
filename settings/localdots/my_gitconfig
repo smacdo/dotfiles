@@ -1,3 +1,5 @@
 [user]
-  name = YOUR_NAME_HERE
-  email = YOUR_EMAIL_HERE
+  # Name and email values are configured automatically via dotfiles 
+  # `./bootstrap.sh && ./setup.sh -l`
+  name = TODO_SET_USER_NAME
+  email = TODO_SET_EMAIL_ADDRESS

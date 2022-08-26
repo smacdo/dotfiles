@@ -30,10 +30,14 @@ main() {
     fi
   fi
 
-  # Bail out if this doesn't look like the checkout directory.
-  if [ ! -f "./bootstrap.sh" ] || [ ! -f "./README.md" ]; then
-    echo "${red}Please run this script from the root directory of the git " \
-        "checkout${normal}"
+  # Bail out if this script is not running in the root of a dotfiles repo dir.
+  if [ ! "$(basename $(git remote get-url origin))" == "dotfiles.git" ]; then
+    echo "${red}This does not look like a dotfiles git repo checkout${normal}"
+    exit 1
+  fi
+
+  if [ ! "$(git rev-parse --show-toplevel 2>/dev/null)" == "$PWD" ]; then
+    echo "${red}Please run this script from the dotfiles root dir${normal}"
     exit 1
   fi
 
@@ -44,14 +48,6 @@ main() {
   echo "goodies contained in this dotfiles repository."
   echo " "
   echo "It looks like the current directory is: $checkout_dir"
-
-  echo "${bold}Is this the root directory of the git checkout? (y|n) "\
-       "${normal} " >&2
-  read -r REPLY
-
-  if [ "${REPLY}" != "Y" ] && [ "${REPLY}" != "y" ]; then
-    exit 1
-  fi
 
   # Load XDG values prior to setup.
   . "${checkout_dir}/shell_profile/xdg.sh"

@@ -6,6 +6,9 @@
   sl = log --graph --color --date=human \
     --pretty=format:"%C(yellow)%h%C(reset)%x20%x20%cd%x20%x20%ce%C(green)%x20%d%C(reset)%n%s%n"
 
+  # Shorthand for status
+  s = status
+
   # Show current working tree status with short format.
   ss = status -s
 
@@ -60,6 +63,18 @@
   # Include summaries of the merged commits when creating commit messages for
   # a merge.
   log = true
+
+[pull]
+  # Rebases local changes on top of incoming remote changes by reapplying the
+  # local changes on top of the new remote changes rather than merging.
+  rebase = true
+
+[fetch]
+  # Automatically clean git objects in your local repository when fetching
+  # changes from remote. This means any local branches that track a remote
+  # branch will be deleted when the remote branch is also deleted which should
+  # prevent your repository from accumulating orphaned branches.
+  prune = true
 
 [include]
   path = ~/.my_gitconfig
