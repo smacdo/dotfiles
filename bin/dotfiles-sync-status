@@ -1,0 +1,98 @@
+#!/bin/sh
+# Author: Scott MacDonald <scott@smacdo.com>
+#-------------------------------------------------------------------------------
+
+################################################################################
+# Help
+################################################################################
+help() {
+  echo "Check if a local (dotfiles) repository is in sync with its remote origin"
+  echo "and if not print how many commits behind and ahead it is."
+  echo
+  echo "Usage: $0 [-h] [-r path/to/repository]"
+  echo " -h        Show this help message"
+  echo " -s        Silence - do not print a message if repo is in sync"
+  echo " -r path   Optional path to git repository"
+}
+
+################################################################################
+# Script entry.
+################################################################################
+print_repo_status() {
+  r_dir="$1"
+  r_name="$2"
+
+  # Make sure the path to the repository is valid.
+  if [ ! -d "$r_dir" ]; then
+    echo "Repository path does not exist or is not a directory"
+    exit 1
+  fi
+
+  if [ ! "$(basename $(git -C "$r_dir" remote get-url origin))" == "dotfiles.git" ]; then
+    echo "This does not look like a $r_name git repo checkout"
+    exit 1
+  fi
+
+  # Force repository to fetch the latest branch information from remote.
+  git -C "$r_dir" fetch 
+  num_behind=$(git -C "$r_dir" rev-list HEAD..origin/master --count)
+  num_ahead=$(git -C "$r_dir" rev-list origin/master..HEAD --count)
+
+  # Custom message depending on the number behind/ahead.
+  if [ "$num_behind" -gt 0 ]; then
+    if [ "$num_ahead" -gt 0 ]; then
+      # Repo is both behind AND ahead.
+      printf \
+        "local $r_name is %d commits behind and %d commits ahead of remote\n" \
+        "$num_behind" \
+        "$num_ahead"
+    else 
+      # Repo is only behind.
+      printf \
+        "local $r_name is %d commits behind remote\n" \
+        "$num_behind"
+    fi
+  elif [ "$num_ahead" -gt 0 ]; then
+    # Repo is only ahead.
+      printf \
+        "local $r_name is %d commits ahead of remote\n" \
+        "$num_ahead"
+  else
+    # Repo is in sync.
+    if [ "$SILENCE" != 1 ]; then
+      echo "local $r_name in sync"
+    fi
+  fi
+}
+
+################################################################################
+# Script entry.
+################################################################################
+start() {
+  dotfiles_dir="${S_DOTFILE_ROOT}"
+
+  while getopts "hsVr:" opt; do
+    case "${opt}" in
+      h)
+        help
+        exit
+        ;;
+      r)
+        dotfiles_dir="${OPTARG}"
+        ;;
+      s)
+        SILENCE=1
+        ;;
+      *)
+        error "unknown option"
+        echo
+        help
+        exit
+        ;;
+    esac
+  done
+
+  print_repo_status "${dotfiles_dir}" "dotfiles"
+}
+
+start "$@"; exit
