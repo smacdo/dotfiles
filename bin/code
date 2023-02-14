@@ -15,7 +15,7 @@ print_help() {
   echo "code [-v] [-F|-V] -- vscode args..."
   echo " Arguments:"
   echo "  -h   Show this help text."
-  echo "  -C   Only search code paths (e.g., do not use code-fb)."
+  echo "  -C   Only search vscode paths (e.g., do not use code-fb)."
   echo "  -F   Only search code-fb paths."
   echo "  -V   Enable verbose mode."
   echo 
@@ -75,11 +75,9 @@ run_if_found() {
 ################################################################################
 run_fbcode() {
   run_if_found "/usr/bin/code-fb" "$@" && return 0
-  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" && return 0
+  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" "$@" && return 0
 
-  # TODO: Windows?
-
-  verbose "fb vscode binaries not found"
+  verbose "fb vscode not found"
 
   return 1
 }
@@ -95,11 +93,32 @@ run_fbcode() {
 ################################################################################
 run_vscode() {
   run_if_found "/usr/bin/code" "$@" && return 0
-  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" && return 0
+  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" "$@" && return 0
 
-  # TODO: Windows?
+  verbose "vscode not found"
 
-  verbose "vscode binaries not found"
+  return 1
+}
+
+###############################################################################
+# Use a non-vscode editor as a default fallback.
+#
+# Arguments:
+#  $1..N  arguments to pass to the vscode binary.
+#
+# Returns 0 if a fallback editor was found and executed successfully,
+# otherwise 1.
+################################################################################
+run_fallback() {
+  # Try Sublime Text first as that's still a GUI editor.
+  run_if_found "/usr/local/bin/subl" "$@" && return 0
+  run_if_found "/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl" "$@" && return 0
+
+  # Try using $VISUAL or $EDITOR as a last resort.
+  run_if_found "$(which "$VISUAL")" "$@" && return 0
+  run_if_found "$(which "$EDITOR")" "$@" && return 0
+
+  verbose "no fallback editors found"
 
   return 1
 }
@@ -121,17 +140,17 @@ main() {
   if [ "$USE_FB" -eq 1 ]; then
     run_fbcode "$@" && return 0
   else
-    verbose "Skipping code-fb paths"
+    verbose "USE_FB not set, skipping fb code"
   fi 
 
   if [ "$USE_MSFT" -eq 1 ]; then
     run_vscode "$@" && return 0
   else
-    verbose "Skipping code paths"
+    verbose "USE_MSFT not set, skipping msft code"
   fi
 
   # No suitable vscode found.
-  exit_with_message 1 "No vscode binary was found"
+  run_fallback "$@"
 }
 
 #===============================================================================
@@ -147,16 +166,20 @@ do
        exit 2
        ;;
     V) set_verbose 1
-       shift 1
        ;;
     F) USE_MSFT=0
-       shift 1
        ;;
     C) USE_FB=0
-       shift 1
+       ;;
+    *) # Invalid options are ignored and passed to vscode.
        ;;
   esac
 done
+
+# Remove parsed arguments.
+# NOTE: For this to work the script's arguments must be specified before the
+# arguments for vscode!
+shift "$((OPTIND - 1))"
 
 # Now start execution of main.
 main "$@"
