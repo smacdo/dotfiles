@@ -1,18 +1,25 @@
 {
-    // Shorthands for preprocessor
-	"C #include": {
+	// Shorthands for preprocessor
+	"#include": {
 		"scope": "c, cpp",
-		"prefix": [ "#in", "#inc"],
-		"body": [ "#include $0" ],
+		"prefix": [
+			"#in",
+			"#inc"
+		],
+		"body": [
+			"#include $0"
+		],
 		"description": "#include shorthand (with < or \" for code completion)"
 	},
-	"C #pragma once": {
+	"#pragma once": {
 		"scope": "c, cpp",
-		"prefix": [ "#po" ],
-		"body": [ "#pragma once", "$0" ],
-		"description": "#pragma once shorthand"
+		"prefix": "#po",
+		"body": [
+			"#pragma once",
+			"$0"
+		],
 	},
-	"C if block": {
+	"#if block": {
 		"scope": "c, cpp",
 		"prefix": "#if",
 		"body": [
@@ -22,9 +29,23 @@
 		],
 		"description": "#if block"
 	},
-	"C ifdef block": {
+	"#if #else block": {
 		"scope": "c, cpp",
-		"prefix": [ "#ifd", "#ifdef" ],
+		"prefix": "#ife",
+		"body": [
+			"#if ${1:expresssion}",
+			"$0",
+			"#else // !$1",
+			"",
+			"#endif // $1"
+		],
+		"description": "#if block"
+	},
+	"#ifdef block": {
+		"scope": "c, cpp",
+		"prefix": [
+			"#ifdef"
+		],
 		"body": [
 			"#ifdef ${1:expresssion}",
 			"$0",
@@ -32,9 +53,26 @@
 		],
 		"description": "#if block"
 	},
+	"#ifdef #else block": {
+		"scope": "c, cpp",
+		"prefix": [
+			"#ifdefe"
+		],
+		"body": [
+			"#ifdef ${1:expresssion}",
+			"$0",
+			"#else // !$1",
+			"",
+			"#endif // $1"
+		],
+		"description": "#if block"
+	},
 	"C ifndef block": {
 		"scope": "c, cpp",
-		"prefix": [ "#ifnd", "#ifndef" ],
+		"prefix": [
+			"#ifnd",
+			"#ifndef"
+		],
 		"body": [
 			"#ifndef ${1:expresssion}",
 			"$0",
@@ -42,46 +80,70 @@
 		],
 		"description": "#ifndef block"
 	},
-    // C++ helpers
-	"C++ using namespace": {
+	// C++ helpers
+	"using namespace NAME": {
 		"scope": "cpp",
-		"prefix": [ "usn", "usingn" ],
-		"body": [ "using namespace $0" ],
-		"description": "using namespace shorthand"
+		"prefix": [
+			"usingns"
+		],
+		"body": [
+			"using namespace $0"
+		],
 	},
-	"C++ declare namespace": {
+	"namespace NAME { ... }": {
 		"scope": "cpp",
-		"prefix": [ "ns", "names" ],
-		"body": [ "namespace ${1:name} {", "\t$0", "} // namespace $1" ],
-		"description": "declare namespace"
+		"prefix": [
+			"ns",
+			"namespace"
+		],
+		"body": [
+			"namespace ${1:name} {",
+			"\t$0",
+			"} // namespace $1"
+		],
 	},
-	"C++ declare anonymous namespace": {
+	"anonymous namespace { ... }": {
 		"scope": "cpp",
-		"prefix": [ "nsa" ],
-		"body": [ "namespace {", "\t$0", "}" ],
-		"description": "anonymous namespace shorthand"
+		"prefix": [
+			"nsa"
+		],
+		"body": [
+			"namespace {",
+			"\t$0",
+			"}"
+		],
 	},
-	"C++ cout": {
+	"std::cout << ... << std::endl;": {
 		"scope": "cpp",
-		"prefix": [ "coutt" ],
-		"body": [ "std::cout << $0 << std::endl;" ],
-		"description": "std::cout shorthand"
+		"prefix": "cout",
+		"body": [
+			"std::cout << $0 << std::endl;"
+		],
 	},
-	"C++ cerr": {
+	"std::cerr << ... << std::endl;": {
 		"scope": "cpp",
-		"prefix": [ "cerr" ],
-		"body": [ "std::cerr << $0 << std::endl;" ],
-		"description": "std::cerr shorthand"
+		"prefix": "cerr",
+		"body": [
+			"std::cerr << $0 << std::endl;"
+		],
 	},
-	"C++ begin end": {
+	"std::cin << ...": {
 		"scope": "cpp",
-		"prefix": [ "beginend" ],
-		"body": [ "std::begin(${1:container}), std::end(${1})" ],
-		"description": "std::cerr shorthand"
+		"prefix": "cin",
+		"body": [
+			"std::cin << "
+		],
 	},
-	"C++ try catch": {
+	"std::begin(C), std::end(C)": {
 		"scope": "cpp",
-		"prefix": [ "try" ],
+		"prefix": "beginend",
+		"body": [
+			"std::begin(${1:container}), std::end(${1})"
+		],
+	},
+	"try { ... } catch (exception) { ... }": {
+		"scope": "cpp",
+		"prefix": "try",
 		"body": [
 			"try {",
 			"\t$0",
@@ -90,33 +152,33 @@
 			"\t// TODO: handle exception...",
 			"}"
 		],
-		"description": "std::cerr shorthand"
 	},
 	// C++ Type shorthands.
-	"c++ unique_ptr": {
+	"std::unique_ptr<T> var": {
 		"scope": "cpp",
-		"prefix": ["up", "uptr"],
-		"body": ["std::unique_ptr<${1:T}> ${2:var}"],
-		"description": "std::unique_ptr<X> ..."
+		"prefix": "uptr",
+		"body": [
+			"std::unique_ptr<${1:T}> ${2:var}"
+		],
 	},
-	"c++ shared_ptr": {
+	"std::shared_ptr<T> var": {
 		"scope": "cpp",
-		"prefix": ["sp", "sptr"],
-		"body": ["std::shared_ptr<${1:T}> ${2:var}"],
-		"description": "std::shared_ptr<X> ..."
+		"prefix": "sptr",
+		"body": [
+			"std::shared_ptr<${1:T}> ${2:var}"
+		],
 	},
 	// C++ helpers
-	"c++ for i": {
-		"scope": "cpp",
+	"for (int i = X; i < Y; ++i) { ... }": {
+		"scope": "c, cpp",
 		"prefix": "fori",
 		"body": [
 			"for (${1:int} ${2:i} = ${3:0}; $2 < $4; ${5:++$2}) {",
 			"\t$0",
 			"}",
 		],
-		"description": "for (int i = X; i < Y; ++i) { ... }"
 	},
-	"c++ for auto": {
+	"for (auto& x : collection) { ... }": {
 		"scope": "cpp",
 		"prefix": "fora",
 		"body": [
@@ -124,19 +186,17 @@
 			"\t$0",
 			"}",
 		],
-		"description": "for (auto& x : collection) { ... }"
 	},
-	"c++ for const auto": {
+	"for (const auto x : collection) { ... }": {
 		"scope": "cpp",
 		"prefix": "forca",
 		"body": [
-			"for (const auto& ${1:x} : ${2:collection}) {",
+			"for (const auto ${1:x} : ${2:collection}) {",
 			"\t$0",
 			"}",
 		],
-		"description": "for (const auto& x : collection) { ... }"
 	},
-	"c++ for auto&": {
+	"for (const auto& x : collection) { ... }": {
 		"scope": "cpp",
 		"prefix": "forra",
 		"body": [
@@ -144,339 +204,417 @@
 			"\t$0",
 			"}",
 		],
-		"description": "for (const auto& x : collection) { ... }"
 	},
-	"c++ make_unique": {
+	"std::make_unique<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["makeu"],
-		"body": ["std::make_unique<${1:T}>($2)"],
-		"description": "std::make_unique<X>(...)"
+		"prefix": "makeuptr",
+		"body": [
+			"std::make_unique<${1:T}>($2)"
+		],
 	},
-	"c++ auto make_unique": {
+	"auto var = std::make_unique<T>(...);": {
 		"scope": "cpp",
-		"prefix": ["amakeu"],
-		"body": ["auto ${1:var} = std::make_unique<${2:T}>($3);$0"],
-		"description": "auto var = std::make_unique<T>(...);"
+		"prefix": "amakeuptr",
+		"body": [
+			"auto ${1:var} = std::make_unique<${2:T}>($3);"
+		],
 	},
-	"c++ make_shared": {
+	"std::make_shared<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["makes"],
-		"body": ["std::make_shared<${1:T}>($2)"],
-		"description": "std::make_shared<X>(...)"
+		"prefix": "makesptr",
+		"body": [
+			"std::make_shared<${1:T}>($2)"
+		],
 	},
-	"c++ auto make_shared": {
+	"auto var = std::make_shared<T>(...);": {
 		"scope": "cpp",
-		"prefix": ["amakes"],
-		"body": ["auto ${1:var} = std::make_shared<${2:T}>($3);$0"],
-		"description": "auto var = std::make_shared<T>(...);"
+		"prefix": "amakesptr",
+		"body": [
+			"auto ${1:var} = std::make_shared<${2:T}>($3);"
+		],
 	},
 	// Casts.
-	"c++ staticCast": {
+	"static_cast<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["scast", "staticcast", "static_cast"],
-		"body": ["static_cast<${1:type}>($2)"],
-		"description": "static_cast<T>(...)"
+		"prefix": [
+			"scast",
+			"staticcast",
+			"static_cast"
+		],
+		"body": [
+			"static_cast<${1:T}>($2:expr)"
+		],
 	},
-	"c++ reinterpretCast": {
+	"reinterpret_cast<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["rcast", "reinterpretcast", "reinterpret_cast"],
-		"body": ["reinterpret_cast<${1:type}>($2)"],
-		"description": "reinterpret_cast<T>(...)"
+		"prefix": [
+			"rcast",
+			"reinterpretcast",
+			"reinterpret_cast"
+		],
+		"body": [
+			"reinterpret_cast<${1:T}>(${2:expr})"
+		],
 	},
-	"c++ dynamicCast": {
+	"dynamic_cast<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["dcast", "dynamiccast", "dynamic_cast"],
-		"body": ["dynamic_cast<${1:type}>($2)"],
-		"description": "dynamic_cast<T>(...)"
+		"prefix": [
+			"dcast",
+			"dynamiccast",
+			"dynamic_cast"
+		],
+		"body": [
+			"dynamic_cast<${1:T}>(${2:expr})"
+		],
 	},
-	"c++ constCast": {
+	"const_cast<T>(...)": {
 		"scope": "cpp",
-		"prefix": ["ccast", "constcast", "const_cast"],
-		"body": ["const_cast<${1:type}>($2)"],
-		"description": "const_cast<T>(...)"
+		"prefix": [
+			"ccast",
+			"constcast",
+			"const_cast"
+		],
+		"body": [
+			"const_cast<${1:T}>(${2:expr})"
+		],
 	},
-    // Lambda
-	"lambda one line": {
+	// Lambda
+	"[capture](params) {...}": {
 		"scope": "cpp",
 		"prefix": "lambda",
-		"body": ["[$1]($2) { $0 }"],
-		"description": "[]() {...}"
+		"body": [
+			"[${1:captures}](${2:params}) { $0 }${3:;}"
+		],
 	},
-	"lambda multi line": {
+	"multiline [capture](params) {...}": {
 		"scope": "cpp",
 		"prefix": "lambdam",
 		"body": [
-			"[$1]($2){",
-		    "\t$0;",
-		    "};"
-        ],
-		"description": "[]() {...}"
+			"[${1:captures}](${2:params}){",
+			"\t$0",
+			"}${3:;}"
+		],
 	},
-    // fmt format library:
-    "include fmtlib": {
-        "scope": "cpp",
-        "prefix": "#ifmt",
-        "body": ["#include <fmt/core.h>"],
-        "description": "#include <fmt/core.h>"
-    },
-    "fmtformat": {
-        "scope": "cpp",
-        "prefix": "fmtf",
-        "body": ["fmt::format($0)"],
-        "description": "fmt::format(...)"
-    },
-    // Documentation:
-	"doxygen block short": {
+	// fmt format library:
+	"include <fmt/core.h>": {
 		"scope": "cpp",
+		"prefix": "#ifmt",
+		"body": [
+			"#include <fmt/core.h>"
+		],
+	},
+	"fmt::format(...)": {
+		"scope": "cpp",
+		"prefix": "fmtf",
+		"body": [
+			"fmt::format($0)"
+		],
+	},
+	// Documentation:
+	"doxygen /** ... */": {
+		"scope": "c, cpp",
 		"prefix": "/**",
-		"body": ["/** $1 */$0"],
+		"body": [
+			"/** $1 */"
+		],
 		"description": "/** ... */"
 	},
-	"doxygen block multi-line": {
-		"scope": "cpp",
+	"doxygen multi-line /** ... */": {
+		"scope": "c, cpp",
 		"prefix": "/***",
 		"body": [
 			"/**",
 			" * $1",
 			" */$0"
 		],
-		"description": "/** ... */"
 	},
-    // Type shortcuts:
-    "array": {
-        "scope": "cpp",
-        "prefix": "array",
-        "body": ["std::array<${1:type}, ${2:N}>"],
-        "description": "std::array<T, N>"
-    },
-    "vector": {
-        "scope": "cpp",
-        "prefix": "vector",
-        "body": ["std::vector<${1:type}>"],
-        "description": "std::vector"
-    },
-    "map": {
-        "scope": "cpp",
-        "prefix": "map",
-        "body": ["std::map<${1:key_type}, ${2:value_type}>"],
-        "description": "std::map"
-    },
-    "deque": {
-        "scope": "cpp",
-        "prefix": "deque<${1:type}>",
-        "body": ["std::deque"],
-        "description": "std::deque"
-    },
-    "queue": {
-        "scope": "cpp",
-        "prefix": "queue",
-        "body": ["std::queue<${1:type}>"],
-        "description": "std::queue"
-    },
-    "priority_queue": {
-        "scope": "cpp",
-        "prefix": ["pqueue", "priority_queue"],
-        "body": ["std::priority_queue<${1:type}>"],
-        "description": "std::priority_queue"
-    },
-    "unordered_map": {
-        "scope": "cpp",
-        "prefix": "unordered_map",
-        "body": ["std::unordered_map<${1:key_type}, ${2:value_type}>"],
-        "description": "std::unordered_map"
-    },
-    "std_wstring": {
-        "scope": "cpp",
-        "prefix": ["wstr", "string"],
-        "body": ["std::wstring"],
-        "description": "std::wstring"
-    },
-    "std_string": {
-        "scope": "cpp",
-        "prefix": ["str", "string"],
-        "body": [
-            "std::string"
-        ],
-        "description": "std::string"
-    },
-    "std_string_view": {
-        "scope": "cpp",
-        "prefix": ["strv", "stringview"],
-        "body": ["std::string_view"],
-        "description": "std::string_view"
-    },
-    "u8": {
-        "scope": "cpp",
-        "prefix": "u8",
-        "body": ["uint8_t"],
-        "description": "uint8_t"
-    },
-    "u16": {
-        "scope": "cpp",
-        "prefix": "u16",
-        "body": ["uint16_t"],
-        "description": "uint16_t"
-    },
-    "u32": {
-        "scope": "cpp",
-        "prefix": "u32",
-        "body": ["uint32_t"],
-        "description": "uint32_t"
-    },
-    "u64": {
-        "scope": "cpp",
-        "prefix": "u64",
-        "body": [
-            "uint64_t"
-        ],
-        "description": "uint64_t"
-    },
-    "i8": {
-        "scope": "cpp",
-        "prefix": "i8",
-        "body": [
-            "int8_t"
-        ],
-        "description": "int8_t"
-    },
-    "i16": {
-        "scope": "cpp",
-        "prefix": "i16",
-        "body": ["int16_t"],
-        "description": "int16_t"
-    },
-    "i32": {
-        "scope": "cpp",
-        "prefix": "i32",
-        "body": ["int32_t"],
-        "description": "int32_t"
-    },
-    "i64": {
-        "scope": "cpp",
-        "prefix": "i64",
-        "body": ["int64_t"],
-        "description": "int64_t"
-    },
-    // Common header shorthands
-    "#include array": {
+	// Type shortcuts:
+	"array<T, N>": {
+		"scope": "cpp",
+		"prefix": "array",
+		"body": [
+			"std::array<${1:type}, ${2:N}>"
+		],
+	},
+	"std::vector<T>": {
+		"scope": "cpp",
+		"prefix": "vector",
+		"body": [
+			"std::vector<${1:type}>"
+		],
+	},
+	"std::map<K, T>": {
+		"scope": "cpp",
+		"prefix": "map",
+		"body": [
+			"std::map<${1:key_type}, ${2:value_type}>"
+		],
+	},
+	"std::deque<T>": {
+		"scope": "cpp",
+		"prefix": "deque",
+		"body": [
+			"std::deque<${1:type}>"
+		],
+	},
+	"std::queue<T>": {
+		"scope": "cpp",
+		"prefix": "queue",
+		"body": [
+			"std::queue<${1:type}>"
+		],
+	},
+	"std::priority_queue<T>": {
+		"scope": "cpp",
+		"prefix": [
+			"pqueue",
+			"priority_queue"
+		],
+		"body": [
+			"std::priority_queue<${1:type}>"
+		],
+	},
+	"std::unordered_map<K, T>": {
+		"scope": "cpp",
+		"prefix": "unordered_map",
+		"body": [
+			"std::unordered_map<${1:key_type}, ${2:value_type}>"
+		],
+	},
+	"std::wstring": {
+		"scope": "cpp",
+		"prefix": "wstring",
+		"body": [
+			"std::wstring"
+		],
+	},
+	"std::string": {
+		"scope": "cpp",
+		"prefix": "string",
+		"body": [
+			"std::string"
+		],
+	},
+	"std::string_view": {
+		"scope": "cpp",
+		"prefix": [
+			"strv",
+			"stringview"
+		],
+		"body": [
+			"std::string_view"
+		],
+	},
+	"uint8_t": {
+		"scope": "c, cpp",
+		"prefix": "u8",
+		"body": [
+			"uint8_t"
+		],
+	},
+	"uint16_t": {
+		"scope": "c, cpp",
+		"prefix": "u16",
+		"body": [
+			"uint16_t"
+		],
+	},
+	"uint32_t": {
+		"scope": "c, cpp",
+		"prefix": "u32",
+		"body": [
+			"uint32_t"
+		],
+	},
+	"uint64_t": {
+		"scope": "c, cpp",
+		"prefix": "u64",
+		"body": [
+			"uint64_t"
+		],
+	},
+	"int8_t": {
+		"scope": "c, cpp",
+		"prefix": "i8",
+		"body": [
+			"int8_t"
+		],
+	},
+	"i16": {
+		"scope": "c, cpp",
+		"prefix": "i16",
+		"body": [
+			"int16_t"
+		],
+		"description": "int16_t"
+	},
+	"int32_t": {
+		"scope": "c, cpp",
+		"prefix": "i32",
+		"body": [
+			"int32_t"
+		],
+	},
+	"int64_t": {
+		"scope": "c, cpp",
+		"prefix": "i64",
+		"body": [
+			"int64_t"
+		],
+	},
+	"uintptr_t": {
+		"scope": "c, cpp",
+		"prefix": [
+			"uiptr"
+		],
+		"body": [
+			"uintptr_t"
+		],
+	},
+	// Common header shorthands
+	"#include <array>": {
 		"scope": "cpp",
 		"prefix": "#incarr",
-		"body": [ "#include <array>" ],
-		"description": "#include <array>"
+		"body": [
+			"#include <array>"
+		],
 	},
-    "#include format": {
+	"#include <format>": {
 		"scope": "cpp",
 		"prefix": "#incform",
-		"body": [ "#include <fmt/format.h>" ],
-		"description": "#include <fmt/format.h>"
+		"body": [
+			"#include <fmt/format.h>"
+		],
 	},
-    "#include functional": {
+	"#include <functional>": {
 		"scope": "cpp",
 		"prefix": "#incfunc",
-		"body": [ "#include <functional>" ],
-		"description": "#include <functional>"
+		"body": [
+			"#include <functional>"
+		],
 	},
-    "#include map": {
+	"#include <map>": {
 		"scope": "cpp",
 		"prefix": "#incmap",
-		"body": [ "#include <map>" ],
-		"description": "#include <map>"
+		"body": [
+			"#include <map>"
+		],
 	},
-    "#include mem": {
+	"#include <memory>": {
 		"scope": "cpp",
 		"prefix": "#incmem",
-		"body": [ "#include <memory>" ],
-		"description": "#include <memory>"
+		"body": [
+			"#include <memory>"
+		],
 	},
-	"#include string": {
+	"#include <string>": {
 		"scope": "cpp",
 		"prefix": "#incstr",
-		"body": [ "#include <string>" ],
-		"description": "#include <string>"
+		"body": [
+			"#include <string>"
+		],
 	},
-	"#include string_view": {
+	"#include <string_view>": {
 		"scope": "cpp",
-		"prefix": "#incsv",
-		"body": [ "#include <string_view>" ],
-		"description": "#include <string_view>"
+		"prefix": "#inctringv",
+		"body": [
+			"#include <string_view>"
+		],
 	},
-	"#include tuple": {
+	"#include <tuple>": {
 		"scope": "cpp",
-		"prefix": "#inctup",
-		"body": [ "#include <tuple>" ],
-		"description": "#include <tuple>"
+		"prefix": "#inctuple",
+		"body": [
+			"#include <tuple>"
+		],
 	},
-    "#include unordered_map": {
+	"#include <unordered_map>": {
 		"scope": "cpp",
 		"prefix": "#incuno",
-		"body": [ "#include <unordered_map>" ],
-		"description": "#include <unordered_map>"
+		"body": [
+			"#include <unordered_map>"
+		],
 	},
-    "#include vector": {
+	"#include <vector>": {
 		"scope": "cpp",
 		"prefix": "#incvec",
-		"body": [ "#include <vector>" ],
-		"description": "#include <vector>"
+		"body": [
+			"#include <vector>"
+		],
 	},
-    // GTest macros:
-    "gtest template": {
-        "scope": "cpp",
-        "prefix": "//gt",
-        "body": [
-            "// COPYRIGHT HERE",
-            "#include \"${1:FILE_UNDER_TEST.h}\"",
-            "",
-            "#include <gmock/gmock.h>",
-            "#include <gtest/gtest.h>",
-            "",
-            "TEST(${2:TestName}) {",
-            "\t$0",
-            "}"
-        ],
-        "description": "GTest File Template"
-    },
-    "gtest test case": {
-        "scope": "cpp",
-        "prefix": ["gtestt"],
-        "body": [
-            "TEST(${1:TestName}) {",
-            "\t$0",
-            "}"
-        ],
-        "description": "GTest TEST"
-    },
-    "gtest fixture test case": {
-        "scope": "cpp",
-        "prefix": ["gtestf"],
-        "body": [
-            "TEST_F(${1:FixtureName}, ${2:TestName}) {",
-            "\t$0",
-            "}"
-        ],
-        "description": "GTest TEST_F"
-    },
-    "gtest EXPECT_EQ": {
-        "scope": "cpp",
-        "prefix": ["expecteq"],
-        "body": [ "EXPECT_EQ($1, $2);" ],
-        "description": "GTest EXPECT_EQ"
-    },
-    "gtest EXPECT_NE": {
-        "scope": "cpp",
-        "prefix": ["expectne"],
-        "body": [ "EXPECT_NE($1, $2);" ],
-        "description": "GTest EXPECT_NE"
-    },
-    "gtest ASSERT_EQ": {
-        "scope": "cpp",
-        "prefix": ["asserteq"],
-        "body": [ "ASSERT_EQ($1, $2);" ],
-        "description": "GTest ASSERT_EQ"
-    },
-    "gtest ASSERT_NE": {
-        "scope": "cpp",
-        "prefix": ["assertne",],
-        "body": [ "ASSERT_NE($1, $2);$0" ],
-        "description": "GTest ASSERT_NE"
-    },
+	// GTest macros:
+	"GTest File Template": {
+		"scope": "cpp",
+		"prefix": "//gt",
+		"body": [
+			"// COPYRIGHT HERE",
+			"#include \"${1:FILE_UNDER_TEST.h}\"",
+			"",
+			"#include <gmock/gmock.h>",
+			"#include <gtest/gtest.h>",
+			"",
+			"TEST(${2:TestName}) {",
+			"\t$0",
+			"}"
+		],
+	},
+	"GTest TEST(NAME) { ... }": {
+		"scope": "cpp",
+		"prefix": [
+			"gtestt"
+		],
+		"body": [
+			"TEST(${1:TestName}) {",
+			"\t$0",
+			"}"
+		],
+	},
+	"GTest TEST_F(F,N) { ... } ": {
+		"scope": "cpp",
+		"prefix": [
+			"gtestf"
+		],
+		"body": [
+			"TEST_F(${1:FixtureName}, ${2:TestName}) {",
+			"\t$0",
+			"}"
+		],
+		"description": "GTest TEST_F"
+	},
+	"EXPECT_EQ": {
+		"scope": "cpp",
+		"prefix": [
+			"expecteq"
+		],
+		"body": [
+			"EXPECT_EQ($1, $2);"
+		],
+	},
+	"EXPECT_NE": {
+		"scope": "cpp",
+		"prefix": [
+			"expectne"
+		],
+		"body": [
+			"EXPECT_NE($1, $2);"
+		],
+	},
+	"ASSERT_EQ": {
+		"scope": "cpp",
+		"prefix": [
+			"asserteq"
+		],
+		"body": [
+			"ASSERT_EQ($1, $2);"
+		],
+	},
+	"ASSERT_NE": {
+		"scope": "cpp",
+		"prefix": [
+			"assertne",
+		],
+		"body": [
+			"ASSERT_NE($1, $2);"
+		],
+	},
 }
