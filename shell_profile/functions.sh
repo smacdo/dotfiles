@@ -56,6 +56,10 @@ i*86)
     export DOT_ARCH_BITS=32
     export DOT_ARCH=x86_32
     ;;
+arm64)
+    export DOT_ARCH_BITS=64
+    export DOT_ARCH=arm64
+    ;;
 *)
     echo "WARN: Could not detect architecture via 'uname -m'!"
     export DOT_ARCH_BITS=0
