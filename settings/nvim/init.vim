@@ -267,6 +267,13 @@ set directory=$HOME/.local/state/vim/tmp      " Stores temporary file state.
 set undodir=$HOME/.local/state/vim/undo       " Stores undo history for files.
 
 "===============================================================================
+" Custom file type detectors.
+"===============================================================================
+" Buck build files use the Starlark language but lack file extension detection.
+au BufRead,BufNewFile * if expand('%:t') == 'BUCK' | set filetype=bzl | endif
+au BufRead,BufNewFile * if expand('%:t') =~# '^TARGETS\(\.v[12]\)\?$' | set filetype=bzl | endif
+
+"===============================================================================
 " Machine local settings.
 "===============================================================================
 let $MY_LOCAL_VIMRC = $HOME . "/.my_vimrc"
