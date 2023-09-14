@@ -25,7 +25,7 @@ endfunction
 if executable('clang-format')
     augroup clangformat_on_save
         autocmd!
-        autocmd BufWritePre *.h,*.hpp,*.c,*.cpp,*.cc :call ClangFormatBuffer("quiet")
+        autocmd BufWritePre *.c,*.cpp,*.cc,*.h,*.hpp,*.inl :call ClangFormatBuffer("quiet")
         autocmd BufWritePre *.vert,*.frag :call ClangFormatBuffer("quiet")
         autocmd BufWritePre *.cs :call ClangFormatBuffer("quiet")
         autocmd BufWritePre *.java :call ClangFormatBuffer("quiet")
@@ -35,4 +35,8 @@ if executable('clang-format')
 endif
 
 " Map CTRL-d (eg visual studio CTRL+K CTRL+D) to format.
-nnoremap <C-d> :call ClangFormatBuffer("")
+let exts = ['c', 'cpp', 'cc', 'h', 'hpp', 'inl', 'vert', 'frag', 'cs', 'java', 'js', 'm', 'mm']
+
+if index(exts, expand('%:e')) > -1
+  nnoremap <C-d> :call ClangFormatBuffer("")
+endif
