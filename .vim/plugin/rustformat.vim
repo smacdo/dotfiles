@@ -2,8 +2,17 @@
 " it and then reload the buffer. If rustfmt fails or produces output the output
 " will be displayed to the user in a new split pane.
 function RustFormatBuffer(verbosity)
+    " Skip formatting if disabled.
+    if exists("g:no_format") && g:fo_format
+      return
+    endif
+
+    " Only format if rustfmt is  installed.
     if !executable('rustfmt')
-        echoerr "rustfmt not installed"
+        if a:verbosity != "quiet"
+            echoerr "rustfmt not installed"
+        endif
+
         return
     endif
 
@@ -21,7 +30,9 @@ function RustFormatBuffer(verbosity)
     " Check for any errors returned from the formatter and do not reload the
     " file if so.
     if v:shell_error > 0
-      echoerr "rustfmt exited with non-zero error code"
+      if a:verbosity != "quiet"
+          echoerr "rustfmt exited with non-zero error code"
+      endif
     else
       " Reload the file because the formatter may have altered the contents
       " of the file.
@@ -31,7 +42,7 @@ function RustFormatBuffer(verbosity)
       " Return to the previous cursor position which is either the same or
       " close to the original spot after formatting is applied.
       call setpos('.', cursor_pos)
-    end
+    endif
 
     " Print the output of the formatter if this function isn't quiet.
     if a:verbosity != "quiet"
@@ -50,8 +61,8 @@ function RustFormatBuffer(verbosity)
 
         " Print the output from rustfmt.
         call append(0, split(output, '\v\n'))
-      end
-    end
+      endif
+    endif
 endfunction
 
 " If rustfmt is found then apply rust formatting anytime a buffer is saved.
