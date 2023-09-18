@@ -6,18 +6,48 @@
 " cursor position, replace the buffer with clang format results and finally
 " restore the cursor position.
 function ClangFormatBuffer(verbosity)
-    if !executable('clang-format')
-        echoerr "clang-format not installed"
-        return
+  " Skip formatting if disabled.
+  if exists("g:no_format") && g:no_format
+    return
+  endif
+
+  " Only run clang format if there is a settings file present.
+  if empty(findfile('.clang-format', expand('%:p:h') . ';'))
+    if a:verbosity != "quiet"
+      echoerr "no .clang-format settings file found"
     endif
 
-    if !empty(findfile('.clang-format', expand('%:p:h') . ';'))
-        let cursor_pos = getpos('.')
-        :%!clang-format
-        call setpos('.', cursor_pos)
-    elseif quiet != "quiet"
-        :echo ".clang-format file not found!"
+    return
+  endif
+
+  " Make sure clang-format is installed prior to formatting.
+  if !executable('clang-format')
+    if a:verbosity != "quiet"
+      echoerr "no clang-format binary found on path"
     endif
+
+    return
+  endif
+
+  " Save the current cursor position prior to formating.
+  let cursor_pos = getpos('.')
+
+  " Run `clang-format` by passing the current contents on the buffer to stdin,
+  " and then replace the current buffer with `clang-format`'s stdout.
+  %!clang-format
+
+  " Check for formatting errors, and undo changes to the buffer.
+  if v:shell_error > 0
+    if a:verbosity != "quiet"
+      echoerr "clang-format exited with non-zero error code"
+    endif
+
+    undo
+    return
+  endif
+
+  " Try to restore the old curosr position to minimize editor churn on the user.
+  call setpos('.', cursor_pos)
 endfunction
 
 " Run clang format whenever a supported file format is used.
