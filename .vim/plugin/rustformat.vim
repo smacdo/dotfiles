@@ -7,7 +7,7 @@ function RustFormatBuffer(verbosity)
     return
   endif
 
-  " Only format if rustfmt is  installed.
+  " Only format if rustfmt is installed.
   if !executable('rustfmt')
     if a:verbosity != "quiet"
       echoerr "rustfmt not installed"
@@ -16,53 +16,29 @@ function RustFormatBuffer(verbosity)
     return
   endif
 
-  " Save the file to force changes to be written out prior to formatting.
-  write
-
   " Save the current window and cursor position for later restoration.
-  let current_window = winnr()
+  let l:current_window = winnr()
   let cursor_pos = getpos('.')
 
-  " Run rustfmt and capture its output in a variable rather than replacing
-  " the current buffer. Otherwise `silent! exec ...` should be used.
-  let output = system('rustfmt ' . expand('%:p'))
+  " Run `rustfmt` by passing the current buffer contents to stdin, and then
+  " replacing the buffer with the contents of stdout (unless there was a
+  " problem).
+  %!rustfmt
 
   " Check for any errors returned from the formatter and do not reload the
   " file if so.
+  " TODO: Only do this if not quiet. In quiet mode merely undo the changes.
   if v:shell_error > 0
-    if a:verbosity != "quiet"
-      echoerr "rustfmt exited with non-zero error code"
-    endif
-  else
-    " Reload the file because the formatter may have altered the contents
-    " of the file.
-    e
-    redraw
-
-    " Return to the previous cursor position which is either the same or
-    " close to the original spot after formatting is applied.
-    call setpos('.', cursor_pos)
-  endif
-
-  " Print the output of the formatter if this function isn't quiet.
-  if a:verbosity != "quiet"
-    if len(output) > 0
-      echoerr "rustfmt had output"
-
-      " Open a new non-file buffer in a vertial split to show the output
-      " from rustfmt. Use `normal! ggdG` to delete anything that might be
-      " there from a previous run.
-      "
-      " You can use vsplit for a vertical split, split for horizontal.
-      " `belowright` prefix makes the horizontal split open at bottom.
-      belowright split __rustfmt__output__
-      normal! ggdG
-      setlocal buftype=nofile
-
-      " Print the output from rustfmt.
-      call append(0, split(output, '\v\n'))
+    if a:verbosity == "quiet"
+      echoerr "rustfmt exited with non-zero error code - unformatted file will be saved"
+      undo
+    else
+      echoerr "rustfmt exited with non-zero error code - call :undo to restore"
     endif
   endif
+
+  " Restore the old cursor position to minimize editor churn on the user.
+  call setpos('.', cursor_pos)
 endfunction
 
 " If rustfmt is found then apply rust formatting anytime a buffer is saved.
