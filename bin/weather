@@ -46,15 +46,15 @@ class TemperatureType(Enum):
     f = "f"
     c = "c"
 
-
-def parse_temperature_type(_type: str) -> TemperatureType:
-    """Reads a character 'f' or 'c' and converts it to `TemperatureType."""
-    if _type == "f" or _type == "F":
-        return TemperatureType.f
-    elif _type == "c" or _type == "C":
-        return TemperatureType.c
-    else:
-        assert False, f"Invalid temperature type {_type}"
+    @staticmethod
+    def from_str(s: str) -> TemperatureType:
+        """Reads a character 'f' or 'c' and converts it to `TemperatureType."""
+        if s == "f" or s == "F":
+            return TemperatureType.f
+        elif s == "c" or s == "C":
+            return TemperatureType.c
+        else:
+            assert False, f"Invalid temperature type {s}"
 
 
 class Temperature:
@@ -68,8 +68,21 @@ class Temperature:
         self._type = (
             _type
             if isinstance(_type, TemperatureType)
-            else parse_temperature_type(_type)
+            else TemperatureType.from_str(_type)
         )
+
+    @staticmethod
+    def from_json(json: dict) -> Optional[Temperature]:
+        """Reads a WMO temperature unit from { "value": ..., "unitCode": "wmoUnit:degC|degF" }"""
+        if json["value"] == None:
+            return None
+        elif json["unitCode"] == "wmoUnit:degC":
+            return Temperature(float(json["value"]), TemperatureType.c)
+        elif json["unitCode"] == "wmoUnit:degF":
+            return Temperature(float(json["value"]), TemperatureType.f)
+        else:
+            return None
+
 
     def __str__(self) -> str:
         c = "f" if self._type == TemperatureType.f else "c"
@@ -131,18 +144,6 @@ def read_unit_percent(json: dict) -> Optional[float]:
         return float(json["value"])
 
 
-def read_unit_temperature(json: dict) -> Optional[Temperature]:
-    """Reads a WMO temperature unit from { "value": ..., "unitCode": "wmoUnit:degC|degF" }"""
-    if json["value"] == None:
-        return None
-    elif json["unitCode"] == "wmoUnit:degC":
-        return Temperature(float(json["value"]), TemperatureType.c)
-    elif json["unitCode"] == "wmoUnit:degF":
-        return Temperature(float(json["value"]), TemperatureType.f)
-    else:
-        return None
-
-
 class ForecastPeriod:
     """Weather forecast data for a period of time."""
 
@@ -166,7 +167,7 @@ class ForecastPeriod:
         self.is_daytime = bool(json["isDaytime"])
         self.temperature = Temperature(json["temperature"], json["temperatureUnit"])
         self.precip_chance = read_unit_percent(json["probabilityOfPrecipitation"])
-        self.dewpoint = read_unit_temperature(json["dewpoint"])
+        self.dewpoint = Temperature.from_json(json["dewpoint"])
         self.relative_humidity = read_unit_percent(json["relativeHumidity"])
         self.wind = WindSpeed.from_str(json["windSpeed"], json["windDirection"])
         self.icon_url = str(json["icon"])
