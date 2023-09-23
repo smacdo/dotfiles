@@ -19,7 +19,7 @@ check_result() {
   # TODO: Make custom continue or abort
   if [ "$1" -ne 0 ]; then
     echo "$2 $3 FAIL (code $1)"
-    exit "$?"
+    exit "$1"
   else
     echo "$2 $3 OK"
   fi
