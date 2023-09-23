@@ -18,13 +18,11 @@ import urllib.request
 # NOAA:
 # https://www.weather.gov/documentation/services-web-api
 
-# note: response conteains urls for forecast
-#
-# Also get alerts
+# TODO: Cache results for faster lookups and offline use.
+# TODO: Support name -> lat/long lookup (make sure to cache this too).
+# TODO: Get alerts for a region
 # https://api.weather.gov/alerts/active?area={state}
-# active=true
-#
-# Also consider air quality
+# TODO: Get air quality
 
 
 class GridPoint:
@@ -38,6 +36,21 @@ class GridPoint:
         self.grid_id = grid_id
         self.x = x
         self.y = y
+
+    @staticmethod
+    def from_noaa_www_lat_long(lat: float, long: float) -> GridPoint:
+        # TODO: Error handling eg invalid lat/long.
+        response_bytes = urllib.request.urlopen(
+            f"https://api.weather.gov/points/{lat},{long}"
+        ).read()
+
+        # TODO: Handle JSON decoding failures.
+        # TODO: Check and handle if response is unexpected.
+        response = json.loads(str(response_bytes, "utf-8"))
+        props = response["properties"]
+
+        return GridPoint(props["gridId"], int(props["gridX"]), int(props["gridY"]))
+
 
 
 class TemperatureType(Enum):
@@ -144,6 +157,7 @@ def read_unit_percent(json: dict) -> Optional[float]:
         return float(json["value"])
 
 
+# TODO: Refactor into ForecastPeriod = Forecast + Start/End
 class ForecastPeriod:
     """Weather forecast data for a period of time."""
 
@@ -157,8 +171,8 @@ class ForecastPeriod:
     relative_humidity: Optional[float]
     wind: Optional[WindSpeed]
     icon_url: str
-    short_forecast: str
-    detailed_forecast: str
+    short_summary: str
+    detailed_summary: str
 
     def __init__(self, json: dict) -> None:
         self.name = json["name"]
@@ -171,8 +185,8 @@ class ForecastPeriod:
         self.relative_humidity = read_unit_percent(json["relativeHumidity"])
         self.wind = WindSpeed.from_str(json["windSpeed"], json["windDirection"])
         self.icon_url = str(json["icon"])
-        self.short_forecast = str(json["shortForecast"])
-        self.detailed_forecast = str(json["detailedForecast"])
+        self.short_summary = str(json["shortForecast"])
+        self.detailed_summary = str(json["detailedForecast"])
 
     def debug_print(self):
         print(f"ForecastPeriod")
@@ -180,24 +194,33 @@ class ForecastPeriod:
             print(f"\t{p}")
 
 
-def lookup_noaa_grid_points(lat: float, long: float) -> GridPoint:
-    # TODO: Error handling eg invalid lat/long.
-    response_bytes = urllib.request.urlopen(
-        f"https://api.weather.gov/points/{lat},{long}"
-    ).read()
+class Forecast:
+    forecast_periods: List[ForecastPeriod]
 
-    # TODO: Handle JSON decoding failures.
-    # TODO: Check and handle if response is unexpected.
-    response = json.loads(str(response_bytes, "utf-8"))
-    props = response["properties"]
+    def __init__(self, forecast_periods: List[ForecastPeriod]):
+        self.forecast_periods = forecast_periods
 
-    return GridPoint(props["gridId"], int(props["gridX"]), int(props["gridY"]))
+    def add(self, forecast_period: ForecastPeriod):
+        self.forecast_periods.append(forecast_period)
 
+    def today(self) -> Optional[ForecastPeriod]:
+        """Find the time period with the latest start date for today while
+        ensuring the end date is later than the current time."""
+        best_forecast: Optional[ForecastPeriod] = None
+        now = datetime.now().astimezone()
 
-def get_forecast(location: GridPoint) -> List[ForecastPeriod]:
+        for p in self.forecast_periods:
+            if p.start_time <= now and p.end_time >= now:
+                if not best_forecast:
+                    best_forecast = p
+                elif p.start_time > best_forecast.start_time:
+                    best_forecast = p
+            
+        return best_forecast
+
+def lookup_forecast(location: GridPoint) -> Forecast:
     # TODO: Error handling eg invalid lat/long.
     url = f"https://api.weather.gov/gridpoints/{location.grid_id}/{location.x},{location.y}/forecast"
-    print(url)
     response_bytes = urllib.request.urlopen(url).read()
 
     # TODO: Handle JSON decoding failures.
@@ -213,11 +236,11 @@ def get_forecast(location: GridPoint) -> List[ForecastPeriod]:
     # also unitCode = "wmoUnit:m" along with value
 
     forecasts: List[ForecastPeriod] = []
+
     for p in response["properties"]["periods"]:
         forecasts.append(ForecastPeriod(p))
-        ForecastPeriod(p).debug_print()
 
-    return forecasts
+    return Forecast(forecasts)
 
 
 def main():
@@ -229,10 +252,10 @@ def main():
 
     args = args_parser.parse_args()
 
-    # print("the weather is: ")
-    # print(get_weather_data("sammamish"))
+    forecasts = lookup_forecast(GridPoint.from_noaa_www_lat_long(47.675, -122.1215))
 
-    get_forecast(lookup_noaa_grid_points(47.675, -122.1215))
+    print(f"""Forecast:
+{forecasts.today().detailed_summary}""")
 
 
 if __name__ == "__main__":
