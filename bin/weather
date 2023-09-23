@@ -1,16 +1,198 @@
 #!/usr/bin/env python3
 # vim: set ft=python
 
+from __future__ import annotations
+from typing import List, Literal, Optional, Union
+
+from datetime import datetime
+from enum import Enum
+from pprint import pprint
+
 import argparse
+import json
 import logging
 import sys
+import urllib.request
+
+# NOAA:
+# https://www.weather.gov/documentation/services-web-api
+
+# note: response conteains urls for forecast
+#
+# Also get alerts
+# https://api.weather.gov/alerts/active?area={state}
+# active=true
+#
+# Also consider air quality
 
 # TODO: Set up linting, formatting.
 # TODO: Add typing.
+# TODO: Add logging
 
-# param 1 weather_location
-# param 2 cache time
+class GridPoint:
+    grid_id: str
+    x: int
+    y: int
 
+    def __init__(self, grid_id: str, x: int, y: int) -> None:
+        self.grid_id = grid_id
+        self.x = x
+        self.y = y
+
+class TemperatureType(Enum):
+    f = 'f'
+    c = 'c'
+
+def parse_temperature_type(_type: str) -> TemperatureType:
+    if _type == 'f' or _type == 'F':
+        return TemperatureType.f
+    elif _type == 'c' or _type == 'C':
+        return TemperatureType.c
+    else:
+        assert False, f"Invalid temperature type {_type}"
+
+class Temperature:
+    value: float
+    _type: TemperatureType
+
+    def __init__(self, value: float, _type: Union[str, TemperatureType]) -> None:
+        self.value = value
+        self._type = _type if isinstance(_type, TemperatureType) else parse_temperature_type(_type)
+
+    def __str__(self) -> str:
+        c = 'f' if self._type == TemperatureType.f else 'c'
+        return f"{self.value:.2g}°{c}"
+
+    def f(self) -> Temperature:
+        if self._type == TemperatureType.f:
+            return Temperature(self.value, TemperatureType.f)
+        else:
+            return Temperature(self.value * 1.8 + 32.0, TemperatureType.f)
+
+    def c(self) -> Temperature:
+        if self._type == TemperatureType.f:
+            return Temperature((self.value - 32.0) / 1.8, TemperatureType.c)
+        else:
+            return Temperature(self.value, TemperatureType.c)
+
+def read_unit_percent(json: dict) -> Optional[float]:
+    """Reads a WMO percent unit from { "value": 12.3, "unitCode": "wmoUnit:percent" }"""
+    if json["value"] == None or json["unitCode"] != "wmoUnit:percent":
+        return None
+    else:
+        return float(json["value"])
+
+def read_unit_temperature(json: dict) -> Optional[Temperature]:
+    """Reads a WMO temperature unit from { "value": ..., "unitCode": "wmoUnit:degC|degF" }"""
+    if json["value"] == None:
+        return None
+    elif json["unitCode"] == "wmoUnit:degC":
+        return Temperature(float(json["value"]), TemperatureType.c)
+    elif json["unitCode"] == "wmoUnit:degF":
+        return Temperature(float(json["value"]), TemperatureType.f)
+    else:
+        return None
+
+
+class ForecastPeriod:
+    name: str
+    start_time: datetime
+    end_time: datetime
+    is_daytime: Optional[bool]
+    temperature: Temperature
+
+
+    # TODO: finish slot types
+
+    def __init__(self, json: dict) -> None:
+        self.name = json['name']
+        self.start_time = datetime.fromisoformat(json['startTime'])
+        self.end_time = datetime.fromisoformat(json['endTime'])
+        self.is_daytime = bool(json['isDaytime'])
+        self.temperature = Temperature(json['temperature'], json['temperatureUnit'])
+        self.precip_probability = read_unit_percent(json['probabilityOfPrecipitation'])
+        self.dewpoint = read_unit_temperature(json['dewpoint'])
+        self.relative_humidity = read_unit_percent(json['relativeHumidity'])
+
+        self.temperature_trend = json['temperatureTrend']
+        self.wind_speed = json['windSpeed'] # "10 to 15 mph"   -also-  "15 mph"
+        self.wind_direction = json['windDirection'] # "S"   -also-  "SE"
+        self.icon = json['icon'] # https://...
+        self.short_forecast = json['shortForecast'] # Mostly Suuny
+        self.detailed_forecast = json['detailedForecast'] # text...
+
+    def debug_print(self):
+        print(f"ForecastPeriod")
+        for p in vars(self).items():
+            print(f"\t{p}")
+
+def lookup_noaa_grid_points(lat: float, long: float) -> GridPoint:
+    # TODO: Error handling eg invalid lat/long.
+    response_bytes = urllib.request.urlopen(f"https://api.weather.gov/points/{lat},{long}").read()
+
+    # TODO: Handle JSON decoding failures.
+    # TODO: Check and handle if response is unexpected.
+    response = json.loads(str(response_bytes, 'utf-8'))
+    props = response['properties']
+
+    return GridPoint(props['gridId'], int(props['gridX']), int(props['gridY']))
+
+def get_forecast(location: GridPoint) -> List[ForecastPeriod]:
+    # TODO: Error handling eg invalid lat/long.
+    url = f"https://api.weather.gov/gridpoints/{location.grid_id}/{location.x},{location.y}/forecast"
+    print(url)
+    response_bytes = urllib.request.urlopen(url).read()
+
+    # TODO: Handle JSON decoding failures.
+    # TODO: Check and handle if response is unexpected.
+    response = json.loads(str(response_bytes, 'utf-8'))
+
+    # TODO: capture remainder of fields and encapsulate into class:
+    props = response['properties']
+    generated_at = props['generatedAt'] # "2023-09-19T17:52:33+00:00",
+    update_time = props['updateTime'] # ^^^^
+    valid_time = props['validTimes'] # "2023-09-19T11:00:00+00:00/P7DT14H"
+    elevation = props['elevation']['value'] # 456.8951999
+    # also unitCode = "wmoUnit:m" along with value
+
+    forecasts: List[ForecastPeriod] = []
+    for p in response['properties']['periods']:
+        forecasts.append(ForecastPeriod(p))
+        ForecastPeriod(p).debug_print()
+
+    return forecasts
+
+class WttrWeatherData:
+    def __init__(self, response_str):
+        parts = response_str.split(';')
+        
+        self.location_name = parts[0]
+        self.condition_grapheme = parts[1]
+        self.condition_str = parts[2]
+        self.temp = parts[3]
+        self.precipitation = parts[4]
+        self.pressure = parts[5]
+        self.moon = parts[6]
+        self.sun = parts[7]
+        self.sunset = parts[8]
+        self.sunrise = parts[9]
+        self.humidity = parts[10]
+
+        pprint(self)
+
+def get_weather_data(location):
+    contents_bytes = urllib.request.urlopen(f"http://wttr.in/{location}?format=%l;%c;%C;%t;%p;%P;%m;%s;%S;%h").read()
+    contents = str(contents_bytes, 'utf-8')
+    print(f"type: {type(contents)}")
+    print(f"weather: {contents}")
+
+    weather_data = WttrWeatherData(contents)
+
+    #location_name, cond, cond_full, temp, precip, pressure, moon, sunset, sunrise, humidity = contents.split(';')
+
+    #print(f"cond: {cond}, cont_full: {cond_full}, temp: {temp}, precip: {precip}")
+
+    return contents
 
 def main():
     # Parse command line options.
@@ -21,7 +203,10 @@ def main():
 
     args = args_parser.parse_args()
 
-    print(f"hello world {args.location}")
+    #print("the weather is: ")
+    #print(get_weather_data("sammamish"))
+
+    get_forecast(lookup_noaa_grid_points(47.675, -122.1215))
 
 
 if __name__ == "__main__":
