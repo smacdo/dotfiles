@@ -4,7 +4,7 @@
 from __future__ import annotations
 from typing import List, Literal, Optional, Union
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pprint import pprint
 
@@ -203,20 +203,34 @@ class Forecast:
     def add(self, forecast_period: ForecastPeriod):
         self.forecast_periods.append(forecast_period)
 
-    def today(self) -> Optional[ForecastPeriod]:
+    def day(self, num_days_from_today: int) -> Optional[ForecastPeriod]:
         """Find the time period with the latest start date for today while
         ensuring the end date is later than the current time."""
         best_forecast: Optional[ForecastPeriod] = None
-        now = datetime.now().astimezone()
+        # FIXME(scott): This will select "$ Night" if now() hour > 18
+        dt = datetime.now().astimezone() + timedelta(days = num_days_from_today)
 
         for p in self.forecast_periods:
-            if p.start_time <= now and p.end_time >= now:
+            if p.start_time <= dt and p.end_time >= dt:
                 if not best_forecast:
                     best_forecast = p
-                elif p.start_time > best_forecast.start_time:
+                elif p.start_time < best_forecast.start_time:
                     best_forecast = p
             
         return best_forecast
+
+    def today(self) -> Optional[ForecastPeriod]:
+        for p in self.forecast_periods:
+            if p.name == "Today":
+                return p
+        return None
+
+    def tonight(self) -> Optional[ForecastPeriod]:
+        for p in self.forecast_periods:
+            if p.name == "Tonight":
+                return p
+        return None
+
 
 def lookup_forecast(location: GridPoint) -> Forecast:
     # TODO: Error handling eg invalid lat/long.
@@ -242,6 +256,9 @@ def lookup_forecast(location: GridPoint) -> Forecast:
 
     return Forecast(forecasts)
 
+def print_summary(forecast_period): 
+    print(f"""\n{forecast_period.name}:\n{forecast_period.detailed_summary}""")
+
 
 def main():
     # Parse command line options.
@@ -254,8 +271,14 @@ def main():
 
     forecasts = lookup_forecast(GridPoint.from_noaa_www_lat_long(47.675, -122.1215))
 
-    print(f"""Forecast:
-{forecasts.today().detailed_summary}""")
+    if forecasts.today():
+        print_summary(forecasts.today())
+
+    if forecasts.tonight():
+        print_summary(forecasts.tonight())
+
+    if forecasts.day(1):
+        print_summary(forecasts.day(1))
 
 
 if __name__ == "__main__":
