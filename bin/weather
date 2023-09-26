@@ -52,7 +52,6 @@ class GridPoint:
         return GridPoint(props["gridId"], int(props["gridX"]), int(props["gridY"]))
 
 
-
 class TemperatureType(Enum):
     """Describes a unit of measurement for temperature"""
 
@@ -95,7 +94,6 @@ class Temperature:
             return Temperature(float(json["value"]), TemperatureType.f)
         else:
             return None
-
 
     def __str__(self) -> str:
         c = "f" if self._type == TemperatureType.f else "c"
@@ -200,7 +198,7 @@ class Forecast:
     def __init__(self, forecast_periods: List[ForecastPeriod]):
         self.forecast_periods = forecast_periods
 
-    def add(self, forecast_period: ForecastPeriod):
+    def add(self, forecast_period: ForecastPeriod) -> None:
         self.forecast_periods.append(forecast_period)
 
     def day(self, num_days_from_today: int) -> Optional[ForecastPeriod]:
@@ -208,7 +206,7 @@ class Forecast:
         ensuring the end date is later than the current time."""
         best_forecast: Optional[ForecastPeriod] = None
         # FIXME(scott): This will select "$ Night" if now() hour > 18
-        dt = datetime.now().astimezone() + timedelta(days = num_days_from_today)
+        dt = datetime.now().astimezone() + timedelta(days=num_days_from_today)
 
         for p in self.forecast_periods:
             if p.start_time <= dt and p.end_time >= dt:
@@ -216,7 +214,7 @@ class Forecast:
                     best_forecast = p
                 elif p.start_time < best_forecast.start_time:
                     best_forecast = p
-            
+
         return best_forecast
 
     def today(self) -> Optional[ForecastPeriod]:
@@ -256,7 +254,8 @@ def lookup_forecast(location: GridPoint) -> Forecast:
 
     return Forecast(forecasts)
 
-def print_summary(forecast_period): 
+
+def print_summary(forecast_period):
     print(f"""\n{forecast_period.name}:\n{forecast_period.detailed_summary}""")
 
 
