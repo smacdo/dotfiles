@@ -201,21 +201,31 @@ class Forecast:
     def add(self, forecast_period: ForecastPeriod) -> None:
         self.forecast_periods.append(forecast_period)
 
-    def day(self, num_days_from_today: int) -> Optional[ForecastPeriod]:
-        """Find the time period with the latest start date for today while
-        ensuring the end date is later than the current time."""
-        best_forecast: Optional[ForecastPeriod] = None
-        # FIXME(scott): This will select "$ Night" if now() hour > 18
-        dt = datetime.now().astimezone() + timedelta(days=num_days_from_today)
+    def day(self, num_days_from_today: int) -> List[ForecastPeriod]:
+        """Get all forecast periods (usually day, night) for the day that is `num_days_from_today`
+        ahead of today."""
+
+        # Calculate the start of the requested day.
+        now = datetime.now().astimezone()
+        day_start = datetime(now.year, now.month, now.day).astimezone() + timedelta(
+            days=num_days_from_today
+        )
+
+        # Find all forecast periods falling within the requested day.
+        forecast_periods: List[ForecastPeriod] = []
 
         for p in self.forecast_periods:
-            if p.start_time <= dt and p.end_time >= dt:
-                if not best_forecast:
-                    best_forecast = p
-                elif p.start_time < best_forecast.start_time:
-                    best_forecast = p
+            if (
+                p.start_time.year == day_start.year
+                and p.start_time.month == day_start.month
+                and p.start_time.day == day_start.day
+            ):
+                forecast_periods.append(p)
 
-        return best_forecast
+        # Ensure the returned list has periods sorted in ascending order
+        # (the earliest period is first)
+        sorted(forecast_periods, key=lambda x: x.start_time)
+        return forecast_periods
 
     def today(self) -> Optional[ForecastPeriod]:
         for p in self.forecast_periods:
@@ -263,21 +273,33 @@ def main():
     # Parse command line options.
     args_parser = argparse.ArgumentParser(description="does neat stuff")
 
+    args_parser.add_argument("time_period_or_action", nargs="?", default="now")
     args_parser.add_argument("-l", "--location")
     args_parser.add_argument("--cache_time_secs", default=10 * 60)
 
     args = args_parser.parse_args()
 
+    # Get weather forecast for region.
     forecasts = lookup_forecast(GridPoint.from_noaa_www_lat_long(47.675, -122.1215))
 
-    if forecasts.today():
-        print_summary(forecasts.today())
+    # Print forecast information depending on what user asked for.
+    if args.time_period_or_action == "now":
+        if forecasts.today():
+            print_summary(forecasts.today())
 
-    if forecasts.tonight():
-        print_summary(forecasts.tonight())
+        if forecasts.tonight():
+            print_summary(forecasts.tonight())
 
-    if forecasts.day(1):
-        print_summary(forecasts.day(1))
+        # Print the first forecast period of tomorrow.
+        tomorrow_forecasts = forecasts.day(1)
+
+        if len(tomorrow_forecasts) > 0:
+            print_summary(tomorrow_forecasts[0])
+    elif args.time_period_or_action == "tomorrow":
+        for period in forecasts.day(1):
+            print_summary(period)
+    else:
+        print(f"*** unknown time period or action: {args.time_period_or_action} ***")
 
 
 if __name__ == "__main__":
