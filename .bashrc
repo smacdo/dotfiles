@@ -102,8 +102,10 @@ set_colored_prompt
 # Load bash auto-completions.
 # TODO: Finish this for debian, fedora, windows installs.
 if is_osx; then
-  [[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \
-    . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+  if type brew &>/dev/null; then
+    [[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \
+      . "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+  fi
 fi
 
 [[ -r "/usr/share/bash-completion/bash_completion" ]] && \

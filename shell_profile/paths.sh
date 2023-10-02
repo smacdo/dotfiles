@@ -50,7 +50,17 @@ add_path_back() {
 add_path_back "$HOME/.cargo/bin"
 
 # Support local homebrew installs (~/homebrew)
-add_path_front "$HOME/homebrew/bin"
+#
+# NOTE: The new preferred local dir for homebrew is `.homebrew`. Continue to
+#       support the older directory but only add it if it is detected. Add the
+#       other path by default to allow the case of booting into this profile,
+#       installing Homebrew locally and then commands should "just work".
+if [ -d "$HOME/homebrew/bin" ]; then
+  add_path_front "$HOME/homebrew/bin"
+fi
+
+add_path_front "$HOME/.homebrew/bin"
+add_path_front "$HOME/.homebrew/sbin"
 
 # Also support scripts from dotfiles (this will override ~/homebrew).
 add_path_back "$S_DOTFILE_ROOT/bin"

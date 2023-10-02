@@ -95,8 +95,10 @@ set -o noclobber
 
 # Use the powerlevel10k theme or warn if not installed.
 if is_osx; then
-  if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-      source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
+  if type brew &>/dev/null; then
+    if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+        source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
+    fi
   fi
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
@@ -133,8 +135,10 @@ compinit
 # line must be last in the .zshrc file.
 # TODO: Source the correct path on Debian, Fedora, Windows.
 if is_osx; then
-  [[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
-    || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  if type brew &>/dev/null; then
+    [[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+      || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+  fi
 else
   [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
