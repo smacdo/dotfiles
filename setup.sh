@@ -55,9 +55,11 @@ init_homebrew() {
   if [ "$USE_LOCAL_BREW" -eq 1 ]; then
     # Local homebrew.
     print_action "Installing Homebrew (user local)"
-    mkdir "$HOME"/homebrew && \
+    mkdir "$HOME"/.homebrew && \
+      pushd "$HOME"/.homebrew &&  \
       curl -L https://github.com/Homebrew/brew/tarball/master | \
-      tar xz --strip 1 -C "$HOME"/homebrew
+      tar xz --strip 1 -C "$HOME"/.homebrew &&
+      popd
   else
     # System homebrew install.
     print_action "Installing Homebrew (global)"
