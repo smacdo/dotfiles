@@ -20,9 +20,10 @@ USE_LOCAL_BREW=0
 ################################################################################
 install_pkg_mac() {
   # Only run this on MacOS platforms.
+  # Assumes Homebrew is installed and available in $PATH.
   if is_osx; then
     print_action Installing packages: "$@"
-    "$HOME"/homebrew/bin/brew install "$@"
+    brew install "$@"
   fi
 }
 
@@ -66,9 +67,6 @@ init_homebrew() {
     /bin/bash -c \
       "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   fi
-
-  # TODO: Needed?
-  # export PATH=${HOME}/homebrew/bin:${PATH}
 }
 
 update_package_manager() {
