@@ -96,7 +96,9 @@ set -o noclobber
 # Use the powerlevel10k theme or warn if not installed.
 if is_osx; then
   if type brew &>/dev/null; then
-    if [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+    if [[ -f "$(brew --prefix)/share/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+        source "$(brew --prefix)/share/powerlevel10k/powerlevel10k.zsh-theme"
+    elif [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
         source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
     fi
   fi

@@ -118,7 +118,7 @@ install_core_packages() {
   # Bash and ZSH shells with additional plugins.
   install_pkg_mac \
     bash bash-completion \
-    zsh zsh-completions zsh-syntax-highlighting romkatv/powerlevel10k/powerlevel10k
+    zsh zsh-completions zsh-syntax-highlighting powerlevel10k
 
   install_pkg_redhat \
     bash bash-completion \
