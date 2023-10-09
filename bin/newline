@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+# vim: set ft=python
+
+from __future__ import annotations
+from enum import Enum
+from typing import List, Optional, TextIO, TYPE_CHECKING
+
+import argparse
+import io
+import sys
+import unittest
+
+# TODO: Tests
+
+DOS_LINE_ENDING = b"\r\n"
+UNIX_LINE_ENDING = b"\n"
+
+class UnsupportedLineEnding(Exception):
+    def __init__(self, to_ending: LineEnding, *args, **kwargs):
+        super().__init__(
+            f"The conversion could not be performed because the requested line ending {to_ending} is not supported",
+            *args,
+            **kwargs)
+
+
+class UnknownLineEndingName(Exception):
+    def __init__(self, ending_name: str, *args, **kwargs):
+        super().__init__(
+            f"The line ending name '{ending_name}' was not recogonized",
+            *args,
+            **kwargs)
+
+
+class LineEnding(Enum):
+    dos = "dos"
+    unix = "unix"
+    mixed = "mixed"
+    invalid = "invalid"
+
+    @staticmethod
+    def parse(s: str) -> LineEnding:
+        if s == "dos":
+            return LineEnding.dos
+        elif s == "unix":
+            return LineEnding.unix
+        else:
+            raise UnknownLineEndingName(s)
+
+
+class OutputMode(Enum):
+    text = "text"
+
+
+def detect_line(line: bytes) -> LineEnding:
+    if line.endswith(DOS_LINE_ENDING):
+        return LineEnding.dos
+    elif line.endswith(UNIX_LINE_ENDING):
+        return LineEnding.unix
+    else:
+        return LineEnding.invalid
+
+
+def detect(file: io.BufferedReader) -> Optional[LineEnding]:
+    mode = None
+
+    for line in file:
+        line_mode = detect_line(line)
+        mode = line_mode if mode == None or mode == line_mode else LineEnding.mixed
+
+    return mode
+
+def perform_detect(filepath: str) -> None:
+    with open(filepath, "rb") as file:
+        print(f"{filepath}: {detect(file)}")
+
+def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
+    if to_ending == LineEnding.dos:
+        return buffer.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
+    elif to_ending == LineEnding.unix:
+        return buffer.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
+    else:
+        raise UnsupportedLineEnding(to_ending)
+
+def perform_convert(filepath: str, to_ending: Optional[LineEnding]) -> None:
+    # If the line_ending was not specified then detect the file line ending and
+    # convert to its opposite (dox <-> unix).
+    if to_ending == None:
+        with open(filepath, "rb") as file:
+            from_ending = detect(file)
+            if from_ending == None:
+                return
+            else:
+                to_ending = LineEnding.unix if from_ending == LineEnding.dos else LineEnding.dos
+        print(f"{filepath}: {from_ending} -> {to_ending}")
+    else:
+        print(f"{filepath}: -> {to_ending}")
+
+    # Convert the file to the requested ending.
+    with open(filepath, "rb") as file:
+        file_contents = file.read()
+
+    if to_ending == LineEnding.dos:
+        file_contents = file_contents.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
+    else:
+        file_contents = file_contents.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
+
+    # Write the converted file out.
+    with open(filepath, "wb") as file:
+        file.write(file_contents)
+
+#==============================================================================#
+# main                                                                         #
+#==============================================================================#
+def main() -> None:
+    # Argument parsing
+    #  - Read stdin or one or more input files.
+    #  - Write stdout or one or more output files.
+    args_parser = argparse.ArgumentParser(description="convert between dos and unix newlines")
+
+    args_parser.add_argument("-c", "--convert", choices=["dos", "unix"], help="Line ending to convert to")
+    args_parser.add_argument("-d", "--detect", action="store_true", help="Report the type of line endings used in file")
+    args_parser.add_argument("inputs", nargs="+", help="One or more input files")
+
+    args = args_parser.parse_args()
+
+    # Convert each input file or print their detect line ending type depending
+    # on user flags.
+    if len(args.inputs) == 0:
+        # TODO: Support stdin and stdout when there are no input files.
+        raise Exception("*** TODO: Support stdin/stdout ***")
+    else:
+        for filepath in args.inputs:
+            if args.detect:
+                perform_detect(filepath)
+            else:
+                perform_convert(filepath, LineEnding.parse(args.convert))
+
+
+if __name__ == '__main__':
+    unittest.main()
+    main()
+
+
+#==============================================================================#
+# unit tests                                                                   #
+#==============================================================================#
+class DetectLineEndingTests(unittest.TestCase):
+    def test_dos(self):
+        pass
