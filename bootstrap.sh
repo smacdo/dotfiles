@@ -64,9 +64,6 @@ main() {
   safe_symlink "$checkout_dir/.gitconfig" "$HOME/.gitconfig"
   make_local_config "$checkout_dir/settings/localdots/my_gitconfig" \
                     "$HOME/.my_gitconfig"
-  safe_symlink "$checkout_dir/settings/nvim/init.vim" \
-               "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
-  safe_symlink "$checkout_dir/settings/nvim/init.vim" "$HOME/.vimrc"
   safe_symlink "$checkout_dir/.vim" "$HOME/.vim"
   safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
   safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
@@ -78,6 +75,14 @@ main() {
   safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
   safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
   safe_symlink "$checkout_dir/.profile" "$HOME/.zshenv"
+
+  # Neovim should share most of its configs with vim to reduce duplication since
+  # I can't always be sure if neovim is installed on the local machine.
+  safe_symlink "$checkout_dir/settings/nvim/init.vim" \
+               "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/init.vim"
+  safe_symlink "$checkout_dir/settings/nvim/init.vim" "$HOME/.vimrc"
+  safe_symlink "$checkout_dir/settings/nvim/site/plugin" \
+               "${XDG_DATA_HOME:-$HOME/.config}/nvim/site/plugin"
 
   # Install plugin managers for vim and neovim.
   # (Does not require either to be installed for this to work).
