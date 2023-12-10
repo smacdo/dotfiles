@@ -130,8 +130,10 @@ install_core_packages() {
 
   # Common command line tools.
   # TODO: Move terminal-notifier to a desktop package.
-  install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux vim wget
-  install_pkg_redhat fzf git-lfs htop neovim ripgrep tmux vim vim-enhanced wget
+  install_pkg_mac fzf git git-lfs htop neovim ripgrep terminal-notifier tmux vim wget \
+    imagemagick
+  install_pkg_redhat fzf git-lfs htop neovim ripgrep tmux vim vim-enhanced wget \
+    imagemagick
 
   # GNU core utilities to simplify cross platform scripts.
   # (Should already be installed on Linux distros).
@@ -183,8 +185,8 @@ install_vscode() {
 }
 
 install_cpp() {
-  install_pkg_mac make cmake llvm clang-format
-  install_pkg_redhat make automake gcc gcc-c++
+  install_pkg_mac make cmake llvm clang-format doxygen ninja
+  install_pkg_redhat make automake gcc gcc-c++ doxygen ninja
 }
 
 ################################################################################
