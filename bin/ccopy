@@ -38,22 +38,36 @@ main() {
   shift "$(($OPTIND -1))"
 
   # Command to copy is different on different platforms.
-  if is_osx ; then
-    if [ -n "$input_file" ]; then
-      verbose "Using file as input source: $input_file"
+  if [ -n "$input_file" ]; then
+    verbose "Using file as input source: $input_file"
+
+    if is_osx; then
       cat "$input_file" | pbcopy
-    elif [ "$#" -gt 0 ]; then
-      verbose "Using command args as input source: $*"
-      echo "$*" | pbcopy
+    elif is_linux; then
+      cat "$input_file" | xsel -i
     else
-      verbose "Using stdin as input source"
-      pbcopy
+      exit_with_message 2 "platform not supported"
     fi
-  elif is_linux ; then
-    # TODO: Finish implementation on linux after verifying OK.
-    xsel -i < "$1"
+  elif [ "$#" -gt 0 ]; then
+    verbose "Using command args as input source: $*"
+
+    if is_osx; then
+      echo "$*" | pbcopy
+    elif is_linux; then
+      echo "$*" | xsel -i
+    else
+      exit_with_message 2 "platform not supported"
+    fi
   else
-    exit_with_message 2 "This platform is not supported yet"
+    verbose "Using stdin as input source"
+
+    if is_osx; then
+      pbcopy
+    elif is_linux; then
+      xsel -i
+    else
+      exit_with_message 2 "platform not supported"
+    fi
   fi
 }
 

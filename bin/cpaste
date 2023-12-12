@@ -5,7 +5,7 @@
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
 print_help() {
-  echo "Cross platform tool to paste text from the system clipboard to stdout"
+  echo "Cross platform tool to paste text from the system clipboard to stdout."
   echo "Usage: $(basename $0) [-V]"
 }
 
@@ -31,7 +31,7 @@ main() {
   if is_osx ; then
     pbpaste
   elif is_linux ; then
-    exit_with_message 2 "Linux support missing"
+    xsel -o
   else
     exit_with_message 2 "This platform is not supported yet"
   fi
