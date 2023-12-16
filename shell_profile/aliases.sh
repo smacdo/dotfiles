@@ -50,9 +50,6 @@ alias ..3='../../..'
 alias .....='../../../..'
 alias ..4='../../../..'
 
-# Get my remote (public) ip address.
-alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
-
 # Get my local IP address.
 alias localip="ip -o addr show up primary scope global | grep -o 'inet6\? [0-9a-f\.:]*' | cut -f 2 -d ' '"
 

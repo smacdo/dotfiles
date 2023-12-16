@@ -1,0 +1,40 @@
+#!/bin/sh
+# Pretty prints JSON text to the command line.
+. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+print_help() {
+  echo "Pretty print JSON text from stdin or a file to the terminal."
+  echo "Usage: $(basename $0) [-f path/to/input]"
+}
+
+main() {
+  while getopts 'hf:' opt; do
+    case "$opt" in
+      h) print_help
+         exit
+         ;;
+      f) input_file="$OPTARG"
+         ;;
+      ?) print_help
+         exit 2
+         ;;
+    esac
+  done
+
+  # Remove processed arguments.
+  shift "$((OPTIND -1))"
+
+  # Open JSON file or use standard input?
+  if [ -n "$input_file" ]; then
+    if [ ! -f "$input_file" ]; then
+      exit_with_message 3 "Input file does not exist: $input_file"
+    fi
+
+    cat "$input_file" | python -mjson.tool
+  else
+    python -mjson.tool "$@"
+  fi
+}
+
+main "$@"
