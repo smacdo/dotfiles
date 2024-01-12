@@ -5,7 +5,7 @@
 
 print_help() {
   echo "Pretty print JSON text from stdin or a file to the terminal."
-  echo "Usage: $(basename $0) [-f path/to/input]"
+  echo "Usage: $(basename "$0") [-f path/to/input]"
 }
 
 main() {
@@ -31,9 +31,9 @@ main() {
       exit_with_message 3 "Input file does not exist: $input_file"
     fi
 
-    cat "$input_file" | python -mjson.tool
+    python3 -mjson.tool < "$input_file"
   else
-    python -mjson.tool "$@"
+    python3 -mjson.tool "$@"
   fi
 }
 

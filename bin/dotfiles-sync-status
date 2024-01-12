@@ -28,7 +28,7 @@ print_repo_status() {
     exit 1
   fi
 
-  if [ ! "$(basename $(git -C "$r_dir" remote get-url origin))" == "dotfiles.git" ]; then
+  if [ ! "$(basename "$(git -C "$r_dir" remote get-url origin)")" = "dotfiles.git" ]; then
     echo "This does not look like a $r_name git repo checkout"
     exit 1
   fi

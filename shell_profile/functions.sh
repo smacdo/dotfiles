@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ## Author: Scott MacDonald <scott@smacdo.com
 ## Created: 09/29/2020 
 ## Purpose: Shell functions shared between bash/zsh/etc.
@@ -236,14 +236,14 @@ man() {
   # ue: End underline, reset formatting.
 
   env \
-    LESS_TERMCAP_mb=$(tput bold; tput setaf 2)               \
-    LESS_TERMCAP_md=$(tput bold; tput setaf 6)               \
-    LESS_TERMCAP_me=$(tput sgr0)                             \
-    LESS_TERMCAP_so=$(tput smso; tput setaf 3; tput setab 4) \
-    LESS_TERMCAP_se=$(tput rmso; tput sgr0)                  \
-    LESS_TERMCAP_us=$(tput smul; tput setaf 5)               \
-    LESS_TERMCAP_ue=$(tput rmul; tput sgr0)                  \
-    GROFF_NO_SGR=1                                           \
+    LESS_TERMCAP_mb="$(tput bold; tput setaf 2)"               \
+    LESS_TERMCAP_md="$(tput bold; tput setaf 6)"               \
+    LESS_TERMCAP_me="$(tput sgr0)"                             \
+    LESS_TERMCAP_so="$(tput smso; tput setaf 3; tput setab 4)" \
+    LESS_TERMCAP_se="$(tput rmso; tput sgr0)"                  \
+    LESS_TERMCAP_us="$(tput smul; tput setaf 5)"               \
+    LESS_TERMCAP_ue="$(tput rmul; tput sgr0)"                  \
+    GROFF_NO_SGR=1                                             \
     man "$@"
 }
 

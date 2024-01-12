@@ -54,8 +54,8 @@ main() {
   fi
 
   # Grab escape codes for bold / unbold to aid in highlighting the current line.
-  hl_s=$'\033[1m'
-  hl_e=$'\033[0m'
+  hl_s=$(printf '\033[1m')
+  hl_e=$(printf '\033[0m')
 
   # Extract and format lines.
   sed -n "$line,$((line + 10))"p "$file" | # Extract 10 lines starting at...

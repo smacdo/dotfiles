@@ -6,7 +6,7 @@
 
 print_help() {
   echo "Cross platform tool to lock the current desktop session."
-  echo "Usage: $(basename $0) [-V]"
+  echo "Usage: $(basename "$0") [-V]"
 }
 
 main() {
@@ -26,7 +26,7 @@ main() {
 
   # Try to use a native tool to lock the screen before using a platform
   # specific invocation.
-  if command -v screenlocker &> /dev/null; then
+  if command -v screenlocker > /dev/null 2>&1 ; then
     verbose "using screenlocker to lock the screen"
     screenlocker
   else

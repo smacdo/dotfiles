@@ -42,7 +42,7 @@ help() {
 #
 ################################################################################
 main() {
-  while getopts "uHVi:" opt; do
+  while getopts "uhVp:" opt; do
     case "$opt" in
       u)
         update_packages

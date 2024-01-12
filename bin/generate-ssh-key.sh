@@ -32,11 +32,13 @@ fi
 if ! grep -qF "IdentityFile ~/.ssh/$keyname" "$configPath"; then
   echo "Adding entry for $keyname to $configPath"
 
-  echo "Host *" >> "$configPath"
-  echo " IgnoreUnknown UseKeychain" >> "$configPath" 
-  echo " AddKeysToAgent yes" >> "$configPath"
-  echo " UseKeychain yes" >> "$configPath"
-  echo " IdentityFile ~/.ssh/$keyname" >> "$configPath"
+  {
+    echo "Host *"
+    echo " IgnoreUnknown UseKeychain"
+    echo " AddKeysToAgent yes"
+    echo " UseKeychain yes"
+    echo " IdentityFile ~/.ssh/$keyname"
+  } >> "$configPath"
 fi
 
 echo "Adding $keyname to ssh-agent"

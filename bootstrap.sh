@@ -31,12 +31,12 @@ main() {
   fi
 
   # Bail out if this script is not running in the root of a dotfiles repo dir.
-  if [ ! "$(basename $(git remote get-url origin))" == "dotfiles.git" ]; then
+  if [ ! "$(basename "$(git remote get-url origin)")" = "dotfiles.git" ]; then
     echo "${red}This does not look like a dotfiles git repo checkout${normal}"
     exit 1
   fi
 
-  if [ ! "$(git rev-parse --show-toplevel 2>/dev/null)" == "$PWD" ]; then
+  if [ ! "$(git rev-parse --show-toplevel 2>/dev/null)" = "$PWD" ]; then
     echo "${red}Please run this script from the dotfiles root dir${normal}"
     exit 1
   fi

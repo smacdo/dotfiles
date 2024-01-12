@@ -56,11 +56,12 @@ init_homebrew() {
   if [ "$USE_LOCAL_BREW" -eq 1 ]; then
     # Local homebrew.
     print_action "Installing Homebrew (user local)"
+    dir_to_return_to=$(pwd)
     mkdir "$HOME"/.homebrew && \
-      pushd "$HOME"/.homebrew &&  \
+      cd "$HOME"/.homebrew && \
       curl -L https://github.com/Homebrew/brew/tarball/master | \
       tar xz --strip 1 -C "$HOME"/.homebrew &&
-      popd
+      cd "$dir_to_return_to" || exit 1
   else
     # System homebrew install.
     print_action "Installing Homebrew (global)"
@@ -99,9 +100,9 @@ install_zsh_powerlevel() {
     # Already installed, pull any updates.
     echo "Powerlevel10k installed - will pull updates"
     current_dir=$(pwd)
-    cd "$p10kdir"
+    cd "$p10kdir" ||  exit 1
     git pull
-    cd "$current_dir"
+    cd "$current_dir" || exit 1
   else 
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$p10kdir"
   fi
@@ -243,9 +244,9 @@ install_package() {
   update_package_manager
   install_build_tools
 
-  if [ "$package" == "core" ]; then
+  if [ "$package" = "core" ]; then
     install_core_packages
-  elif [ "$package" == "vscode" ]; then
+  elif [ "$package" = "vscode" ]; then
     install_vscode
   else
     error "Unknown package '$package'"
@@ -279,7 +280,7 @@ install_build_tools() {
   # Rust foundation so it should be safe to trust...
   # TODO: Can we silence the text about env var path not being set up?
   if is_osx || is_redhat; then
-    if ! command -v rustup &> /dev/null; then
+    if ! command -v rustup > /dev/null 2>&1 ; then
       print_action "installing rust..."
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
     else
@@ -314,12 +315,12 @@ apply_settings_for() {
 configure_local_configs() {
   # Configure local version control values.
   printf "Name for version control: "
-  read VC_USERNAME
+  read -r VC_USERNAME
 
   printf "Email for version control: "
-  read VC_EMAIL
+  read -r VC_EMAIL
 
-  VC_EMAIL=$(printf "$VC_EMAIL" | sed 's/@/\\@/')
+  VC_EMAIL=$(printf "%s" "$VC_EMAIL" | sed 's/@/\\@/')
 
   # TODO: Confirm before applying.
 

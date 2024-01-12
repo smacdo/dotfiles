@@ -28,8 +28,12 @@ main() {
       V) set_verbose 1
         shift 1
         ;;
+      *)
+        # Ignore unknown arguments and pass them to sublime
     esac
   done
+
+  echo "args: $*"
 
   # Locate Sublime depending on current platform.
   if is_osx ; then

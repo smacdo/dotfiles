@@ -7,14 +7,15 @@
 # Print all possible (256) color backgrounds and then foregrounds.
 echo "----- 256 Background Colors -----"
 for i in {0..255}; do
-    echo -n "$(tput setab $i) $i "
+    echo -n "$(tput setab "$i") $i "
 done
 
-echo $(tput sgr0)
+echo -n "$(tput sgr0)"
 
 echo "----- 256 Foreground Colors -----"
 for i in {0..255}; do
-    echo -n "$(tput setaf $i) $i "
+    echo -n "$(tput setaf "$i") $i "
 done
 
-echo $(tput sgr0)
+echo -n "$(tput sgr0)"
+echo

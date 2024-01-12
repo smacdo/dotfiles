@@ -6,11 +6,11 @@
 
 print_help() {
   echo "Cross platform tool to copy text from stdin to the system clipboard."
-  echo "Usage: $(basename $0) [-V] [-f path/to/input] [text...]"
+  echo "Usage: $(basename "$0") [-V] [-f path/to/input] [text...]"
   echo
-  echo "To copy text from a file:       $(basename $0) -f path/to/file"
-  echo " .. or directly from arguments: $(basename $0) your text here"
-  echo " .. or from standard input:     $(basename $0)"
+  echo "To copy text from a file:       $(basename "$0") -f path/to/file"
+  echo " .. or directly from arguments: $(basename "$0") your text here"
+  echo " .. or from standard input:     $(basename "$0")"
 }
 
 main() {
@@ -35,16 +35,16 @@ main() {
   done
 
   # Remove process arguments.
-  shift "$(($OPTIND -1))"
+  shift "$((OPTIND -1))"
 
   # Command to copy is different on different platforms.
   if [ -n "$input_file" ]; then
     verbose "Using file as input source: $input_file"
 
     if is_osx; then
-      cat "$input_file" | pbcopy
+      pbcopy < "$input_file"
     elif is_linux; then
-      cat "$input_file" | xsel -i
+      xsel -i < "$input_file"
     else
       exit_with_message 2 "platform not supported"
     fi

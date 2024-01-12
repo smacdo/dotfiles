@@ -61,7 +61,7 @@ read_2fac() {
 
   # TODO: Better prompt (same line, maybe colored)
   echo "Please login with 2factor authentication: "
-  read VPN_2FAC_PASSWORD
+  read -r VPN_2FAC_PASSWORD
 
   # TODO: Detect presence of yubiswitch and then use this.
   # Or use &> /dev/null
@@ -77,7 +77,7 @@ kill_anyconnect() {
   if is_verbose ; then
     pkill -9 "$anyconnect_name"
   else
-    pkill -9 "$anyconnect_name" &> /dev/null
+    pkill -9 "$anyconnect_name" > /dev/null 2>&1
   fi
 }
 
@@ -129,16 +129,16 @@ connect() {
   print_action "Connecting to VPN... (this might take a second; ignore any prompts)"
 
   if is_verbose ; then
-    printf "$password\n" | "$anyconnect_bin" -s connect "$host"
+    printf "%s\n" "$password" | "$anyconnect_bin" -s connect "$host"
   else
-    printf "$password\n" | "$anyconnect_bin" -s connect "$host" &> /dev/null
+    printf "%s\n" "$password" | "$anyconnect_bin" -s connect "$host" > /dev/null 2>&1
   fi
 
   # Relaunch the GUI?
   if is_verbose ; then
-    osascript -e "open app "$anyconnect_name""
+    osascript -e "open app $anyconnect_name"
   else
-    osascript -e "open app "$anyconnect_name"" &> /dev/null
+    osascript -e "open app $anyconnect_name" > /dev/null 2>&1
   fi
 
   # Print new connection state.
@@ -162,7 +162,7 @@ disconnect() {
   if is_verbose ; then 
     "$anyconnect_bin" disconnect
   else
-    "$anyconnect_bin" disconnect &> /dev/null
+    "$anyconnect_bin" disconnect > /dev/null 2>&1
   fi
 
   # Print new connection state.
