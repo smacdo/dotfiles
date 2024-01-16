@@ -1,108 +1,154 @@
 #!/usr/bin/env python3
 # Author: Scott MacDonald <scott@smacdo.com>
 # Purpose: CI linter for the dotfiles repository.
-#
-# Working directory must be root of dotfiles.
 import logging
 import os
 import shutil
 import subprocess
 
+SH_EXTS = [".sh"]
+SH_SHEBANGS = ["#!/bin/sh", "#!/bin/bash"]
+
+PY_EXTS = [".py"]
+PY_SHEBANGS = ["#!/usr/bin/env python3"]
+
+BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
+DOTFILES_SH_SCRIPTS = ["bootstrap.sh", "setup.sh"]
 
 ################################################################################
-# Lint all shellscripts in the repo
+# Lint a list of shell scripts, and return a list of files that failed a linter
+# check.
 ################################################################################
-def lint_all_shell_scripts() -> int:
-    # Lint sh and bash shell script files.
-    if shutil.which("shellcheck") == None:
+def lint_sh_files(file_paths: list[str]) -> list[str]:
+    # Make sure linter tool is available.
+    if shutil.which("shellcheck") is None:
         raise Exception("cannot lint shell scripts - shellcheck not found")
 
-    SHELL_PROFILE_SCRIPTS = [".bash_profile", ".bashrc"]
-    SHELL_REPO_SCRIPTS = ["bootstrap.sh", "setup.sh"]
+    # Lint each script individually.
+    files_failed: list[str] = []
 
-    shell_scripts = (
-        SHELL_PROFILE_SCRIPTS
-        + SHELL_REPO_SCRIPTS
-        + find_shell_scripts("shell_profile")
-        + find_shell_scripts("bin")
-    )
+    for file_path in file_paths:
+        # SC1090 - ignore warning for can't follow non-constant source.
+        # SC1091 - ignore warning for included files that cannot be found.
+        result = subprocess.run(["shellcheck", file_path, "-e", "SC1090", "-e", "SC1091"])
 
-    sh_lint_issues = 0
+        if result.returncode != 0:
+            files_failed.append(file_path)
+            continue
 
-    for script_filepath in shell_scripts:
-        if not shellcheck_file(script_filepath):
-            sh_lint_issues += 1
+        # File looks ok.
+        logging.debug(f"{file_path}: OK")
 
-    return sh_lint_issues
+    # Report the files that failed to lint.
+    return files_failed
 
 
 ################################################################################
-# Runs the shellcheck tool on a given shell script file.
+# Lint a list of python files, and return a list of the files that failed a
+# linter check.
+#
+# This function assumes that `mypy` and `ruff` are installed, otherwise a sub-
+# process exception will be raised. 
 ################################################################################
-def shellcheck_file(script_filepath: str) -> bool:
-    # SC1090 - ignore warning for can't follow non-constant source.
-    # SC1091 - ignore warning for included files that cannot be found.
-    result = subprocess.run(
-        ["shellcheck", script_filepath, "-e", "SC1090", "-e", "SC1091"]
-    )
+def lint_py_files(file_paths: list[str]) -> list[str]: 
+    # Make sure Python linter tools are available.
+    if shutil.which("mypy") is None:
+        raise Exception("cannot lint python scripts - mypy not found")
+    if shutil.which("ruff") is None:
+        raise Exception("cannot lint python scripts - ruff not found")
 
-    if result.returncode == 0:
-        logging.debug(f"{script_filepath}: OK")
-    elif result.returncode != 0:
-        logging.error(f"{script_filepath}: SHELLCHECK FAILED")
-        if result.stdout != None:
-            logging.info(f"shellcheck output:\n{result.stdout}")
+    # Lint each file individually.
+    files_failed: list[str] = []
 
-    return result.returncode == 0
+    for file_path in file_paths:
+        # Typecheck the python file.
+        result = subprocess.run(["mypy", "--no-error-summary", file_path])
+
+        if result.returncode != 0:
+            files_failed.append(file_path)
+            continue
+
+        # Apply standard linting rules with Ruff.
+        result = subprocess.run(["ruff", "check", file_path])
+
+        if result.returncode != 0:
+            files_failed.append(file_path)
+
+        # File is good
+        logging.debug(f"{file_path}: OK")
+
+    # Report the files that failed to lint.
+    return files_failed
 
 
-# Check if the given filepath is a shell script. This function considers a file
-# a shell script if it ends with `.sh` or if the first line contains a shebang
-# reference to a shell interpreter.
-def is_shell_script(filepath: str, base_dir=None) -> bool:
-    if base_dir is not None:
-        filepath = os.path.join(base_dir, filepath)
-
-    if filepath.endswith(".sh"):
-        return True
+################################################################################
+# Check if the given file could be considered a script given a list of valid
+# script file extensions and shebang first line candidates. A file matching any
+# of these criteria will be considered a script.
+################################################################################
+def is_script(filepath: str, file_exts: list[str], first_lines: list[str]) -> bool:
+    for x in file_exts:
+        if filepath.endswith(x):
+            return True
 
     with open(filepath) as f:
         first_line = f.readline().strip()
-        if first_line == "#!/bin/sh" or first_line == "#!/bin/bash":
-            return True
+        for x in first_lines:
+            if first_line == x:
+                return True
+
+    return False
 
 
-# Returns a list of shell scripts found in the given directory.
-def find_shell_scripts(dirpath: str) -> list[str]:
+################################################################################
+# Return a list of files that could be considered a script given a list of valid
+# script file extensions and shebang first line candidates. A file matching any
+# of these criteria will be considered a script.
+################################################################################
+def find_shell_scripts(
+    dirpath: str, file_exts: list[str], first_lines: list[str]
+) -> list[str]:
     return [
         os.path.join(dirpath, f)
         for f in os.listdir(dirpath)
-        if is_shell_script(f, dirpath)
+        if is_script(os.path.join(dirpath, f), file_exts, first_lines)
     ]
 
 
+################################################################################
+# Script main
+################################################################################
 def main() -> None:
     # Show log info messages (disabled by default).
     logging.getLogger().setLevel(logging.INFO)
 
     # Lint shell scripts.
-    logging.info(f"linting shell scripts...")
-    sh_lint_issues = lint_all_shell_scripts()
+    logging.info("linting shell scripts...")
+    failed_sh_files = lint_sh_files(
+        BASH_CONFIG_FILES
+        + DOTFILES_SH_SCRIPTS
+        + find_shell_scripts("shell_profile", SH_EXTS, SH_SHEBANGS)
+        + find_shell_scripts("bin", SH_EXTS, SH_SHEBANGS)
+    )
 
-    if sh_lint_issues > 0:
-        logging.warning(f"found {sh_lint_issues} shell scripts with linting issues")
+    if len(failed_sh_files) > 0:
+        logging.warning(f"{len(failed_sh_files)} shell scripts failed linter checks")
 
-    # TODO: Lint python scripts.
+    # Lint python scripts.
+    logging.info("linting python scripts...")
+    failed_py_files = lint_py_files(
+        ["lint_all.py"] + find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS)
+    )
+
+    if len(failed_py_files) > 0:
+        logging.warning(f"{len(failed_py_files)} python scripts failed linter checks")
 
     # TODO: Test bash profile with a docker container.
     # TODO: Test zsh profile with a docker container.
     # TODO: Test bootstrap process in a docker container.
 
-    # TODO: Determine if any errors were present when linting (as opposed to
-    # warnings), and print that result down here.
-
     # Report if all tests passed or not.
-    if sh_lint_issues == 0:
+    if len(failed_sh_files) + len(failed_py_files) == 0:
         logging.info("all lint checks passed!")
     else:
         logging.warning("linter issues found")

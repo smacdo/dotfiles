@@ -2,17 +2,14 @@
 # vim: set ft=python
 
 from __future__ import annotations
-from typing import List, Literal, Optional, Union
+from typing import List, Optional, Union
 
 from datetime import datetime, timedelta
 from enum import Enum
-from pprint import pprint
 
 import argparse
 import json
-import logging
 import re
-import sys
 import urllib.request
 
 # NOAA:
@@ -86,7 +83,7 @@ class Temperature:
     @staticmethod
     def from_json(json: dict) -> Optional[Temperature]:
         """Reads a WMO temperature unit from { "value": ..., "unitCode": "wmoUnit:degC|degF" }"""
-        if json["value"] == None:
+        if json["value"] is None:
             return None
         elif json["unitCode"] == "wmoUnit:degC":
             return Temperature(float(json["value"]), TemperatureType.c)
@@ -149,7 +146,7 @@ class WindSpeed:
 
 def read_unit_percent(json: dict) -> Optional[float]:
     """Reads a WMO percent unit from { "value": 12.3, "unitCode": "wmoUnit:percent" }"""
-    if json["value"] == None or json["unitCode"] != "wmoUnit:percent":
+    if json["value"] is None or json["unitCode"] != "wmoUnit:percent":
         return None
     else:
         return float(json["value"])
@@ -187,7 +184,7 @@ class ForecastPeriod:
         self.detailed_summary = str(json["detailedForecast"])
 
     def debug_print(self):
-        print(f"ForecastPeriod")
+        print("ForecastPeriod")
         for p in vars(self).items():
             print(f"\t{p}")
 
@@ -250,11 +247,11 @@ def lookup_forecast(location: GridPoint) -> Forecast:
     response = json.loads(str(response_bytes, "utf-8"))
 
     # TODO: capture remainder of fields and encapsulate into class:
-    props = response["properties"]
-    generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
-    update_time = props["updateTime"]  # ^^^^
-    valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
-    elevation = props["elevation"]["value"]  # 456.8951999
+    #props = response["properties"]
+    #generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
+    #update_time = props["updateTime"]  # ^^^^
+    #valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
+    #elevation = props["elevation"]["value"]  # 456.8951999
     # also unitCode = "wmoUnit:m" along with value
 
     forecasts: List[ForecastPeriod] = []
