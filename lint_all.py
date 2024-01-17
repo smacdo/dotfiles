@@ -15,6 +15,7 @@ PY_SHEBANGS = ["#!/usr/bin/env python3"]
 BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
 DOTFILES_SH_SCRIPTS = ["bootstrap.sh", "setup.sh"]
 
+
 ################################################################################
 # Lint a list of shell scripts, and return a list of files that failed a linter
 # check.
@@ -30,7 +31,9 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
     for file_path in file_paths:
         # SC1090 - ignore warning for can't follow non-constant source.
         # SC1091 - ignore warning for included files that cannot be found.
-        result = subprocess.run(["shellcheck", file_path, "-e", "SC1090", "-e", "SC1091"])
+        result = subprocess.run(
+            ["shellcheck", file_path, "-e", "SC1090", "-e", "SC1091"]
+        )
 
         if result.returncode != 0:
             files_failed.append(file_path)
@@ -48,9 +51,9 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
 # linter check.
 #
 # This function assumes that `mypy` and `ruff` are installed, otherwise a sub-
-# process exception will be raised. 
+# process exception will be raised.
 ################################################################################
-def lint_py_files(file_paths: list[str]) -> list[str]: 
+def lint_py_files(file_paths: list[str]) -> list[str]:
     # Make sure Python linter tools are available.
     if shutil.which("mypy") is None:
         raise Exception("cannot lint python scripts - mypy not found")
@@ -87,10 +90,16 @@ def lint_py_files(file_paths: list[str]) -> list[str]:
 # of these criteria will be considered a script.
 ################################################################################
 def is_script(filepath: str, file_exts: list[str], first_lines: list[str]) -> bool:
+    # Ignore directories, and files that do not exist.
+    if not os.path.exists(filepath) or os.path.isdir(filepath):
+        return False
+
+    # Check if file extension matches.
     for x in file_exts:
         if filepath.endswith(x):
             return True
 
+    # Look for first line of file matches.
     with open(filepath) as f:
         first_line = f.readline().strip()
         for x in first_lines:
@@ -143,8 +152,17 @@ def main() -> None:
     if len(failed_py_files) > 0:
         logging.warning(f"{len(failed_py_files)} python scripts failed linter checks")
 
+    # TODO: Build minimal "bootstrap" docker image which will test that the
+    #       bootstrap process runs correctly, and that people can use either
+    #       bash or zsh without errors.
+    # sudo docker build -t bootstrap -f tests/images/bootstrap/Dockerfile .
+
     # TODO: Test bash profile with a docker container.
+    # sudo docker run --rm -it --entrypoint bash bootstrap
+
     # TODO: Test zsh profile with a docker container.
+    # sudo docker run --rm -it --entrypoint zsh bootstrap
+
     # TODO: Test bootstrap process in a docker container.
 
     # Report if all tests passed or not.
