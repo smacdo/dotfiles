@@ -59,6 +59,8 @@ if [ -d "$HOME/homebrew/bin" ]; then
   add_path_front "$HOME/homebrew/bin"
 fi
 
+add_path_front "/opt/homebrew/bin"
+
 add_path_front "$HOME/.homebrew/bin"
 add_path_front "$HOME/.homebrew/sbin"
 
