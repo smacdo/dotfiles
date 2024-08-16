@@ -130,7 +130,7 @@ class WindSpeed:
             return f"{self.direction} {self.min_speed} to {self.max_speed} mph"
 
     @staticmethod
-    def from_str(s: str, direction: str) -> Optional[WindSpeed]:
+    def from_str(s: str, direction: str) -> WindSpeed:
         regex = re.compile("^(?P<min_s>\\d+)( to (?P<max_s>\\d+))? mph$")
         matches = regex.match(s)
 
@@ -173,12 +173,12 @@ class ForecastPeriod:
         self.name = json["name"]
         self.start_time = datetime.fromisoformat(json["startTime"])
         self.end_time = datetime.fromisoformat(json["endTime"])
-        self.is_daytime = bool(json["isDaytime"])
+        self.is_daytime = bool(json["isDaytime"]) if "isDaytime" in json else None
         self.temperature = Temperature(json["temperature"], json["temperatureUnit"])
-        self.precip_chance = read_unit_percent(json["probabilityOfPrecipitation"])
-        self.dewpoint = Temperature.from_json(json["dewpoint"])
-        self.relative_humidity = read_unit_percent(json["relativeHumidity"])
-        self.wind = WindSpeed.from_str(json["windSpeed"], json["windDirection"])
+        self.precip_chance = read_unit_percent(json["probabilityOfPrecipitation"]) if "probabilityOfPrecipitation" in json else None
+        self.dewpoint = Temperature.from_json(json["dewpoint"]) if "dewpoint" in json else None
+        self.relative_humidity = read_unit_percent(json["relativeHumidity"]) if "relativeHumidity" in json else None
+        self.wind = WindSpeed.from_str(json["windSpeed"], json["windDirection"]) if "windSpeed" in json else None
         self.icon_url = str(json["icon"])
         self.short_summary = str(json["shortForecast"])
         self.detailed_summary = str(json["detailedForecast"])
@@ -193,7 +193,10 @@ class Forecast:
     forecast_periods: List[ForecastPeriod]
 
     def __init__(self, forecast_periods: List[ForecastPeriod]):
+        # Sort the forecast periods in ascending order by start time.
+        # (Most recent forecast period is first.)
         self.forecast_periods = forecast_periods
+        self.forecast_periods.sort(key=lambda x: x.start_time)
 
     def add(self, forecast_period: ForecastPeriod) -> None:
         self.forecast_periods.append(forecast_period)
@@ -225,19 +228,21 @@ class Forecast:
         return forecast_periods
 
     def today(self) -> Optional[ForecastPeriod]:
+        """Get the first forecast covering today."""
         for p in self.forecast_periods:
-            if p.name == "Today":
+            if p.start_time.day == datetime.now().day:
                 return p
         return None
 
     def tonight(self) -> Optional[ForecastPeriod]:
+        """Get the forecast covering tonight if available."""
         for p in self.forecast_periods:
-            if p.name == "Tonight":
+            if p.start_time.day == datetime.now().day and p.name.find("Tonight") != -1:
                 return p
         return None
 
 
-def lookup_forecast(location: GridPoint) -> Forecast:
+def lookup_forecast(location: GridPoint, debug_print=False) -> Forecast:
     # TODO: Error handling eg invalid lat/long.
     url = f"https://api.weather.gov/gridpoints/{location.grid_id}/{location.x},{location.y}/forecast"
     response_bytes = urllib.request.urlopen(url).read()
@@ -245,6 +250,9 @@ def lookup_forecast(location: GridPoint) -> Forecast:
     # TODO: Handle JSON decoding failures.
     # TODO: Check and handle if response is unexpected.
     response = json.loads(str(response_bytes, "utf-8"))
+
+    if debug_print:
+        print(repr(response))
 
     # TODO: capture remainder of fields and encapsulate into class:
     #props = response["properties"]
@@ -262,11 +270,11 @@ def lookup_forecast(location: GridPoint) -> Forecast:
     return Forecast(forecasts)
 
 
-def print_summary(forecast_period):
+def print_summary(forecast_period: ForecastPeriod) -> None:
     print(f"""\n{forecast_period.name}:\n{forecast_period.detailed_summary}""")
 
 
-def main():
+def main() -> None:
     # Parse command line options.
     args_parser = argparse.ArgumentParser(description="does neat stuff")
 
@@ -281,11 +289,14 @@ def main():
 
     # Print forecast information depending on what user asked for.
     if args.time_period_or_action == "now":
-        if forecasts.today():
-            print_summary(forecasts.today())
+        today_forecast = forecasts.today()
+        tonight_forecast = forecasts.tonight()
 
-        if forecasts.tonight():
-            print_summary(forecasts.tonight())
+        if today_forecast is not None:
+            print_summary(today_forecast)
+
+        if tonight_forecast is not None:
+            print_summary(tonight_forecast)
 
         # Print the first forecast period of tomorrow.
         tomorrow_forecasts = forecasts.day(1)

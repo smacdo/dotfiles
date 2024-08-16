@@ -65,7 +65,10 @@ def lint_py_files(file_paths: list[str]) -> list[str]:
 
     for file_path in file_paths:
         # Typecheck the python file.
-        result = subprocess.run(["mypy", "--no-error-summary", file_path])
+        result = subprocess.run([
+            "mypy", "--no-error-summary", "--disallow-untyped-calls",
+            file_path
+        ])
 
         if result.returncode != 0:
             files_failed.append(file_path)
