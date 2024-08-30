@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Author: Scott MacDonald <scott@smacdo.com>
 # Purpose: CI linter for the dotfiles repository.
+import argparse
 import logging
 import os
 import shutil
@@ -131,8 +132,17 @@ def find_shell_scripts(
 # Script main
 ################################################################################
 def main() -> None:
+    # Command line arguments.
+    parser = argparse.ArgumentParser("dotfiles lint checker")
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose logging')
+
+    args = parser.parse_args()
+
     # Show log info messages (disabled by default).
-    logging.getLogger().setLevel(logging.INFO)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
 
     # Lint shell scripts.
     logging.info("linting shell scripts...")
