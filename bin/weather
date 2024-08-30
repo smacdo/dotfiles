@@ -10,6 +10,7 @@ from enum import Enum
 import argparse
 import json
 import re
+import sqlite3
 import urllib.request
 
 # NOAA:
@@ -33,20 +34,6 @@ class GridPoint:
         self.grid_id = grid_id
         self.x = x
         self.y = y
-
-    @staticmethod
-    def from_noaa_www_lat_long(lat: float, long: float) -> GridPoint:
-        # TODO: Error handling eg invalid lat/long.
-        response_bytes = urllib.request.urlopen(
-            f"https://api.weather.gov/points/{lat},{long}"
-        ).read()
-
-        # TODO: Handle JSON decoding failures.
-        # TODO: Check and handle if response is unexpected.
-        response = json.loads(str(response_bytes, "utf-8"))
-        props = response["properties"]
-
-        return GridPoint(props["gridId"], int(props["gridX"]), int(props["gridY"]))
 
 
 class TemperatureType(Enum):
@@ -242,32 +229,64 @@ class Forecast:
         return None
 
 
-def lookup_forecast(location: GridPoint, debug_print=False) -> Forecast:
-    # TODO: Error handling eg invalid lat/long.
-    url = f"https://api.weather.gov/gridpoints/{location.grid_id}/{location.x},{location.y}/forecast"
-    response_bytes = urllib.request.urlopen(url).read()
+class WeatherClient:
+    """Looks up weather related information using the weather.gov API."""
+    debug_print: bool
 
-    # TODO: Handle JSON decoding failures.
-    # TODO: Check and handle if response is unexpected.
-    response = json.loads(str(response_bytes, "utf-8"))
+    def __init__(self, debug_print=False) -> None:
+        self.debug_print = debug_print
 
-    if debug_print:
-        print(repr(response))
+        # Create or open the client request cache. This cache is used to store responses coming from
+        # the weather.gov API. Results can be cached for a custom amount of time eg location lookups
+        # should probably be persisted for a long time, but forecast data should be refreshed.
+        # TODO: Support XDG specs and also support Windows.
+        self.cache_con = sqlite3.connect("~/.weather.db")
 
-    # TODO: capture remainder of fields and encapsulate into class:
-    #props = response["properties"]
-    #generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
-    #update_time = props["updateTime"]  # ^^^^
-    #valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
-    #elevation = props["elevation"]["value"]  # 456.8951999
-    # also unitCode = "wmoUnit:m" along with value
+    def lookup_grid_point(self, lat: float, long: float) -> GridPoint:
+        """Takes a lat/long value and returns the corresponding NOAA GridPoint value."""
 
-    forecasts: List[ForecastPeriod] = []
+        # TODO: Error handling eg invalid lat/long.
+        response_bytes = urllib.request.urlopen(
+            f"https://api.weather.gov/points/{lat},{long}"
+        ).read()
 
-    for p in response["properties"]["periods"]:
-        forecasts.append(ForecastPeriod(p))
+        # TODO: Handle JSON decoding failures.
+        # TODO: Check and handle if response is unexpected.
+        response = json.loads(str(response_bytes, "utf-8"))
 
-    return Forecast(forecasts)
+        if self.debug_print:
+            print(repr(response))
+
+        props = response["properties"]
+
+        return GridPoint(props["gridId"], int(props["gridX"]), int(props["gridY"]))
+
+    def lookup_forecast(self, location: GridPoint) -> Forecast:
+        # TODO: Error handling eg invalid lat/long.
+        url = f"https://api.weather.gov/gridpoints/{location.grid_id}/{location.x},{location.y}/forecast"
+        response_bytes = urllib.request.urlopen(url).read()
+
+        # TODO: Handle JSON decoding failures.
+        # TODO: Check and handle if response is unexpected.
+        response = json.loads(str(response_bytes, "utf-8"))
+
+        if self.debug_print:
+            print(repr(response))
+
+        # TODO: capture remainder of fields and encapsulate into class:
+        #props = response["properties"]
+        #generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
+        #update_time = props["updateTime"]  # ^^^^
+        #valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
+        #elevation = props["elevation"]["value"]  # 456.8951999
+        # also unitCode = "wmoUnit:m" along with value
+
+        forecasts: List[ForecastPeriod] = []
+
+        for p in response["properties"]["periods"]:
+            forecasts.append(ForecastPeriod(p))
+
+        return Forecast(forecasts)
 
 
 def print_summary(forecast_period: ForecastPeriod) -> None:
@@ -285,7 +304,9 @@ def main() -> None:
     args = args_parser.parse_args()
 
     # Get weather forecast for region.
-    forecasts = lookup_forecast(GridPoint.from_noaa_www_lat_long(47.675, -122.1215))
+    # TODO: Support location lookup by name.
+    weather_client = WeatherClient()
+    forecasts = weather_client.lookup_forecast(weather_client.lookup_grid_point(47.675, -122.1215))
 
     # Print forecast information depending on what user asked for.
     if args.time_period_or_action == "now":
