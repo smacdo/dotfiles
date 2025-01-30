@@ -26,12 +26,6 @@ for file in "${S_DOTFILE_ROOT}"/shell_profile/\
 done;
 unset file
 
-[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
-&& source "${HOME}/.my_shell_profile.sh"
-
-[ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]\
-&& source "${HOME}/.my_zshrc.sh"
-
 # Load .dotfiles shared zsh modules.
 for file in ~/.zsh/*.zsh; do
     . "$file"
@@ -145,3 +139,12 @@ else
   [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
+
+# Load any optional per-machine config profiles at the end to allow them to 
+# override this default config profile.
+[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
+&& source "${HOME}/.my_shell_profile.sh"
+
+[ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]\
+&& source "${HOME}/.my_zshrc.sh"
+

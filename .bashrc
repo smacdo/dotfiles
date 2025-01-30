@@ -22,19 +22,14 @@ export S_DOTFILE_ROOT="$HOME/.dotfiles"
 # between the different shells like bash, and zsh to reduce duplication.
 #
 # If you want to have machine specific stuff the best place to put it is in
-# ~/.my_shell_profile.sh or ~/.my_bash_rc
+# ~/.my_shell_profile.sh or ~/.my_bash_rc. These files are sourced at the end
+# this config.
 for file in $S_DOTFILE_ROOT/shell_profile/\
 {xdg.sh,paths.sh,exports.sh,functions.sh,aliases.sh}; do
     # -r test if readable, -f is file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;
 unset file
-
-[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
-&& source "${HOME}/.my_shell_profile.sh"
-
-[ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]\
-&& source "${HOME}/.my_bashrc.sh"
 
 # Flash the screen instead of playing an audio bell.
 set bell-style visible
@@ -118,3 +113,11 @@ fi
 
 # Load fzf support.
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+# Load any optional per-machine configuration profiles at the end to allow them
+# to override the default config profile.
+[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
+&& source "${HOME}/.my_shell_profile.sh"
+
+[ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]\
+&& source "${HOME}/.my_bashrc.sh"
