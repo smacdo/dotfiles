@@ -126,8 +126,10 @@ noremap <silent> <C-l> :wincmd l<CR>
 
 " Map <F2> to a toggle switch that enables or disables vim's auto indent on
 " paste. Use this when you want to paste code without applying indent rules.
-noremap <F2> :set invpaste paste?<CR>
-set pastetoggle=<F2>
+if !has('nvim')
+  noremap <F2> :set invpaste paste?<CR>
+  set pastetoggle=<F2>
+endif
 
 " Use <C-M> to clear highlighting from :set hlsearch.
 if maparg('<C-M>', 'n') ==# ''
