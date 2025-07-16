@@ -1,185 +1,183 @@
-#!/bin/sh
+#!/usr/bin/env python3
+# vim: set filetype=python
 # Author: Scott MacDonald
 # Purpose: Run vscode and variants the same way across multiple platforms.
 #
-# Run with `-h` or see `print_help()` for more information.
+# Unrecogonized arguments are passed to the invoked editor command. Arguments
+# can also be passed to the editor by using `--`.
+#
+# This script supports fb-code in addition to vscode, which is a special
+# Facebook maintained fork of Microsoft\'s vscode. No proprietary information
+# is included in this script.
+#
+# You can see more information on this fork here:
+# https://github.com/facebookexperimental/fb-vscode
 ################################################################################
-. "$S_DOTFILE_ROOT"/sh/cli.sh
+import argparse
+import logging
+import os
+import shutil
+import subprocess
+import sys
 
-################################################################################
-# Print usage (help) text.
-################################################################################
-print_help() {
-  echo "Run vscode and variants the same way across multiple platforms."
-  echo 
-  echo "code [-v] [-F|-V] -- vscode args..."
-  echo " Arguments:"
-  echo "  -h   Show this help text."
-  echo "  -C   Only search vscode paths (e.g., do not use code-fb)."
-  echo "  -F   Only search code-fb paths."
-  echo "  -V   Enable verbose mode."
-  echo 
-  echo " This script supports fb-code in addition to vscode, which is a special"
-  echo " Facebook maintained fork of Microsoft's vscode. No proprietary"
-  echo " information is included in this script."
-  echo 
-  echo " You can see more information on this fork here:"
-  echo " https://github.com/facebookexperimental/fb-vscode"
+
+logger = logging.getLogger(__name__)
+
+FB_CODE_NAME = "fbcode"
+VS_CODE_NAME = "vscode"
+SUBLIME_NAME = "sublime"
+FALLBACK_NAME = "fallback"
+
+APP_PATHS: dict[str, list[str | None]] = {
+    FB_CODE_NAME: [
+        "/usr/bin/code-fb",
+        "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code",
+        "/usr/local/bin/code" if "FBVSCODE_REMOTE_ENV_NAME" in os.environ else None,
+    ],
+    VS_CODE_NAME: [
+        "/usr/bin/code",
+        "/usr/share/code/bin/code",
+        "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+    ],
+    SUBLIME_NAME: [
+        "/usr/local/bin/subl",
+        "/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl",
+    ],
+    FALLBACK_NAME: [
+        f'{shutil.which(os.environ["VISUAL"])}' if "VISUAL" in os.environ else None,
+        f'{shutil.which(os.environ["EDITOR"])}' if "EDITOR" in os.environ else None,
+    ],
 }
 
-################################################################################
-# Run vscode binary with parameters if the given binary path is executable.
-#
-# Arguments:
-#  $1     path to a potential vscode binary.
-#  $2..N  arguments to pass to the vscode binary, if it exists.
-#
-# Returns 0 if vscode was found and executed successfully, and 0 if the vscode
-# binary was not found. If vscode was found but did not exit succesfully this
-# process will be terminated with the error code returned by vscode.
-################################################################################
-run_if_found() {
-  vscode_path="$1"
-  shift # Remove first argument (vscode path) from arguments list.
+APP_ORDER = [FB_CODE_NAME, VS_CODE_NAME, SUBLIME_NAME, FALLBACK_NAME]
 
-  if [ -x "$vscode_path" ]; then
-    verbose "run: " "$vscode_path" "$@"
 
-    "$vscode_path" "$@"
+def main() -> None:
+    """Application entry point."""
+    parser = argparse.ArgumentParser(
+        description="Run vscode or its clones from the command line.",
+        epilog="Any unrecogonized arguments and anything after `--` are passed to the editor.",
+    )
 
-    if "$vscode_path" "$@" ; then
-      # Nothing, it worked fine!
-      true # ... but you can't have an empty clause so use 'true'.
-    else
-      exit_with_message "$?" \
-        "ERROR: Got error code $? when launching vscode '$vscode_path'"
-    fi
+    parser.add_argument(
+        "--check", action="store_true", help="check which paths are valid"
+    )
+    parser.add_argument("--verbose", action="store_true", help="enable verbose output")
 
-    return 0
-  else
-    verbose "Not found: $vscode_path"
-  fi
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--vscode", action="store_true", help="use vs-code and skip fb-code paths"
+    )
+    group.add_argument(
+        "--fb", action="store_true", help="use fb-code and skip vscode paths"
+    )
 
-  # Not found, return 1 to indicate failure.
-  return 1
-}
+    args, extra_args = parser.parse_known_args()
 
-################################################################################
-# Try to run vscode-fb with the given parameters by searching commonly used
-# installation locations.
-#
-# Arguments:
-#  $1..N  arguments to pass to the vscode binary.
-#
-# Returns 0 if vscode-fb was found and executed successfully, otherwise 1.
-################################################################################
-run_fbcode() {
-  run_if_found "/usr/bin/code-fb" "$@" && return 0
-  run_if_found "/Applications/VS Code @ FB.app/Contents/Resources/app/bin/code" "$@" && return 0
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.WARNING)
 
-  verbose "fb vscode not found"
+    apps_to_try = APP_ORDER
 
-  return 1
-}
+    if args.vscode:
+        apps_to_try.remove(FB_CODE_NAME)
 
-###############################################################################
-# Try to run vscode with the given parameters by searching commonly used
-# installation locations.
-#
-# Arguments:
-#  $1..N  arguments to pass to the vscode binary.
-#
-# Returns 0 if vscode was found and executed successfully, otherwise 1.
-################################################################################
-run_vscode() {
-  run_if_found "/usr/bin/code" "$@" && return 0
-  run_if_found "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" "$@" && return 0
+    if args.fb:
+        apps_to_try.remove(VS_CODE_NAME)
 
-  verbose "vscode not found"
+    did_find_runnable = try_running_any_in_order(apps_to_try, extra_args, args.check)
 
-  return 1
-}
+    if not args.check and not did_find_runnable:
+        logging.error("no editors were found :(")
+        sys.exit(1)
 
-###############################################################################
-# Use a non-vscode editor as a default fallback.
-#
-# Arguments:
-#  $1..N  arguments to pass to the vscode binary.
-#
-# Returns 0 if a fallback editor was found and executed successfully,
-# otherwise 1.
-################################################################################
-run_fallback() {
-  # Try Sublime Text first as that's still a GUI editor.
-  run_if_found "/usr/local/bin/subl" "$@" && return 0
-  run_if_found "/Applications/Sublime\ Text.app/Contents/SharedSupport/bin/subl" "$@" && return 0
 
-  # Try using $VISUAL or $EDITOR as a last resort.
-  run_if_found "$(which "$VISUAL")" "$@" && return 0
-  run_if_found "$(which "$EDITOR")" "$@" && return 0
+def try_running_any_in_order(apps: list[str], extra_args, check=False) -> bool:
+    """
+    Iterates through a list of paths grouped by application name and returns
+    after executing the first path that exists.
 
-  verbose "no fallback editors found"
+    Args:
+        apps: A list of application names to try. Each name must be a key in `APP_PATHS`.
+        extra_args: Additional arguments that should be passed to the executable when run.
 
-  return 1
-}
+    Returns:
+        True if a path was found and succesfully executed, false otherwise.
+    """
+    for app in apps:
+        paths = APP_PATHS[app]
 
-################################################################################
-# Run vscode-fb/vscode if it exists on the system.
-# 
-# Globals:
-#  VERBOSE
-#
-# Arguments:
-#  $1..N  arguments to pass to the vscode binary.
-#
-# Returns 0 if vscode was found and executed successfully, and 0 if the vscode
-# binary was not found. If vscode was found but did not exit succesfully this
-# process will be terminated with the error code returned by vscode.
-################################################################################
-main() {
-  if [ "$USE_FB" -eq 1 ]; then
-    run_fbcode "$@" && return 0
-  else
-    verbose "USE_FB not set, skipping fb code"
-  fi 
+        for path in paths:
+            if path is None:
+                continue
 
-  if [ "$USE_MSFT" -eq 1 ]; then
-    run_vscode "$@" && return 0
-  else
-    verbose "USE_MSFT not set, skipping msft code"
-  fi
+            if check:
+                check_path(app, path, stdout=True)
+            elif run_if_found(app, path, extra_args):
+                logging.debug(f"ran {path} succesfully")
+                return True
+            else:
+                logging.debug(f"{app} not found")
 
-  # No suitable vscode found.
-  run_fallback "$@"
-}
+    return False
 
-#===============================================================================
-# Script entry point.                                                          #
-#===============================================================================
-USE_FB=1
-USE_MSFT=1
 
-while getopts ':hVCF' OPTION
-do 
-  case "$OPTION" in
-    h) print_help
-       exit 2
-       ;;
-    V) set_verbose 1
-       ;;
-    F) USE_MSFT=0
-       ;;
-    C) USE_FB=0
-       ;;
-    *) # Invalid options are ignored and passed to vscode.
-       ;;
-  esac
-done
+def run_if_found(name: str, path: str, args: list[str]) -> bool:
+    """
+    Tries to run the executable file given in `path`.
 
-# Remove parsed arguments.
-# NOTE: For this to work the script's arguments must be specified before the
-# arguments for vscode!
-shift "$((OPTIND - 1))"
+    Args:
+        name: Name of the application referred to by `path`.
+        path: Path to an executable file.
+        args: List of arguments to pass to the executable.
 
-# Now start execution of main.
-main "$@"
+    Returns:
+        True if the executable file was run succesfully, false otherwise.
+    """
+    if not check_path(name, path):
+        return False
+
+    logger.debug(f"will try {name} path: {path}")
+    subprocess.run([path] + args)
+
+    return True
+
+
+def check_path(name: str, path: str, stdout: bool = False):
+    """
+    Check if the given path exists and is executable.
+
+    Args:
+        name: Name of the application referred to by `path`.
+        path: Path to an executable file.
+        stdout: Prints check output to stdout if set to `True`.
+
+    Returns:
+        True if the file exists and is executable, otherwise returns false.
+    """
+    if not os.path.exists(path):
+        logger.debug(f"{name} path not found: {path}")
+
+        if stdout:
+            print(f"{name} {path}: NOT FOUND")
+
+        return False
+
+    if not os.access(path, os.X_OK):
+        logger.warn(f"{name} path exists but is not executable: {path}")
+
+        if stdout:
+            print(f"{name} {path}: NOT EXECUTABLE")
+
+        return False
+
+    if stdout:
+        print(f"{name} {path}: OK")
+
+    return True
+
+
+if __name__ == "__main__":
+    main()
