@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # vim: set ft=python
 
-from __future__ import annotations
 from enum import Enum
-from typing import Optional
+from pathlib import Path
 
 import argparse
 import io
+import sys
 import unittest
 
 # TODO: Tests
@@ -16,7 +16,7 @@ UNIX_LINE_ENDING = b"\n"
 
 
 class UnsupportedLineEnding(Exception):
-    def __init__(self, to_ending: LineEnding, *args, **kwargs):
+    def __init__(self, to_ending: "LineEnding", *args, **kwargs):
         super().__init__(
             f"The conversion could not be performed because the requested line ending {to_ending} is not supported",
             *args,
@@ -38,7 +38,7 @@ class LineEnding(Enum):
     invalid = "invalid"
 
     @staticmethod
-    def parse(s: str) -> LineEnding:
+    def parse(s: str) -> "LineEnding":
         if s == "dos":
             return LineEnding.dos
         elif s == "unix":
@@ -46,9 +46,6 @@ class LineEnding(Enum):
         else:
             raise UnknownLineEndingName(s)
 
-
-class OutputMode(Enum):
-    text = "text"
 
 
 def detect_line(line: bytes) -> LineEnding:
@@ -60,19 +57,21 @@ def detect_line(line: bytes) -> LineEnding:
         return LineEnding.invalid
 
 
-def detect(file: io.BufferedReader) -> Optional[LineEnding]:
-    mode = None
+def detect(file: io.BufferedReader | Path | str ) -> LineEnding | None:
+    try:
+        if isinstance(file, Path) or isinstance(file, str):
+            file = open(file, "rb")
 
-    for line in file:
-        line_mode = detect_line(line)
-        mode = line_mode if mode is None or mode == line_mode else LineEnding.mixed
+        mode = None
 
-    return mode
+        for line in file:
+            line_mode = detect_line(line)
+            mode = line_mode if mode is None or mode == line_mode else LineEnding.mixed
 
-
-def perform_detect(filepath: str) -> None:
-    with open(filepath, "rb") as file:
-        print(f"{filepath}: {detect(file)}")
+        return mode
+    finally:
+        if isinstance(file, io.BufferedReader):
+            file.close()
 
 
 def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
@@ -84,7 +83,7 @@ def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
         raise UnsupportedLineEnding(to_ending)
 
 
-def perform_convert(filepath: str, to_ending: Optional[LineEnding]) -> None:
+def perform_convert(filepath: str, to_ending: LineEnding | None) -> None:
     # If the line_ending was not specified then detect the file line ending and
     # convert to its opposite (dox <-> unix).
     if to_ending is None:
@@ -146,14 +145,17 @@ def main() -> None:
     else:
         for filepath in args.inputs:
             if args.detect:
-                perform_detect(filepath)
+                print(f"{filepath}: {detect(Path(filepath))}")
             else:
                 perform_convert(filepath, LineEnding.parse(args.convert))
 
 
 if __name__ == "__main__":
-    unittest.main()
-    main()
+    if '--run-tests' in sys.argv:
+        sys.argv.remove('--run-tests')
+        unittest.main()
+    else:
+        main()
 
 
 # ==============================================================================#
