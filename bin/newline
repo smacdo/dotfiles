@@ -16,19 +16,15 @@ UNIX_LINE_ENDING = b"\n"
 
 
 class UnsupportedLineEnding(Exception):
-    def __init__(self, to_ending: "LineEnding", *args, **kwargs):
+    def __init__(self, to_ending: "LineEnding"):
         super().__init__(
             f"The conversion could not be performed because the requested line ending {to_ending} is not supported",
-            *args,
-            **kwargs,
         )
 
 
 class UnknownLineEndingName(Exception):
-    def __init__(self, ending_name: str, *args, **kwargs):
-        super().__init__(
-            f"The line ending name '{ending_name}' was not recogonized", *args, **kwargs
-        )
+    def __init__(self, ending_name: str):
+        super().__init__(f"The line ending name '{ending_name}' was not recognized")
 
 
 class LineEnding(Enum):
@@ -47,7 +43,6 @@ class LineEnding(Enum):
             raise UnknownLineEndingName(s)
 
 
-
 def detect_line(line: bytes) -> LineEnding:
     if line.endswith(DOS_LINE_ENDING):
         return LineEnding.dos
@@ -57,7 +52,7 @@ def detect_line(line: bytes) -> LineEnding:
         return LineEnding.invalid
 
 
-def detect(file: io.BufferedReader | Path | str ) -> LineEnding | None:
+def detect(file: io.BufferedReader | Path | str) -> LineEnding | None:
     try:
         if isinstance(file, Path) or isinstance(file, str):
             file = open(file, "rb")
@@ -84,7 +79,7 @@ def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
 
 
 def perform_convert(filepath: str, to_ending: LineEnding | None) -> None:
-    # If the line_ending was not specified then detect the file line ending and
+    # If the line_ending was not specified, then detect the file line ending and
     # convert to its opposite (dox <-> unix).
     if to_ending is None:
         with open(filepath, "rb") as file:
@@ -137,22 +132,21 @@ def main() -> None:
 
     args = args_parser.parse_args()
 
-    # Convert each input file or print their detect line ending type depending
-    # on user flags.
+    # TODO: Support stdin and stdout when there are no input files.
     if len(args.inputs) == 0:
-        # TODO: Support stdin and stdout when there are no input files.
         raise Exception("*** TODO: Support stdin/stdout ***")
-    else:
-        for filepath in args.inputs:
-            if args.detect:
-                print(f"{filepath}: {detect(Path(filepath))}")
-            else:
-                perform_convert(filepath, LineEnding.parse(args.convert))
+
+    # Perform the user requested action (convert or explain) on input files.
+    for filepath in args.inputs:
+        if args.detect:
+            print(f"{filepath}: {detect(Path(filepath))}")
+        else:
+            perform_convert(filepath, LineEnding.parse(args.convert))
 
 
 if __name__ == "__main__":
-    if '--run-tests' in sys.argv:
-        sys.argv.remove('--run-tests')
+    if "--run-tests" in sys.argv:
+        sys.argv.remove("--run-tests")
         unittest.main()
     else:
         main()
