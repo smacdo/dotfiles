@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+# vim: set filetype=python
+
+"""
+Author: Scott MacDonald
+
+This script performs actions on behalf of the dotfiles checkout.
+"""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import argparse
+import logging
+import os
+import subprocess
+import sys
+
+
+logger = logging.getLogger(__name__)
+
+
+# TODO: allow user to pass path to the dotfile dir as an argument
+# TODO: action to produce a "bundle" of the dotfiles directory as a tar/zip
+#       (this should include any externally downloaded files from setup)
+# TODO: action to show repository out of date status (num behind, ahead)
+# TODO: action to show repository outstanding changes
+# TODO: action to print the path to dotfiles dir
+
+
+def main() -> None:
+    """
+    Application entry point.
+    """
+    print(get_dotfiles_dir())
+    repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
+    print(f'changes? : {repo_status.has_uncommitted_files}')
+    print("hello world")
+
+
+def get_dotfiles_dir() -> Path | None:
+    dotfile_dir = os.getenv("S_DOTFILE_ROOT", None)
+    root_dotfile_dir = os.path.join(os.path.expanduser("~"), ".dotfiles")
+
+    if dotfile_dir:
+        if not os.path.isdir(dotfile_dir):
+            logger.error(f"env var S_DOTFILE_ROOT is not a directory: {dotfile_dir}")
+            return None
+    elif os.path.isdir(root_dotfile_dir):
+        dotfile_dir = root_dotfile_dir
+    else:
+        logger.error("could not find the dotfiles checkout")
+        return None
+
+    if not os.path.exists(os.path.join(dotfile_dir, ".__dotfiles_root__")):
+        logger.error(f"not a dotfiles root: {dotfile_dir}")
+        return None
+
+    return Path(dotfile_dir)
+
+
+def is_valid_repo(repo_dir: Path) -> bool:
+    result = subprocess.run(
+        ["git", "-C", repo_dir, "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    return result.stdout.endswith("dotfiles.git")
+
+
+@dataclass
+class RepoCheckoutStatus:
+    """Information about a Git repository checkout."""
+
+    # TODO: add remote origin name.
+    commits_ahead: int
+    commits_behind: int
+    has_uncommitted_files: bool  # TODO: change to list of uncommitted files
+
+    @staticmethod
+    def from_dir(repo_dir: Path) -> "RepoCheckoutStatus":
+        # Calculate the number of commits ahead and behind this checkout is.
+        # Ref: https://stackoverflow.com/a/27940027
+        result = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", "master...origin/master"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        parts = result.stdout.split()  # <AHEAD>      <BEHDIN>
+        assert len(parts) == 2
+
+        ahead = int(parts[0])
+        behind = int(parts[1])
+
+        # Check if there are uncommited changes in the repository.
+        # Ref: https://stackoverflow.com/a/62768943
+        result = subprocess.run(
+            [
+                "git",
+                "status",
+                "--porcelain=v1",
+            ],  # prints machine readable uncommited files
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        has_changes = result.returncode != 1
+
+        return RepoCheckoutStatus(
+            commits_ahead=ahead,
+            commits_behind=behind,
+            has_uncommitted_files=has_changes,
+        )
+
+
+if __name__ == "__main__":
+    main()
