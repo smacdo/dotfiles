@@ -28,13 +28,14 @@ class UnknownLineEndingName(Exception):
 
 
 class LineEnding(Enum):
-    dos = "dos"
-    unix = "unix"
+    dos = "dos"  # \r\n
+    unix = "unix"  # \n
     mixed = "mixed"
     invalid = "invalid"
 
     @staticmethod
     def parse(s: str) -> "LineEnding":
+        """Parses a string as a line ending name, and returns the corresponding LineEnding enum value."""
         if s == "dos":
             return LineEnding.dos
         elif s == "unix":
@@ -44,6 +45,7 @@ class LineEnding(Enum):
 
 
 def detect_line(line: bytes) -> LineEnding:
+    """Returns the line ending for then given line."""
     if line.endswith(DOS_LINE_ENDING):
         return LineEnding.dos
     elif line.endswith(UNIX_LINE_ENDING):
@@ -53,6 +55,7 @@ def detect_line(line: bytes) -> LineEnding:
 
 
 def detect(file: io.BufferedReader | Path | str) -> LineEnding | None:
+    """Detects the line end for the given file."""
     try:
         if isinstance(file, Path) or isinstance(file, str):
             file = open(file, "rb")
@@ -70,6 +73,16 @@ def detect(file: io.BufferedReader | Path | str) -> LineEnding | None:
 
 
 def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
+    """
+    Converts the given buffer to the requested line ending.
+
+    Args:
+        buffer: The buffer to convert.
+        to_ending: The line ending to convert to.
+
+    Returns:
+        A new buffer with the line endings converted to `to_ending`.
+    """
     if to_ending == LineEnding.dos:
         return buffer.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
     elif to_ending == LineEnding.unix:
