@@ -119,29 +119,33 @@ def main() -> None:
         description="convert between dos and unix newlines"
     )
 
-    args_parser.add_argument(
+    group = args_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
         "-c", "--convert", choices=["dos", "unix"], help="Line ending to convert to"
     )
-    args_parser.add_argument(
+    group.add_argument(
         "-d",
         "--detect",
         action="store_true",
         help="Report the type of line endings used in file",
     )
-    args_parser.add_argument("inputs", nargs="+", help="One or more input files")
+
+    args_parser.add_argument(
+        "inputs",
+        nargs="*",
+        type=argparse.FileType("rb"),
+        default=[sys.stdin.buffer],
+        help="Input file paths or '-' for stdin",
+    )
 
     args = args_parser.parse_args()
 
-    # TODO: Support stdin and stdout when there are no input files.
-    if len(args.inputs) == 0:
-        raise Exception("*** TODO: Support stdin/stdout ***")
-
     # Perform the user requested action (convert or explain) on input files.
-    for filepath in args.inputs:
+    for file in args.inputs:
         if args.detect:
-            print(f"{filepath}: {detect(Path(filepath))}")
+            print(detect(file))
         else:
-            perform_convert(filepath, LineEnding.parse(args.convert))
+            perform_convert(file, LineEnding.parse(args.convert))
 
 
 if __name__ == "__main__":
