@@ -23,19 +23,47 @@ logger = logging.getLogger(__name__)
 # TODO: allow user to pass path to the dotfile dir as an argument
 # TODO: action to produce a "bundle" of the dotfiles directory as a tar/zip
 #       (this should include any externally downloaded files from setup)
-# TODO: action to show repository out of date status (num behind, ahead)
-# TODO: action to show repository outstanding changes
-# TODO: action to print the path to dotfiles dir
 
 
 def main() -> None:
     """
     Application entry point.
     """
-    print(get_dotfiles_dir())
-    repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
-    print(f'changes? : {repo_status.has_uncommitted_files}')
-    print("hello world")
+
+    argparser = argparse.ArgumentParser()
+    subparser = argparser.add_subparsers(dest="command")
+
+    path_command = subparser.add_parser(
+        "path", help="Show the path to the dotfiles checkout"
+    )
+    status_command = subparser.add_parser(
+        "status", help="Info on the dotfiles checkout"
+    )
+
+    args = argparser.parse_args()
+
+    if args.command == "status":
+        repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
+        ahead = repo_status.commits_ahead
+        behind = repo_status.commits_behind
+
+        if repo_status.is_clean():
+            print(f"local dotfiles is up to date and has no local uncommitted changes")
+        elif ahead != 0 or behind != 0:
+            print(
+                f"Local dotfiles is {ahead} commits ahead and {behind} commits behind origin"
+            )
+            sys.exit(1)
+        elif repo_status.has_uncommitted_changes():
+            print("There are uncommitted changes in the local dotfiles checkout: ")
+            for line in repo_status.uncommitted_files:
+                print(f"\t{line}")
+            sys.exit(1)
+        else:
+            raise Exception("unhanlded condition for why repo is not clean")
+    else:
+        # default is the path command
+        print(get_dotfiles_dir())
 
 
 def get_dotfiles_dir() -> Path | None:
@@ -70,14 +98,35 @@ def is_valid_repo(repo_dir: Path) -> bool:
     return result.stdout.endswith("dotfiles.git")
 
 
+# TODO: add remote origin name.
+
+
 @dataclass
 class RepoCheckoutStatus:
     """Information about a Git repository checkout."""
 
-    # TODO: add remote origin name.
+    """The number of commits in this checkout that have not been pushed to origin."""
     commits_ahead: int
+
+    """The number of commits in origin that have not been pulled to this checkout."""
     commits_behind: int
-    has_uncommitted_files: bool  # TODO: change to list of uncommitted files
+
+    """The list of files in this checkout that have not been committed."""
+    uncommitted_files: list[str]
+
+    def is_clean(self) -> bool:
+        """
+        Checks if the local repository has any uncommited changes (false) or is ahead/behind on any
+        commits (false). If none of these conditions apply then `True` is returned.
+        """
+        return (
+            self.commits_ahead == 0
+            and self.commits_behind == 0
+            and len(self.uncommitted_files) == 0
+        )
+
+    def has_uncommitted_changes(self) -> bool:
+        return len(self.uncommitted_files) > 0
 
     @staticmethod
     def from_dir(repo_dir: Path) -> "RepoCheckoutStatus":
@@ -109,12 +158,12 @@ class RepoCheckoutStatus:
             check=True,
         )
 
-        has_changes = result.returncode != 1
+        uncommitted_files = result.stdout.splitlines()
 
         return RepoCheckoutStatus(
             commits_ahead=ahead,
             commits_behind=behind,
-            has_uncommitted_files=has_changes,
+            uncommitted_files=uncommitted_files,
         )
 
 
