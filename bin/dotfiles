@@ -30,40 +30,83 @@ def main() -> None:
     Application entry point.
     """
 
+    # Parse parameters.
     argparser = argparse.ArgumentParser()
     subparser = argparser.add_subparsers(dest="command")
+    
+    argparser.add_argument("-v", "--verbose", action='store_true', help='Enable verbose output (DEBUG level logging)')
 
     path_command = subparser.add_parser(
         "path", help="Show the path to the dotfiles checkout"
     )
     status_command = subparser.add_parser(
-        "status", help="Info on the dotfiles checkout"
+        "syncstate", help="Display information about the state of the git checkout"
+    )
+    update_command = subparser.add_parser(
+        "update", help="Update the dotfiles checkout with upstream changes"
     )
 
     args = argparser.parse_args()
 
-    if args.command == "status":
-        repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
-        ahead = repo_status.commits_ahead
-        behind = repo_status.commits_behind
-
-        if repo_status.is_clean():
-            print(f"local dotfiles is up to date and has no local uncommitted changes")
-        elif ahead != 0 or behind != 0:
-            print(
-                f"Local dotfiles is {ahead} commits ahead and {behind} commits behind origin"
-            )
-            sys.exit(1)
-        elif repo_status.has_uncommitted_changes():
-            print("There are uncommitted changes in the local dotfiles checkout: ")
-            for line in repo_status.uncommitted_files:
-                print(f"\t{line}")
-            sys.exit(1)
-        else:
-            raise Exception("unhanlded condition for why repo is not clean")
+    # Logging setup.
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
     else:
-        # default is the path command
+        logging.basicConfig(level=logging.INFO)
+
+    # Execute requested command.
+    if args.command == "syncstate": 
+        if not status_cmd():
+            sys.exit(1)
+    elif args.command == "path":
         print(get_dotfiles_dir())
+    elif args.command == "update":
+        if not update_cmd():
+            sys.exit(1)
+    else:
+        # default (no command) is to show repo info and change state.
+        print(get_dotfiles_dir())
+        sys.exit(status_cmd())
+
+def status_cmd() -> bool:
+    repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
+    ahead = repo_status.commits_ahead
+    behind = repo_status.commits_behind
+
+    if repo_status.is_clean():
+        print(f"local dotfiles is up to date and has no local uncommitted changes")
+        return True
+
+    if ahead != 0 or behind != 0:
+        print(
+            f"Local dotfiles is {ahead} commits ahead and {behind} commits behind origin"
+        )
+
+    if repo_status.has_uncommitted_changes():
+        print("There are uncommitted changes in the local dotfiles checkout: ")
+        for line in repo_status.uncommitted_files:
+            print(f"\t{line}")
+
+    return False
+
+def update_cmd() -> bool:
+    logger.debug("fetching git updates from origin")
+    result = subprocess.run(["git", "fetch", "origin"], check=False)
+    
+    if result.returncode != 0:
+        logger.warning(f"Errors encountered when running `git fetch origin`! Please update manually")
+        return False
+
+    logger.debug("rebasing on changes from origin/master")
+    result = subprocess.run(["git", "rebase", "origin/master"], check=False)
+
+    if result.returncode != 0:
+        logger.warning("Errors encountered when running `git rebase origin/master`. Please rebase manually")
+        return False
+
+    # TODO: Check if/how many updates were pulled
+    logger.info("dotfiles repo updated with changes from `origin/master`")
+    return True
 
 
 def get_dotfiles_dir() -> Path | None:
