@@ -65,7 +65,6 @@ def main() -> None:
             sys.exit(1)
     else:
         # default (no command) is to show repo info and change state.
-        print(get_dotfiles_dir())
         sys.exit(status_cmd())
 
 def status_cmd() -> bool:
@@ -73,17 +72,21 @@ def status_cmd() -> bool:
     ahead = repo_status.commits_ahead
     behind = repo_status.commits_behind
 
+    printed_repo_path = False
+
     if repo_status.is_clean():
-        print(f"local dotfiles is up to date and has no local uncommitted changes")
+        print(f"{get_dotfiles_dir()} dotfiles is up to date and has no local uncommitted changes")
         return True
 
     if ahead != 0 or behind != 0:
         print(
-            f"Local dotfiles is {ahead} commits ahead and {behind} commits behind origin"
+            f"{get_dotfiles_dir()} is {ahead} commits ahead and {behind} commits behind origin"
         )
+        printed_repo_path = True
 
     if repo_status.has_uncommitted_changes():
-        print("There are uncommitted changes in the local dotfiles checkout: ")
+        local_dotfiles = get_dotfiles_dir() if not printed_repo_path else "the local dotfiles checkout"
+        print(f"There are uncommitted changes in {local_dotfiles}: ")
         for line in repo_status.uncommitted_files:
             print(f"\t{line}")
 
