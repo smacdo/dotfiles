@@ -15,9 +15,6 @@
 # return immediately if the shell is not interactive.
 [[ -z "$DOTFILE_CI_TEST_MODE" ]] && [[ $- != *i* ]] && return
 
-# Export the dotfiles path as an environment variable to avoid hardcoding paths.
-export S_DOTFILE_ROOT="$HOME/.dotfiles"
-
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 #
@@ -25,7 +22,7 @@ export S_DOTFILE_ROOT="$HOME/.dotfiles"
 # ~/.my_shell_profile.sh or ~/.my_bash_rc. These files are sourced at the end
 # this config.
 for file in $S_DOTFILE_ROOT/shell_profile/\
-{xdg.sh,paths.sh,exports.sh,functions.sh,aliases.sh}; do
+{xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh}; do
     # -r test if readable, -f is file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"
 done;

@@ -5,6 +5,10 @@
 # NOTE: This file might be sourced more than once, especially for interactive
 # login shell session.
 ################################################################################
+# Export the dotfiles path as an environment variable to avoid hardcoding paths.
+# TODO: Is it possible to support installations other than ~/.dotfiles ?
+export S_DOTFILE_ROOT="$HOME/.dotfiles"
+
 # Make neovim -> vim -> nano -> vi the default editor.
 # (Weird note that `nvim -s` is not silent despite the man page on OSX stating
 #  it doesn't print output!)

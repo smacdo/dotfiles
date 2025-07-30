@@ -16,12 +16,13 @@ if [ -f "$HOME/.bashrc" ]; then
     source "$HOME/.bashrc"
 fi
 
+# Load custom environment variables.
+if [ -f "$HOME/.dotfiles/shell_profile/env.sh" ]; then
+    source "$HOME/.dotfiles/shell_profile/env.sh"
+fi
+
 # Load XDG and other custom environment variables.
 if [ -f "$S_DOTFILE_ROOT/shell_profile/xdg.sh" ]; then
     source "$S_DOTFILE_ROOT/shell_profile/xdg.sh"
 fi
 
-# Load custom environment variables.
-if [ -f "$S_DOTFILE_ROOT/shell_profile/exports.sh" ]; then
-    source "$S_DOTFILE_ROOT/shell_profile/exports.sh"
-fi
