@@ -75,7 +75,7 @@ def status_cmd() -> bool:
     printed_repo_path = False
 
     if repo_status.is_clean():
-        print(f"{get_dotfiles_dir()} dotfiles is up to date and has no local uncommitted changes")
+        print(f"{get_dotfiles_dir()} is up to date and has no local uncommitted changes")
         return True
 
     if ahead != 0 or behind != 0:
