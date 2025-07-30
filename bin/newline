@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # vim: set ft=python
-
+import typing
 from enum import Enum
 from pathlib import Path
 
@@ -27,11 +27,26 @@ class UnknownLineEndingName(Exception):
         super().__init__(f"The line ending name '{ending_name}' was not recognized")
 
 
+class CannotConvertAutoLineEnding(Exception):
+    def __init__(self, to_ending: "LineEnding"):
+        super().__init__(f"Cannot convert from mixed line ending to {to_ending}")
+
+
 class LineEnding(Enum):
     dos = "dos"  # \r\n
     unix = "unix"  # \n
     mixed = "mixed"
     invalid = "invalid"
+
+    def opposite(self):
+        assert self != self.invalid
+
+        if self == self.dos:
+            return self.unix
+        elif self == self.unix:
+            return self.dos
+        else:
+            raise CannotConvertAutoLineEnding(self)
 
     @staticmethod
     def parse(s: str) -> "LineEnding":
@@ -54,22 +69,18 @@ def detect_line(line: bytes) -> LineEnding:
         return LineEnding.invalid
 
 
-def detect(file: io.BufferedReader | Path | str) -> LineEnding | None:
+def detect(file: io.BufferedReader | Path) -> LineEnding | None:
     """Detects the line end for the given file."""
-    try:
-        if isinstance(file, Path) or isinstance(file, str):
-            file = open(file, "rb")
+    if isinstance(file, Path):
+        file = open(file, "rb")
 
-        mode = None
+    mode = None
 
-        for line in file:
-            line_mode = detect_line(line)
-            mode = line_mode if mode is None or mode == line_mode else LineEnding.mixed
+    for line in file:
+        line_mode = detect_line(line)
+        mode = line_mode if mode is None or mode == line_mode else LineEnding.mixed
 
-        return mode
-    finally:
-        if isinstance(file, io.BufferedReader):
-            file.close()
+    return mode
 
 
 def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
@@ -91,34 +102,29 @@ def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
         raise UnsupportedLineEnding(to_ending)
 
 
-def perform_convert(filepath: str, to_ending: LineEnding | None) -> None:
-    # If the line_ending was not specified, then detect the file line ending and
-    # convert to its opposite (dox <-> unix).
-    if to_ending is None:
-        with open(filepath, "rb") as file:
-            from_ending = detect(file)
-            if from_ending is None:
-                return
-            else:
-                to_ending = (
-                    LineEnding.unix if from_ending == LineEnding.dos else LineEnding.dos
-                )
-        print(f"{filepath}: {from_ending} -> {to_ending}")
-    else:
-        print(f"{filepath}: -> {to_ending}")
+def perform_convert(
+    input_file: io.BufferedReader | Path,
+    output_file: io.BufferedWriter | Path,
+    to_ending: LineEnding,
+) -> None:
+    # Load the file to memory.
+    if isinstance(input_file, Path):
+        input_file = open(input_file, "rb")
 
-    # Convert the file to the requested ending.
-    with open(filepath, "rb") as file:
-        file_contents = file.read()
+    file_contents = input_file.read()
 
+    # Convert the in-memory file buffer to the requested line ending.
     if to_ending == LineEnding.dos:
         file_contents = file_contents.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
     else:
         file_contents = file_contents.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
 
-    # Write the converted file out.
-    with open(filepath, "wb") as file:
-        file.write(file_contents)
+    # Write the converted buffer to disk.
+    if isinstance(output_file, Path):
+        with open(output_file, "wb") as file:
+            file.write(file_contents)
+    else:
+        output_file.write(file_contents)
 
 
 # ==============================================================================#
@@ -134,7 +140,11 @@ def main() -> None:
 
     group = args_parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "-c", "--convert", choices=["dos", "unix"], help="Line ending to convert to"
+        "-c",
+        "--convert",
+        choices=["dos", "unix", "auto"],
+        default="auto",
+        help="Line ending to convert to",
     )
     group.add_argument(
         "-d",
@@ -154,11 +164,22 @@ def main() -> None:
     args = args_parser.parse_args()
 
     # Perform the user requested action (convert or explain) on input files.
-    for file in args.inputs:
+    for input_reader in args.inputs:
         if args.detect:
-            print(detect(file))
+            print(detect(input_reader))
         else:
-            perform_convert(file, LineEnding.parse(args.convert))
+            if args.convert == "auto":
+                from_ending = detect(input_reader)
+                to_ending = from_ending.opposite()
+            else:
+                to_ending = LineEnding.parse(args.convert)
+
+            if input_reader == sys.stdin.buffer:
+                print("hello there")
+                perform_convert(input_reader, sys.stdout, to_ending)
+            else:
+                with open(f"{input_reader.name}", "wb") as output_file:
+                    perform_convert(input_reader, output_file, to_ending)
 
 
 if __name__ == "__main__":
