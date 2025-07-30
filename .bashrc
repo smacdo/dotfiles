@@ -57,7 +57,8 @@ set -o noclobber
 
 ## History
 # Append to bash history file rather than overwriting it.
-shopt -s histappend     # Append to bash history fle rather than overwriting it.
+shopt -s histappend
+PROMPT_COMMAND="history -a; $PROMPT_COMMAND"  # Append new commands each time prompt is displayed.
 
 HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 HISTFILESIZE=1000000    # One million entries
