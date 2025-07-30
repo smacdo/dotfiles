@@ -32,3 +32,11 @@ export CLICOLOR=1
 # ls colors (MacOS)
 export CLICOLOR=1
 export LSCOLORS=ExFxCxDxBxegedabagacad
+
+# View more types of files with `less` if `lesspipe` is installed.
+# Example: `less foo.zip`
+if [ -x /opt/homebrew/bin/lesspipe.sh ]; then
+  export LESSOPEN="|/opt/homebrew/bin/lesspipe.sh %s"
+elif [ -x /usr/bin/lesspipe.sh ]; then
+  export LESSOPEN="|/usr/bin/lesspipe.sh %s"
+fi

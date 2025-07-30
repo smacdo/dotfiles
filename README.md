@@ -91,3 +91,6 @@ configuration yet. Maybe I'll do that someday.
     * Terminal -> Scrollback lines unlimited scrollback [x]
     * Terminal -> Flash visual bell [x]
     * Keys -> Left Option Key = Esc+a
+
+## Packages
+* lesspipe
