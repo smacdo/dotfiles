@@ -76,5 +76,8 @@
   # prevent your repository from accumulating orphaned branches.
   prune = true
 
+[filter "lfs"]
+  required = true
+
 [include]
   path = ~/.my_gitconfig
