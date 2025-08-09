@@ -2,8 +2,8 @@
 # Author: Scott MacDonald <scott@smacdo.com>
 #-------------------------------------------------------------------------------
 # Configures a *nix environment to use the scripts and configuration values
-# contained in this git repository. Once this script is run, further system
-# bootstrapping can be performed with scripts found in `postinit`.
+# contained in this git repository. Once this script is run use the `init.py`
+# script to finish installation.
 #
 # Actions in this file should be idempotent - meaning it should be possible to
 # run this script multiple times without having problems arise.
@@ -77,7 +77,7 @@ main() {
   safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
   safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
   safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
-  safe_symlink "$checkout_dir/.dotfiles/shell_profile/env.sh" "$HOME/.zshenv"
+  safe_symlink "$checkout_dir/shell_profile/env.sh" "$HOME/.zshenv"
 
   # Neovim should share most of its configs with vim to reduce duplication since
   # I can't always be sure if neovim is installed on the local machine.
