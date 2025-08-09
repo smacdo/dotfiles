@@ -15,6 +15,12 @@
 # return immediately if the shell is not interactive.
 [[ -z "$DOTFILE_CI_TEST_MODE" ]] && [[ $- != *i* ]] && return
 
+# Export the dotfiles path as an environment variable to avoid hardcoding paths.
+# TODO: Is it possible to support installations other than ~/.dotfiles ?
+if [ -z ${S_DOTFILE_ROOT+x} ]; then
+  export S_DOTFILE_ROOT="$HOME/.dotfiles"
+fi
+
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 #
