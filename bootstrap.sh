@@ -71,13 +71,13 @@ main() {
   safe_symlink "$checkout_dir/.bash_profile" "$HOME/.bash_profile"
   safe_symlink "$checkout_dir/.bashrc" "$HOME/.bashrc"
   safe_symlink "$checkout_dir/.zshrc" "$HOME/.zshrc"
+  safe_symlink "$checkout_dir/.zshenv" "$HOME/.zshenv"
   safe_symlink "$checkout_dir/.p10k.zsh" "$HOME/.p10k.zsh"
   safe_symlink "$checkout_dir/zsh_files" "$HOME/.zsh"
   safe_symlink "$checkout_dir/.dircolors" "$HOME/.dircolors"
   safe_symlink "$checkout_dir/.tmux.conf" "$HOME/.tmux.conf"
   safe_symlink "$checkout_dir/.inputrc" "$HOME/.inputrc"
   safe_symlink "$checkout_dir/.profile" "$HOME/.profile"
-  safe_symlink "$checkout_dir/shell_profile/env.sh" "$HOME/.zshenv"
 
   # Neovim should share most of its configs with vim to reduce duplication since
   # I can't always be sure if neovim is installed on the local machine.
