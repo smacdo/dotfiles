@@ -128,6 +128,16 @@ fi
 # Finish zsh auto completion init.
 compinit
 
+# Load any optional per-machine config profiles at the end to allow them to
+# override this default config profile.
+if [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]; then
+    source "${HOME}/.my_shell_profile.sh"
+fi
+
+if [ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]; then
+    source "${HOME}/.my_zshrc.sh"
+fi
+
 # Load zsh syntax highlighting plugin. According to install instructions this
 # line must be last in the .zshrc file.
 # TODO: Source the correct path on Debian, Fedora, Windows.
@@ -140,11 +150,3 @@ else
   [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
-
-# Load any optional per-machine config profiles at the end to allow them to 
-# override this default config profile.
-[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
-&& source "${HOME}/.my_shell_profile.sh"
-
-[ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]\
-&& source "${HOME}/.my_zshrc.sh"

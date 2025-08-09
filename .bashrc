@@ -118,10 +118,12 @@ fi
 # Load fzf support.
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-# Load any optional per-machine configuration profiles at the end to allow them
-# to override the default config profile.
-[ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]\
-&& source "${HOME}/.my_shell_profile.sh"
+# Load any optional per-machine config profiles at the end to allow them to
+# override this default config profile.
+if [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]; then
+    source "${HOME}/.my_shell_profile.sh"
+fi
 
-[ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]\
-&& source "${HOME}/.my_bashrc.sh"
+if [ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]; then
+    source "${HOME}/.my_zshrc.sh"
+fi
