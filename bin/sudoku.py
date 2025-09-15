@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
 """
 A simple Sudoku puzzle solver.
 """
 
 import argparse
+import unittest
 from io import TextIOWrapper
+from typing import Generator
 
 BOX_ROWS = 3
 BOX_COLS = 3
@@ -11,6 +14,47 @@ MAX_ROWS = 9
 MAX_COLS = 9
 MIN_DIGIT = 1
 MAX_DIGIT = 9
+MAX_SOLVE_ITERATIONS = 20
+
+
+def all_cells() -> Generator[tuple[int, int], None, None]:
+    for r_i in range(0, MAX_ROWS):
+        for c_i in range(0, MAX_COLS):
+            yield r_i, c_i
+
+
+def row_peers(row: int, col: int) -> Generator[tuple[int, int], None, None]:
+    for c_i in range(0, MAX_COLS):
+        if c_i == col:
+            continue
+
+        yield row, c_i
+
+
+def col_peers(row: int, col: int) -> Generator[tuple[int, int], None, None]:
+    for r_i in range(0, MAX_ROWS):
+        if r_i == row:
+            continue
+
+        yield r_i, col
+
+
+def box_peers(row: int, col: int) -> Generator[tuple[int, int], None, None]:
+    start_row = (row // BOX_ROWS) * BOX_ROWS
+    start_col = (col // BOX_COLS) * BOX_COLS
+
+    for r_i in range(start_row, start_row + BOX_ROWS):
+        for c_i in range(start_col, start_col + BOX_COLS):
+            if r_i == row and c_i == col:
+                continue
+
+            yield r_i, c_i
+
+
+def all_peers(row: int, col: int) -> Generator[tuple[int, int], None, None]:
+    yield from row_peers(row, col)
+    yield from col_peers(row, col)
+    yield from box_peers(row, col)
 
 
 class Cell:
@@ -48,6 +92,32 @@ class Cell:
     def is_complete(self) -> bool:
         return len(self.digits) == 1
 
+    def solution(self) -> int:
+        if len(self.digits) == 1:
+            return self.digits[0]
+        else:
+            raise Exception(
+                f"cannot get solution at row {self.row} col {self.col} because it has multiple digits ({self.digits})"
+            )
+
+    def try_eliminate(self, digit: int) -> bool:
+        if digit in self.digits:
+            if len(self.digits) == 1:
+                raise Exception(
+                    f"cannot remove the last value from cell row {self.row} col {self.col}"
+                )
+
+            self.digits.remove(digit)
+            return True
+        else:
+            return False
+
+    def __contains__(self, item: any) -> bool:
+        return item in self.digits
+
+    def __len__(self) -> int:
+        return len(self.digits)
+
     def __str__(self) -> str:
         return self.to_formatted_str()
 
@@ -70,6 +140,17 @@ class Sudoku:
     cells: list[list[Cell]]
 
     def __init__(self, initial_values: list[list[int | None]]) -> None:
+        if len(initial_values) != MAX_ROWS:
+            raise ValueError(
+                f"expected {MAX_ROWS} rows but got {len(initial_values)} when initializing sudoku"
+            )
+
+        for r_i in range(0, MAX_ROWS):
+            if len(initial_values[r_i]) != MAX_COLS:
+                raise ValueError(
+                    f"expected {MAX_COLS} columns but got {len(initial_values[r_i])} when initializing sudoku row {r_i}"
+                )
+
         self.cells = [
             [
                 Cell(row=row, col=col, initial_value=initial_values[row][col])
@@ -77,6 +158,42 @@ class Sudoku:
             ]
             for row in range(0, MAX_ROWS)
         ]
+
+    def is_solved(self) -> bool:
+        return self.cells_completed() == MAX_ROWS * MAX_COLS
+
+    def cells_completed(self) -> int:
+        count = 0
+
+        for r, c in all_cells():
+            if self.cells[r][c].is_complete():
+                count += 1
+
+        return count
+
+    def validate(self) -> None:
+        for row, col in all_cells():
+            cell = self.cells[row][col]
+
+            if cell.is_complete():
+                cell_value = cell.solution()
+
+                for n_row, n_col in all_peers(row, col):
+                    n_cell = self.cells[n_row][n_col]
+
+                    if n_cell.is_complete() and cell.solution() == n_cell.solution():
+                        raise Exception(
+                            f"digit {cell_value} at row {n_row} col {n_col} conflicts with row {row} col {col}"
+                        )
+
+    def __getitem__(self, key: tuple[int, int]) -> Cell:
+        return self.cells[key[0]][key[1]]
+
+    def __setitem__(self, key: any, value: any) -> None:
+        raise NotImplementedError()
+
+    def __delitem__(self, key):
+        raise NotImplementedError()
 
     def __str__(self) -> str:
         return self.to_formatted_str(multi_line=True)
@@ -92,9 +209,6 @@ class Sudoku:
         cell_space_required = 1
 
         if show_candidates:
-            # TODO: Calculate the maximum space required to show candidates.
-            #       - use .center() just center justify all candidates.
-            #       - format per cell is "{123456789}" or "3" if one value.
             for row in range(0, MAX_ROWS):
                 for col in range(0, MAX_COLS):
                     space_required = len(
@@ -163,6 +277,52 @@ def parse_sudoku(sudoku_text: str) -> Sudoku:
     return Sudoku(rows)
 
 
+def solve(sudoku: Sudoku) -> int:
+    print(f"solve started with {sudoku.cells_completed()} initial cells provided")
+
+    for i in range(MAX_SOLVE_ITERATIONS):
+        eliminations = propagate_constraints(sudoku)
+
+        if eliminations > 0:
+            print(
+                f"iteration {i}: {eliminations} elimination with {sudoku.cells_completed()} completed"
+            )
+        elif not sudoku.is_solved():
+            raise Exception(
+                f"failed to solve puzzle with constraint propagation after {i + 1} iterations"
+            )
+        else:
+            return i
+
+    raise Exception(
+        f"failed to solve puzzle with constraint propagation after {MAX_SOLVE_ITERATIONS} iterations"
+    )
+
+
+def propagate_constraints(sudoku: Sudoku) -> int:
+    eliminations = 0
+
+    for row, col in all_cells():
+        eliminations += propagate_constraint_at(sudoku, row, col)
+
+    return eliminations
+
+
+def propagate_constraint_at(sudoku: Sudoku, row: int, col: int) -> int:
+    eliminations = 0
+    cell = sudoku.cells[row][col]
+
+    if not cell.is_complete():
+        return eliminations
+
+    for n_row, n_col in all_peers(row, col):
+        n_cell = sudoku.cells[n_row][n_col]
+        if n_cell.try_eliminate(cell.solution()):
+            eliminations += 1
+
+    return eliminations
+
+
 def load_sudoku_file(sudoku_file: TextIOWrapper) -> Sudoku:
     return parse_sudoku(sudoku_file.read())
 
@@ -174,11 +334,70 @@ def main():
         "-i", "--input", type=argparse.FileType("r"), required=True, help="sudoku file"
     )
 
-    print(
-        load_sudoku_file(parser.parse_args().input).to_formatted_str(
-            with_grid=True, show_candidates=True
+    sudoku = load_sudoku_file(parser.parse_args().input)
+    sudoku.validate()
+
+    try:
+        solve(sudoku)
+        sudoku.validate()
+
+        print(sudoku.to_formatted_str(with_grid=True))
+    except Exception as e:  # TODO: print it
+        print(sudoku.to_formatted_str(with_grid=True, show_candidates=True))
+        print("*** error ***")
+        print(e)
+
+
+class SudokuTests(unittest.TestCase):
+    def test_peer_generators(self):
+        self.assertEqual(
+            [x for x in row_peers(3, 6)],
+            [
+                (3, 0),
+                (3, 1),
+                (3, 2),
+                (3, 3),
+                (3, 4),
+                (3, 5),
+                (3, 7),
+                (3, 8),
+            ],
         )
-    )
+
+        self.assertEqual(
+            [x for x in col_peers(3, 6)],
+            [
+                (0, 6),
+                (1, 6),
+                (2, 6),
+                (4, 6),
+                (5, 6),
+                (6, 6),
+                (7, 6),
+                (8, 6),
+            ],
+        )
+
+        self.assertEqual(
+            [x for x in box_peers(4, 6)],
+            [
+                (3, 6),
+                (3, 7),
+                (3, 8),
+                (4, 7),
+                (4, 8),
+                (5, 6),
+                (5, 7),
+                (5, 8),
+            ],
+        )
+
+        self.assertEqual(
+            [x for x in all_peers(4, 6)],
+            [x for x in row_peers(4, 6)]
+            + [x for x in col_peers(4, 6)]
+            + [x for x in box_peers(4, 6)],
+        )
 
 
 if __name__ == "__main__":
