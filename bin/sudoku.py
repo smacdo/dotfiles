@@ -323,8 +323,15 @@ def propagate_constraint_at(sudoku: Sudoku, row: int, col: int) -> int:
     return eliminations
 
 
-def load_sudoku_file(sudoku_file: TextIOWrapper) -> Sudoku:
-    return parse_sudoku(sudoku_file.read())
+def load_sudoku_file(
+    sudoku_file: TextIOWrapper, multi_puzzle: bool = False
+) -> list[Sudoku]:
+    file_contents = sudoku_file.read()
+
+    if multi_puzzle:
+        return [parse_sudoku(line) for line in file_contents.splitlines()]
+    else:
+        return [parse_sudoku(file_contents)]
 
 
 def main():
@@ -333,19 +340,31 @@ def main():
     parser.add_argument(
         "-i", "--input", type=argparse.FileType("r"), required=True, help="sudoku file"
     )
+    parser.add_argument(
+        "-m",
+        "--multi",
+        action="store_true",
+        help="Specify that the input file has multiple puzzles (one per line)",
+    )
 
-    sudoku = load_sudoku_file(parser.parse_args().input)
-    sudoku.validate()
+    args = parser.parse_args()
 
-    try:
-        solve(sudoku)
+    for index, sudoku in enumerate(
+        load_sudoku_file(parser.parse_args().input, multi_puzzle=args.multi)
+    ):
+        # TODO: catch validation failure exceptions (should be special type), print and continue.
         sudoku.validate()
 
-        print(sudoku.to_formatted_str(with_grid=True))
-    except Exception as e:  # TODO: print it
-        print(sudoku.to_formatted_str(with_grid=True, show_candidates=True))
-        print("*** error ***")
-        print(e)
+        # TODO: solver exceptions should be special type
+        try:
+            solve(sudoku)
+            sudoku.validate()
+
+            print(sudoku.to_formatted_str(with_grid=True))
+        except Exception as e:  # TODO: print it
+            print(sudoku.to_formatted_str(with_grid=True, show_candidates=True))
+            print(f"*** error for puzzle on line {index} ***")
+            print(e)
 
 
 class SudokuTests(unittest.TestCase):
