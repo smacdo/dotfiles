@@ -4,9 +4,14 @@ A simple Sudoku puzzle solver.
 """
 
 import argparse
+import logging
 import unittest
 from io import TextIOWrapper
 from typing import Generator
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 BOX_ROWS = 3
 BOX_COLS = 3
@@ -136,19 +141,64 @@ class Cell:
                 return unknown_value
 
 
+class SudokuException(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class SudokuValidationError(SudokuException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class SudokuInvalidCharacterError(SudokuValidationError):
+    def __init__(self, char: str, index: int) -> None:
+        super().__init__(
+            f"unknown character {char} at index {index} when parsing sudoku"
+        )
+
+
+class SudokuInvalidRowCountError(SudokuValidationError):
+    def __init__(self, expected_row_count: int, actual_row_count: int) -> None:
+        super().__init__(
+            f"expected {expected_row_count} rows but got {actual_row_count} rows"
+        )
+
+
+class SudokuInvalidColCountError(SudokuValidationError):
+    def __init__(
+        self, row: int, expected_col_count: int, actual_col_count: int
+    ) -> None:
+        super().__init__(
+            f"expected {expected_col_count} cols but got {actual_col_count} cols at row {row}"
+        )
+
+
+class SudokuInvalidDigitError(SudokuValidationError):
+    def __init__(
+        self, digit: int, row_i: int, col_i: int, row_j: int, col_j: int
+    ) -> None:
+        super().__init__(
+            f"digit {digit} at row {row_j} col {col_j} conflicts with row {row_i} col {col_i}"
+        )
+
+
+class SudokuCannotSolveError(SudokuValidationError):
+    def __init__(self, iteration_count: int) -> None:
+        super().__init__(f"failed to solve sudoku after {iteration_count} iterations")
+
+
 class Sudoku:
     cells: list[list[Cell]]
 
     def __init__(self, initial_values: list[list[int | None]]) -> None:
         if len(initial_values) != MAX_ROWS:
-            raise ValueError(
-                f"expected {MAX_ROWS} rows but got {len(initial_values)} when initializing sudoku"
-            )
+            raise SudokuInvalidRowCountError(MAX_ROWS, len(initial_values))
 
         for r_i in range(0, MAX_ROWS):
             if len(initial_values[r_i]) != MAX_COLS:
-                raise ValueError(
-                    f"expected {MAX_COLS} columns but got {len(initial_values[r_i])} when initializing sudoku row {r_i}"
+                raise SudokuInvalidColCountError(
+                    r_i, MAX_COLS, len(initial_values[r_i])
                 )
 
         self.cells = [
@@ -251,11 +301,6 @@ def parse_sudoku(sudoku_text: str) -> Sudoku:
     sudoku_text = sudoku_text.replace("\n", "")
     sudoku_text = sudoku_text.strip()
 
-    if len(sudoku_text) != MAX_ROWS * MAX_COLS:
-        raise ValueError(
-            f"sudoku input file must be {MAX_ROWS * MAX_COLS} chars in length, but was {len(sudoku_text)}"
-        )
-
     rows = []
 
     for row in range(0, MAX_ROWS):
@@ -270,33 +315,29 @@ def parse_sudoku(sudoku_text: str) -> Sudoku:
             elif len(char) == 1 and char.isdigit():
                 rows[-1].append(int(char))
             else:
-                raise ValueError(
-                    f"unknown character {char} at index {index} when parsing sudoku input"
-                )
+                raise SudokuInvalidCharacterError(char, index)
 
     return Sudoku(rows)
 
 
 def solve(sudoku: Sudoku) -> int:
-    print(f"solve started with {sudoku.cells_completed()} initial cells provided")
+    logging.debug(
+        f"solve started with {sudoku.cells_completed()} initial cells provided"
+    )
 
     for i in range(MAX_SOLVE_ITERATIONS):
         eliminations = propagate_constraints(sudoku)
 
         if eliminations > 0:
-            print(
+            logging.debug(
                 f"iteration {i}: {eliminations} elimination with {sudoku.cells_completed()} completed"
             )
         elif not sudoku.is_solved():
-            raise Exception(
-                f"failed to solve puzzle with constraint propagation after {i + 1} iterations"
-            )
+            raise SudokuCannotSolveError(iteration_count=i + 1)
         else:
             return i
 
-    raise Exception(
-        f"failed to solve puzzle with constraint propagation after {MAX_SOLVE_ITERATIONS} iterations"
-    )
+    raise SudokuCannotSolveError(iteration_count=MAX_SOLVE_ITERATIONS)
 
 
 def propagate_constraints(sudoku: Sudoku) -> int:
@@ -346,25 +387,55 @@ def main():
         action="store_true",
         help="Specify that the input file has multiple puzzles (one per line)",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Show additional logging output",
+    )
 
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    prevalidation_error_count = 0
+    solver_error_count = 0
 
     for index, sudoku in enumerate(
         load_sudoku_file(parser.parse_args().input, multi_puzzle=args.multi)
     ):
-        # TODO: catch validation failure exceptions (should be special type), print and continue.
-        sudoku.validate()
+        # Validate sudoku input prior to solving it.
+        try:
+            sudoku.validate()
+        except SudokuValidationError as e:
+            logging.error(
+                f"Sudoku on line {index} failed validation after loading: {e}"
+            )
+            prevalidation_error_count += 1
+            continue
 
-        # TODO: solver exceptions should be special type
+        # Solve the Sudoku puzzle.
         try:
             solve(sudoku)
             sudoku.validate()
 
             print(sudoku.to_formatted_str(with_grid=True))
-        except Exception as e:  # TODO: print it
+        except SudokuValidationError as e:
+            print("===== SOLVER ERROR =====")
             print(sudoku.to_formatted_str(with_grid=True, show_candidates=True))
-            print(f"*** error for puzzle on line {index} ***")
-            print(e)
+            print(f"ERROR: {e}")
+            print(f" LINE: {index + 1}")
+            print("========================")
+            solver_error_count += 1
+
+    if prevalidation_error_count > 0:
+        logging.error(
+            f"!!! Encountered {prevalidation_error_count} load validation errors!"
+        )
+
+    if solver_error_count > 0:
+        logging.error(f"!!! Encountered {solver_error_count} solver errors!")
 
 
 class SudokuTests(unittest.TestCase):
