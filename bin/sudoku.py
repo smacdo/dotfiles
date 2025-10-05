@@ -22,6 +22,53 @@ MAX_DIGIT = 9
 MAX_SOLVE_ITERATIONS = 20
 
 
+class SudokuException(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class SudokuValidationError(SudokuException):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class SudokuInvalidCharacterError(SudokuValidationError):
+    def __init__(self, char: str, index: int) -> None:
+        super().__init__(
+            f"unknown character {char} at index {index} when parsing sudoku"
+        )
+
+
+class SudokuInvalidRowCountError(SudokuValidationError):
+    def __init__(self, expected_row_count: int, actual_row_count: int) -> None:
+        super().__init__(
+            f"expected {expected_row_count} rows but got {actual_row_count} rows"
+        )
+
+
+class SudokuInvalidColCountError(SudokuValidationError):
+    def __init__(
+        self, row: int, expected_col_count: int, actual_col_count: int
+    ) -> None:
+        super().__init__(
+            f"expected {expected_col_count} cols but got {actual_col_count} cols at row {row}"
+        )
+
+
+class SudokuInvalidDigitError(SudokuValidationError):
+    def __init__(
+        self, digit: int, row_i: int, col_i: int, row_j: int, col_j: int
+    ) -> None:
+        super().__init__(
+            f"digit {digit} at row {row_j} col {col_j} conflicts with row {row_i} col {col_i}"
+        )
+
+
+class SudokuCannotSolveError(SudokuValidationError):
+    def __init__(self, iteration_count: int) -> None:
+        super().__init__(f"failed to solve sudoku after {iteration_count} iterations")
+
+
 def all_cells() -> Generator[tuple[int, int], None, None]:
     for r_i in range(0, MAX_ROWS):
         for c_i in range(0, MAX_COLS):
@@ -105,17 +152,28 @@ class Cell:
                 f"cannot get solution at row {self.row} col {self.col} because it has multiple digits ({self.digits})"
             )
 
-    def try_eliminate(self, digit: int) -> bool:
-        if digit in self.digits:
-            if len(self.digits) == 1:
+    def _eliminate(self, digit: int, throw_if_missing: bool = False) -> bool:
+        if digit not in self.digits:
+            if throw_if_missing:
                 raise Exception(
-                    f"cannot remove the last value from cell row {self.row} col {self.col}"
+                    f"cannot eliminate digit {digit} because it is not in the list of possible digits {self.digits} at row {self.row} col {self.col}"
                 )
 
-            self.digits.remove(digit)
-            return True
-        else:
             return False
+
+        if len(self.digits) == 1:
+            raise Exception(
+                f"cannot eliminate the last digit {digit} at row {self.row} col {self.col}"
+            )
+
+        self.digits.remove(digit)
+        return True
+
+    def eliminate(self, digit: int):
+        self._eliminate(digit, throw_if_missing=True)
+
+    def try_eliminate(self, digit: int) -> bool:
+        return self._eliminate(digit, throw_if_missing=False)
 
     def __contains__(self, item: any) -> bool:
         return item in self.digits
@@ -139,53 +197,6 @@ class Cell:
                 return f"{{{all_digits_str}}}"
             else:
                 return unknown_value
-
-
-class SudokuException(Exception):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
-
-class SudokuValidationError(SudokuException):
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
-
-class SudokuInvalidCharacterError(SudokuValidationError):
-    def __init__(self, char: str, index: int) -> None:
-        super().__init__(
-            f"unknown character {char} at index {index} when parsing sudoku"
-        )
-
-
-class SudokuInvalidRowCountError(SudokuValidationError):
-    def __init__(self, expected_row_count: int, actual_row_count: int) -> None:
-        super().__init__(
-            f"expected {expected_row_count} rows but got {actual_row_count} rows"
-        )
-
-
-class SudokuInvalidColCountError(SudokuValidationError):
-    def __init__(
-        self, row: int, expected_col_count: int, actual_col_count: int
-    ) -> None:
-        super().__init__(
-            f"expected {expected_col_count} cols but got {actual_col_count} cols at row {row}"
-        )
-
-
-class SudokuInvalidDigitError(SudokuValidationError):
-    def __init__(
-        self, digit: int, row_i: int, col_i: int, row_j: int, col_j: int
-    ) -> None:
-        super().__init__(
-            f"digit {digit} at row {row_j} col {col_j} conflicts with row {row_i} col {col_i}"
-        )
-
-
-class SudokuCannotSolveError(SudokuValidationError):
-    def __init__(self, iteration_count: int) -> None:
-        super().__init__(f"failed to solve sudoku after {iteration_count} iterations")
 
 
 class Sudoku:
@@ -362,6 +373,73 @@ def propagate_constraint_at(sudoku: Sudoku, row: int, col: int) -> int:
             eliminations += 1
 
     return eliminations
+
+
+def assign(sudoku: Sudoku, row: int, col: int, digit: int) -> None:
+    """
+    Assigns `digit` as the single possible value for the cell at row `row` and col `col`, and remove
+    other digits as possible values. The function will also remove `digit` as possible value from
+    the cell's peers or raise an exception if a contradiction is encountered.
+    """
+    cell = sudoku[(row, col)]
+
+    for d in cell.digits:
+        if d != digit:
+            eliminate(sudoku, row, col, d)
+
+    assert cell.solution() == digit
+
+
+def eliminate(sudoku: Sudoku, row: int, col: int, digit: int) -> None:
+    """
+    Removes `digit` as a possible solution for the requested cell.
+
+    :param sudoku:
+    :param row:
+    :param col:
+    :param digit:
+    :return:
+    """
+    cell = sudoku.cells[row][col]
+    assert digit in cell.digits
+
+    # Remove the digit from `cell`'s possible solutions.
+    assert cell.eliminate(digit)
+
+    # If there is only one possible digit left for cell, then it must be the solution. Eliminate
+    # this digit from the cell's peers.
+    if cell.is_complete():
+        assert digit == cell.solution()
+
+        for row_j, col_j in all_peers(row, col):
+            peer = sudoku.cells[row_j][col_j]
+            peer.try_eliminate(digit)
+
+    # Check this cell's row, column and box units. If there's only one location for the digit in
+    # a set then assign it, otherwise if there are no locations throw an exception.
+    def find_possible_cells(
+        digit: int, peers: Generator[tuple[int, int], None, None]
+    ) -> Generator[Cell, None, None]:
+        for row_k, col_k in peers:
+            if digit in sudoku.cells[row_k][col_k]:
+                yield sudoku.cells[row_k][col_k]
+
+    for peer_group_generator in [
+        row_peers(row, col),
+        col_peers(col, row),
+        box_peers(row, col),
+    ]:
+        # Locate the cells in the peer group where this digit could be placed, or has been placed.
+        # TODO: avoid the allocation from calling list.
+        places = list(find_possible_cells(digit, peer_group_generator))
+
+        if len(places) == 0:
+            # TODO: Make specialized exception with better message
+            raise Exception(
+                "peer group must have a cell where digit {digit} can be placed"
+            )
+        elif len(places) == 1 and not places[0].is_complete():
+            assign(sudoku, places[0].row, places[1].col, digit)
 
 
 def load_sudoku_file(
