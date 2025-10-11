@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+### A script for RimWorld that determines thread on/off phases for the Phoebe storyteller.
+# vim: set filetype=python
+# Ref: https://rimworldwiki.com/wiki/Phoebe_Chillax
+import argparse
+from typing import NamedTuple
+
+# Day when threat begins for the first time.
+INITIAL_THREAT_DAY = 13
+
+# The number of days that threat lasts for.
+THREAT_LENGTH = 8
+
+# The number of days in a threat cycle.
+CYCLE_LENGTH = THREAT_LENGTH * 2
+
+# The day when the first cycle ends.
+INITIAL_CYCLE_END = INITIAL_THREAT_DAY + THREAT_LENGTH
+
+
+class ThreatPeriod(NamedTuple):
+    """
+    Details on the beginning and end of a threat period's active phase.
+
+    :ivar start: The day when the active phase of a threat period begins.
+    :ivar end: The day when the active phase of a threat period ends.
+    """
+
+    start: int
+    end: int
+
+
+def threat_cycle(day: int) -> ThreatPeriod:
+    """
+    Calculates the start and end of the threat period for the given day. If the storyteller threat
+    is in the off phase for the given day, then the next upcoming threat period will be returned.
+
+    :param day: The day to calculate the threat period for.
+    :return: Start and stop days for the threat period.
+    """
+    if day < 1:
+        raise ValueError(f"day {day} must be a non-zero positive integer")
+
+    if day < INITIAL_CYCLE_END:
+        return ThreatPeriod(start=INITIAL_THREAT_DAY, end=INITIAL_CYCLE_END)
+    else:
+        day -= INITIAL_CYCLE_END
+        index = (day // CYCLE_LENGTH) + 1
+        return ThreatPeriod(
+            start=INITIAL_THREAT_DAY + CYCLE_LENGTH * index,
+            end=INITIAL_CYCLE_END + CYCLE_LENGTH * index,
+        )
+
+
+def print_table(start_day: int, end_day: int) -> None:
+    """
+    Prints a table of active threat periods for a range of days starting from `start_day` to
+    `end_day`.
+
+    :param start_day: The first day to use when generating the period table.
+    :param end_day: The last day to use when generating the period table.
+    """
+    if start_day < 1:
+        raise ValueError(f"start_day {start_day} must be a non-zero positive integer")
+    if end_day <= start_day:
+        raise ValueError(f"end_day {end_day} must be larger than start_day {start_day}")
+
+    last_threat: ThreatPeriod | None = None
+
+    print(f"{'START':<5}   {'END':<5}")
+    print("-" * 12)
+
+    for i in range(start_day, end_day):
+        threat = threat_cycle(i)
+        if last_threat is None or threat.start != last_threat.start:
+            print(f"{threat.start:<5}   {threat.end:<5}")
+            last_threat = threat
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Calculate Phoebe Chillax storyteller threat periods for RimWorld",
+        epilog="Examples:\n"
+        "  %(prog)s 15          # Check if day 15 is a threat day\n"
+        "  %(prog)s --end 100   # Show threat table for days 1-100",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "day",
+        nargs="?",
+        type=int,
+        help="check threat status for a specific day (if blank then a threat table will be shown)",
+    )
+    parser.add_argument(
+        "--start",
+        default=1,
+        type=int,
+        help="start day to use if generating a threat period table (default: 1)",
+    )
+    parser.add_argument(
+        "--end",
+        default=200,
+        type=int,
+        help="end day to use if generating a threat period table",
+    )
+
+    args = parser.parse_args()
+
+    if args.day is None:
+        print_table(args.start, args.end + 1)
+    else:
+        day = args.day
+        threat = threat_cycle(day)
+
+        if day < threat.start:
+            print(f"Day {day}: OFF phase")
+            print(
+                f"Threat period starts in {threat.start - day} days on day {threat.start}"
+            )
+        else:
+            print(f"Day {day}: THREAT ACTIVE")
+            print(f"Threat period ends in {threat.end - day} days on day {threat.end}")
+
+
+if __name__ == "__main__":
+    main()
