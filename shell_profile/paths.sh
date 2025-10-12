@@ -49,6 +49,9 @@ add_path_back() {
 # (prepended in case cargo needs to override system installed rustc).
 add_path_back "$HOME/.cargo/bin"
 
+# UV installs tools to the user's home directory as well.
+add_path_back "$HOME/.local/share/uv/tools"
+
 # Support local homebrew installs (~/homebrew)
 #
 # NOTE: The new preferred local dir for homebrew is `.homebrew`. Continue to
@@ -60,15 +63,8 @@ if [ -d "$HOME/homebrew/bin" ]; then
 fi
 
 add_path_front "/opt/homebrew/bin"
-
 add_path_front "$HOME/.homebrew/bin"
 add_path_front "$HOME/.homebrew/sbin"
 
 # Also support scripts from dotfiles (this will override ~/homebrew).
 add_path_back "$S_DOTFILE_ROOT/bin"
-
-# Also support scripts in user bin (overriding previous).
-add_path_back "$HOME/bin"
-
-
-
