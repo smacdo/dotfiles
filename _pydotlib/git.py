@@ -1,9 +1,32 @@
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import CalledProcessError
+
+
+def get_repo_root(path: Path) -> Path | None:
+    # Use the git command to find the top level directory for the repo.
+    try:
+        git_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+    except CalledProcessError as e:
+        if e.stderr.startswith("fatal: not a git repository"):
+            return None
+
+        raise
+
+    # Read the directory from stdout, and verify that it's a valid directory before returning.
+    root_dir = Path(git_result.stdout.strip()).resolve()
+
+    return root_dir
 
 
 def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
