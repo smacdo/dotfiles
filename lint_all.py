@@ -15,6 +15,7 @@ PY_SHEBANGS = ["#!/usr/bin/env python3"]
 
 BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
 DOTFILES_SH_SCRIPTS = ["bootstrap.sh", "setup.sh"]
+DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "init.py"]
 
 
 ################################################################################
@@ -66,10 +67,9 @@ def lint_py_files(file_paths: list[str]) -> list[str]:
 
     for file_path in file_paths:
         # Typecheck the python file.
-        result = subprocess.run([
-            "mypy", "--no-error-summary", "--disallow-untyped-calls",
-            file_path
-        ])
+        result = subprocess.run(
+            ["mypy", "--no-error-summary", "--disallow-untyped-calls", file_path]
+        )
 
         if result.returncode != 0:
             files_failed.append(file_path)
@@ -134,7 +134,7 @@ def find_shell_scripts(
 def main() -> None:
     # Command line arguments.
     parser = argparse.ArgumentParser("dotfiles lint checker")
-    parser.add_argument('-v', '--verbose', action='store_true', help='verbose logging')
+    parser.add_argument("-v", "--verbose", action="store_true", help="verbose logging")
 
     args = parser.parse_args()
 
@@ -159,7 +159,7 @@ def main() -> None:
     # Lint python scripts.
     logging.info("linting python scripts...")
     failed_py_files = lint_py_files(
-        ["lint_all.py"] + find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS)
+        DOTFILES_PY_SCRIPTS + find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS)
     )
 
     if len(failed_py_files) > 0:
