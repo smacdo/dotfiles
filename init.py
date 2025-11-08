@@ -13,7 +13,12 @@ from pathlib import Path
 import argparse
 import logging
 
-from _pydotlib.bootstrap import is_dotfiles_root, safe_symlink
+from _pydotlib.bootstrap import (
+    create_dirs,
+    download_files,
+    is_dotfiles_root,
+    safe_symlink,
+)
 from _pydotlib.cli import ColoredLogFormatter, confirm, input_field
 from _pydotlib.git import (
     get_repo_root,
@@ -75,21 +80,6 @@ def apply_dotfile_symlinks(
         safe_symlink(
             source=dotfiles_dir.joinpath(source), target=target, dry_run=dry_run
         )
-
-
-def create_dirs(dry_run: bool, dirs: list[str | Path]) -> None:
-    dry_text = "[DRY RUN] " if dry_run else ""
-
-    for d in dirs:
-        d = Path(d)
-
-        if d.exists() and not d.is_dir():
-            logger.error(f"{dry_text}expected {d} to be a directory, but it is not")
-        elif d.exists():
-            logger.info(f"{dry_text}{d} already exists")
-        else:
-            d.mkdir(parents=True, exist_ok=True)
-            logger.info(f"{dry_text}Created dir {d}")
 
 
 def main() -> None:
@@ -158,6 +148,24 @@ def main() -> None:
             ("settings/nvim/init.vim", home_dir / ".vimrc"),
             ("settings/nvim/init.vim", xdg_config_dir() / "nvim/init.vim"),
             ("settings/nvim/site/plugin", xdg_data_dir() / "nvim/site/plugin"),
+        ],
+    )
+
+    download_files(
+        dry_run=args.dry_run,
+        urls=[
+            (
+                "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
+                home_dir / ".vim/autoload/plug.vim",
+            ),
+            (
+                "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
+                xdg_data_dir() / "nvim/site/autoload/plug.vim",
+            ),
+            (
+                "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
+                "/tmp/foo",
+            ),
         ],
     )
 
