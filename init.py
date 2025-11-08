@@ -20,7 +20,7 @@ from _pydotlib.git import (
     read_git_config_file,
     update_git_config_file,
 )
-from _pydotlib.xdg import xdg_config_dir, xdg_data_dir
+from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,24 @@ def apply_dotfile_symlinks(
     assert dotfiles_dir.is_dir()
 
     for source, target in files:
-        safe_symlink(source=dotfiles_dir.joinpath(source), target=target, dry_run=True)
+        safe_symlink(
+            source=dotfiles_dir.joinpath(source), target=target, dry_run=dry_run
+        )
+
+
+def create_dirs(dry_run: bool, dirs: list[str | Path]) -> None:
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    for d in dirs:
+        d = Path(d)
+
+        if d.exists() and not d.is_dir():
+            logger.error(f"{dry_text}expected {d} to be a directory, but it is not")
+        elif d.exists():
+            logger.info(f"{dry_text}{d} already exists")
+        else:
+            d.mkdir(parents=True, exist_ok=True)
+            logger.info(f"{dry_text}Created dir {d}")
 
 
 def main() -> None:
@@ -111,6 +128,14 @@ def main() -> None:
 
     # Run installation commands.
     home_dir = Path.home()
+
+    create_dirs(
+        dry_run=args.dry_run,
+        dirs=[
+            xdg_state_dir() / "vim/backups",
+            xdg_state_dir() / "vim/tmp",
+        ],
+    )
 
     apply_dotfile_symlinks(
         dotfiles_dir=git_root,

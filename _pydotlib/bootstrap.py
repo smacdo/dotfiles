@@ -94,7 +94,7 @@ def make_local_config(source: Path, target: Path) -> bool:
         target: Path to the target file.
     """
     if target.exists():
-        # TODO: log that the file already exists, and this step will be skipped.
+        logging.info(f"{source} already exists")
         return False
 
     if not source.exists():
