@@ -14,8 +14,8 @@ PY_EXTS = [".py"]
 PY_SHEBANGS = ["#!/usr/bin/env python3"]
 
 BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
-DOTFILES_SH_SCRIPTS = ["bootstrap.sh", "setup.sh"]
-DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "init.py"]
+DOTFILES_SH_SCRIPTS = ["_setup.sh"]
+DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
 
 
 ################################################################################

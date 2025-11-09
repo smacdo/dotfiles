@@ -5,5 +5,5 @@ RUN apk add --no-cache zsh
 RUN apk add --no-cache curl
 COPY . /root/.dotfiles
 WORKDIR /root/.dotfiles
-RUN ./bootstrap.sh
+RUN ./bootstrap.py
 WORKDIR /root

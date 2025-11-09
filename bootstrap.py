@@ -162,12 +162,11 @@ def main() -> None:
                 "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
                 xdg_data_dir() / "nvim/site/autoload/plug.vim",
             ),
-            (
-                "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
-                "/tmp/foo",
-            ),
         ],
     )
+
+    # TODO: Install plugin manager automatically with
+    # <path/to/[n]vim> +'PlugInstall --sync' +qa
 
 
 if __name__ == "__main__":
