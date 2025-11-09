@@ -154,7 +154,7 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
             # Create destination directory if it does not already exist.
             if not dest.exists():
                 if not dry_run:
-                    dest.mkdir(parents=True)
+                    dest.mkdir(parents=True, exist_ok=True)
 
                 logging.info(f"{dry_text}Created dir {dest}")
 
