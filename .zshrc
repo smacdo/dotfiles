@@ -20,7 +20,7 @@ fi
 # If you want to have machine specific stuff the best place to put it is in
 # ~/.my_shell_profile.sh or ~/.my_zshrc
 for file in "${S_DOTFILE_ROOT}"/shell_profile/\
-{xdg.sh,paths.sh,functions.sh,aliases.sh,private_branch.sh}; do
+{xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
     # -r test if FILE exists and is readable.
     # -f test if FILE exists and is a file.
     [ -r "$file" ] && [ -f "$file" ] && source "$file"

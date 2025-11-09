@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+# vim: set ft=python
+
+# TODO: CLI argument to adjust a timestamp by a given number of seconds
+# TODO: Print the "relative time" when showing a parsed timestamp
+#       (eg, "55 minutes ago")
+# TODO: Handle ISO timestamps as input, which should then print the unix time.
+# TODO: Add CLI argument to only print specific fields (without additional text)
+#         - useful for including in a pipeline or other scripts.
+# TODO: Add CLI argument to show additional timezone locales.
+# TODO: Add CLI argument for custom date format string.
+# TODO: Use logging for errors and warnings.
+
+# Note: unix timestamps (seconds since epoch) do not depend on a time zone, so
+# they are neither UTC nor local time.
+# See: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_15
+
+import argparse
+import time
+import re
+import sys
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class ParsedTimestamp:
+    timestamp: int
+    local: datetime
+    utc: datetime
+
+    @staticmethod
+    def parse(unix_timestamp: str) -> Optional["ParsedTimestamp"]:
+        if not re.search(r"^\d+", unix_timestamp):
+            return None
+
+        timestamp = int(unix_timestamp)
+
+        return ParsedTimestamp(
+            timestamp=timestamp,
+            local=datetime.fromtimestamp(timestamp).astimezone(),
+            utc=datetime.fromtimestamp(timestamp, timezone.utc),
+        )
+
+
+def get_current_timestamp() -> int:
+    return int(time.time())
+
+
+def main() -> int:
+    # Argument parsing.
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("time", nargs="*")
+
+    args = arg_parser.parse_args()
+
+    # Print the current unix timestamp if the user didn't provide any input
+    # dates to parse.
+    if len(args.time) == 0:
+        print(get_current_timestamp())
+        return 0
+
+    # Print information about each input timestamp.
+    status_code = 0
+
+    for t in args.time:
+        ts = ParsedTimestamp.parse(t)
+
+        if ts is not None:
+            print(f" Unix time: {ts.timestamp}")
+            print(f"Local time: {ts.local}")
+            print(f"       UTC: {ts.utc}")
+        else:
+            print(f"INVALID: {t}")
+            status_code = 1
+
+    return status_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
