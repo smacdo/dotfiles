@@ -1,3 +1,8 @@
+"""CLI utilities for interactive command-line applications.
+
+Provides colored logging, user input prompts, and confirmation dialogs.
+"""
+
 import logging
 import sys
 import unittest
@@ -18,6 +23,8 @@ LOG_LEVEL_COLORS = {
 
 
 class ColoredLogFormatter(logging.Formatter):
+    """Formatter that adds colors to log messages based on severity level."""
+
     format_strs: dict[int, logging.Formatter]
 
     def __init__(self):
@@ -36,6 +43,16 @@ class ColoredLogFormatter(logging.Formatter):
 def input_field(
     message: str, default_message: str | None = None, default_value: str | None = None
 ) -> str | None:
+    """Prompt user for input with optional default value.
+
+    Args:
+        message: Prompt message to display
+        default_message: Custom default message (overrides auto-generated)
+        default_value: Value to return if user enters nothing
+
+    Returns:
+        User input string or default_value if empty input
+    """
     if default_message is None:
         default_message = (
             f"[{default_value}]"
@@ -47,13 +64,22 @@ def input_field(
 
     input_result = input(f"{message} {default_message}: ")
 
-    if input_result.strip() == "":
+    if len(input_result.strip()) == 0:
         return default_value
     else:
         return input_result
 
 
 def confirm(message: str, default: bool | None = None) -> bool:
+    """Prompt user for yes/no confirmation.
+
+    Args:
+        message: Question to ask user
+        default: Default answer if user enters nothing (None for required input)
+
+    Returns:
+        True for yes, False for no, default value for empty input
+    """
     while True:
         print(
             f"{message} [{'Y' if default is True else 'y'}/{'N' if default is False else 'n'}] ",
@@ -70,7 +96,12 @@ def confirm(message: str, default: bool | None = None) -> bool:
             return False
 
 
-class GitConfigTests(unittest.TestCase):
+class InputFieldTests(unittest.TestCase):
+    @patch("builtins.input", return_value="user input")
+    def test_returns_user_input_when_provided(self, mock_input):
+        result = input_field("Enter value")
+        self.assertEqual(result, "user input")
+
     @patch("builtins.input", return_value="")
     def test_confirm_prints_message_with_yes_no(self, mocked_input):
         with redirect_stderr(StringIO()) as stderr_buffer:
@@ -150,3 +181,13 @@ class GitConfigTests(unittest.TestCase):
             self.assertIsNone(confirm(message="do something?", default=None))
             self.assertTrue(confirm(message="do something?", default=True))
             self.assertFalse(confirm(message="do something?", default=False))
+
+    @patch("builtins.input", return_value="")
+    def test_returns_default_value_when_input_empty(self, mock_input):
+        result = input_field("Enter value", default_value="default")
+        self.assertEqual(result, "default")
+
+    @patch("builtins.input", return_value="")
+    def test_returns_none_when_input_empty_and_no_default(self, mock_input):
+        result = input_field("Enter value")
+        self.assertIsNone(result)
