@@ -1,0 +1,19 @@
+FROM debian:bookworm-slim
+
+# Install essential packages
+RUN apt-get update && apt-get install -y \
+    git \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a test user (not root) to simulate real usage
+RUN useradd -m -s /bin/bash testuser
+
+# Switch to test user
+USER testuser
+WORKDIR /home/testuser
+
+# The dotfiles repo will be mounted or copied here
+# We'll do this at runtime to allow for easy iteration
+
+CMD ["/bin/bash"]

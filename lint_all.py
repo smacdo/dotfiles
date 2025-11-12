@@ -165,10 +165,10 @@ def main() -> None:
     if len(failed_py_files) > 0:
         logging.warning(f"{len(failed_py_files)} python scripts failed linter checks")
 
-    # TODO: Build minimal "bootstrap" docker image which will test that the
+    # TODO: Build minimal "bootstrap" docker target which will test that the
     #       bootstrap process runs correctly, and that people can use either
     #       bash or zsh without errors.
-    # sudo docker build -t bootstrap -f tests/images/bootstrap/Dockerfile .
+    # sudo docker build -t bootstrap -f tests/docker/bootstrap/Dockerfile.debian .
 
     # TODO: Test bash profile with a docker container.
     # sudo docker run --rm -it --entrypoint bash bootstrap

@@ -3,17 +3,21 @@ import os.path
 import shutil
 import ssl
 import subprocess
+import tempfile
+import unittest
 import urllib.request
 import urllib.error
 
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from _pydotlib.colors import Colors
 from _pydotlib.cli import confirm
 
 
 def is_dotfiles_root(path: Path) -> bool:
+    """Check if a path is the root of a dotfiles repository."""
     return path.joinpath(".__dotfiles_root__").is_file()
 
 
@@ -25,7 +29,7 @@ def create_backup_filename(target: Path) -> Path:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")[
             :-3
         ]  # First three millisecond digits.
-        backup_path = Path(f"{name}_{timestamp}.{ext}")
+        backup_path = Path(f"{name}_{timestamp}{ext}")
 
     return backup_path
 
@@ -205,3 +209,42 @@ def download_files(
             logging.info(f"{dry_text}{target} already exists - skipping download")
         else:
             download_file(url=url, dest=target, dry_run=dry_run)
+
+
+class TestIsDotfilesRoot(unittest.TestCase):
+    def test_returns_true_when_marker_file_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            marker = tmp_path / ".__dotfiles_root__"
+            marker.touch()
+
+            self.assertTrue(is_dotfiles_root(tmp_path))
+
+    def test_returns_false_when_marker_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            self.assertFalse(is_dotfiles_root(tmp_path))
+
+
+class TestCreateBackupFilename(unittest.TestCase):
+    def test_creates_original_suffix(self):
+        target = Path("/home/user/.bashrc")
+        backup = create_backup_filename(target)
+
+        self.assertEqual(backup, Path("/home/user/.bashrc.ORIGINAL"))
+
+    def test_adds_timestamp_if_original_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            target = tmp_path / ".bashrc"
+            original = tmp_path / ".bashrc.ORIGINAL"
+            original.touch()
+
+            backup = create_backup_filename(target)
+
+            self.assertTrue(str(backup).startswith(str(tmp_path / ".bashrc_")))
+            self.assertTrue(str(backup).endswith(".ORIGINAL"))
+            self.assertNotEqual(backup, original)
+
+            filename = backup.name
+            self.assertRegex(filename, r"\.bashrc_\d+\.ORIGINAL")
