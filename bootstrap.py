@@ -148,6 +148,7 @@ def main() -> None:
             ("settings/nvim/init.vim", home_dir / ".vimrc"),
             ("settings/nvim/init.vim", xdg_config_dir() / "nvim/init.vim"),
             ("settings/nvim/site/plugin", xdg_data_dir() / "nvim/site/plugin"),
+            ("settings/ghostty/config", xdg_config_dir() / "ghostty/config"),
         ],
     )
 
