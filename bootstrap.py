@@ -149,6 +149,7 @@ def main() -> None:
             ("settings/nvim/init.vim", xdg_config_dir() / "nvim/init.vim"),
             ("settings/nvim/site/plugin", xdg_data_dir() / "nvim/site/plugin"),
             ("settings/ghostty/config", xdg_config_dir() / "ghostty/config"),
+            ("settings/wezterm/wezterm.lua", xdg_config_dir() / "wezterm/wezterm.lua"),
         ],
     )
 
