@@ -124,6 +124,6 @@ if [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" 
     source "${HOME}/.my_shell_profile.sh"
 fi
 
-if [ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]; then
-    source "${HOME}/.my_zshrc.sh"
+if [ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]; then
+    source "${HOME}/.my_bashrc.sh"
 fi
