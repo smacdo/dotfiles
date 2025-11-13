@@ -63,7 +63,7 @@ def configure_vcs_author() -> None:
     update_git_config_file(MY_GITCONFIG_PATH, git_keys)
 
 
-def initalize_vim_plugin_manager() -> None:
+def initialize_vim_plugin_manager() -> None:
     """
     Initializes the vim-plug plugin manager for vim and neovim, if they are installed on the system.
     """
@@ -108,6 +108,9 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
     symlinked to `source` are skipped. If the target already exists, it will be renamed to
     `.ORIGINAL`
 
+    TODO: Add ability to cancel the backup/delete operation to the interactive prompt.
+    TODO: Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo.
+
     Args:
         source: A dotfiles file to symlink to.
         target: Path in the user's home directory that will be symlinked to `source`.
@@ -134,7 +137,6 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
     if target.exists():
         # Ask user if they would like to "back up" the file by renaming before replacing it with a
         # symlink.
-        # TODO: Add cancel option, which is to skip.
         backup_path = create_backup_filename(target)
 
         if confirm(

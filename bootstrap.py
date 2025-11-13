@@ -19,7 +19,7 @@ import logging
 from _pydotlib.bootstrap import (
     create_dirs,
     download_files,
-    initalize_vim_plugin_manager,
+    initialize_vim_plugin_manager,
     is_dotfiles_root,
     safe_symlink,
 )
@@ -126,7 +126,7 @@ def main() -> None:
         ],
     )
 
-    initalize_vim_plugin_manager()
+    initialize_vim_plugin_manager()
 
 
 if __name__ == "__main__":
