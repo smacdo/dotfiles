@@ -17,6 +17,7 @@ import argparse
 import logging
 
 from _pydotlib.bootstrap import (
+    configure_vcs_author,
     create_dirs,
     download_files,
     initialize_vim_plugin_manager,
@@ -127,6 +128,7 @@ def main() -> None:
     )
 
     initialize_vim_plugin_manager()
+    configure_vcs_author()
 
 
 if __name__ == "__main__":
