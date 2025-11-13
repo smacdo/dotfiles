@@ -63,6 +63,24 @@ def configure_vcs_author() -> None:
     update_git_config_file(MY_GITCONFIG_PATH, git_keys)
 
 
+def initalize_vim_plugin_manager() -> None:
+    """
+    Initializes the vim-plug plugin manager for vim and neovim, if they are installed on the system.
+    """
+
+    if shutil.which("nvim") is not None:
+        logging.info("Initializing vim-plug for neovim")
+        subprocess.check_call(["nvim", "+'PlugInstall --sync'", "+qa"])
+    else:
+        logging.info("neovim not installed - skip initializing vim-plug for neovim")
+
+    if shutil.which("vim") is not None:
+        logging.info("Initializing vim-plug for vim")
+        subprocess.check_call(["vim", "+'PlugInstall --sync'", "+qa"])
+    else:
+        logging.info("vim not installed - skip initializing vim-plug for vim")
+
+
 def is_dotfiles_root(path: Path) -> bool:
     """Check if a path is the root of a dotfiles repository."""
     return path.joinpath(".__dotfiles_root__").is_file()

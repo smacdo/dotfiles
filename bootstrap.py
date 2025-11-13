@@ -4,6 +4,9 @@
 Author: Scott MacDonald <root@smacdo.com>
 
 This script will configure the dotfiles repo for the current user to use.
+
+TODO: initialize gitconfig via configure_vcs_author
+TODO: initialize git lfs (if installed)
 """
 import os
 import sys
@@ -16,6 +19,7 @@ import logging
 from _pydotlib.bootstrap import (
     create_dirs,
     download_files,
+    initalize_vim_plugin_manager,
     is_dotfiles_root,
     safe_symlink,
 )
@@ -122,8 +126,7 @@ def main() -> None:
         ],
     )
 
-    # TODO: Install plugin manager automatically with
-    # <path/to/[n]vim> +'PlugInstall --sync' +qa
+    initalize_vim_plugin_manager()
 
 
 if __name__ == "__main__":
