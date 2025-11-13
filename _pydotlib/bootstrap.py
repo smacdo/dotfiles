@@ -1,3 +1,7 @@
+"""
+Utility functions for the bootstrap.py program.
+"""
+
 import logging
 import os.path
 import shutil
@@ -10,10 +14,53 @@ import urllib.error
 
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
-
+from _pydotlib.cli import confirm, input_field
 from _pydotlib.colors import Colors
-from _pydotlib.cli import confirm
+from _pydotlib.git import (
+    read_git_config_file,
+    update_git_config_file,
+)
+
+
+MY_GITCONFIG_PATH = Path.joinpath(Path.home(), ".my_gitconfig")
+VCS_MISSING_NAME = "TODO_SET_USER_NAME"
+VCS_MISSING_EMAIL = "TODO_SET_EMAIL_ADDRESS"
+
+
+def configure_vcs_author() -> None:
+    # Create the ~/.my_gitconfig file if it does not exist.
+    if not MY_GITCONFIG_PATH.exists():
+        MY_GITCONFIG_PATH.write_text(
+            f"""[user]
+  name = {VCS_MISSING_NAME}
+  email = {VCS_MISSING_EMAIL}
+"""
+        )
+
+    # Read ~/.my_gitconfig, and replace keys that are marked as `TODO_SET_*`.
+    # Any line that is not modified should be written back out exactly as it was.
+    def try_update_key(
+        keys: dict[str, str], key: str, default_value: str, prompt: str
+    ) -> str | None:
+        if key in keys:
+            git_keys[key] = input_field(
+                prompt,
+                default_message=(
+                    git_keys[key]
+                    if git_keys[key] != default_value
+                    else "leave blank to skip"
+                ),
+                default_value=(
+                    git_keys[key] if git_keys[key] != default_value else None
+                ),
+            )
+
+    git_keys = read_git_config_file(MY_GITCONFIG_PATH, ["user:name", "user:email"])
+
+    try_update_key(git_keys, "user:name", VCS_MISSING_NAME, "Enter your git name")
+    try_update_key(git_keys, "user:email", VCS_MISSING_EMAIL, "Enter your git email")
+
+    update_git_config_file(MY_GITCONFIG_PATH, git_keys)
 
 
 def is_dotfiles_root(path: Path) -> bool:
