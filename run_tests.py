@@ -98,6 +98,8 @@ def delete_docker_container(target: str, flavor: str) -> bool:
         ]
     )
 
+    logging.info(f"Deleted container {container_name}")
+
     return True
 
 
@@ -135,35 +137,41 @@ def run_docker_test(target: str, flavor: str) -> bool:
     logging.info(f"Created docker container {container_name} with id {container_id}")
 
     # Run bootstrap.py:
-    # TODO: Find way of forcing default prompt option or overriding stdin.
-    subprocess.check_output(
-        [
-            "docker",
-            "exec",
-            "-it",
-            container_name,
-            "bash",
-            "-c",
-            "cd /home/testuser/.dotfiles && python3 bootstrap.py --dry-run -v",
-        ],
-        timeout=10,
-    )
+    try:
+        subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                "-it",
+                container_name,
+                "bash",
+                "-c",
+                "cd /home/testuser/.dotfiles && python3 bootstrap.py -v --git-name 'Testy McTestFace' --git-email 'testy@test.com' < /dev/null",
+            ],
+            timeout=10,
+        )
 
-    logging.info(
-        f"Ran bootstrap.py in container {container_name} with id {container_id}"
-    )
-
-    # TODO: Verify bootstrap.py ran OK.
-    # TODO: Verify bash starts without error.
-    # TODO: Verify zsh starts without error.
-    # TODO: Verify vim starts without error.
-    # TODO: Verify neovim starts without error.
-    # TODO: Verify tmux starts without error.
-
-    # Stop the container after tests have completed.
-    subprocess.check_output(["docker", "stop", container_name])
-
-    return True
+        # TODO: Verify bootstrap.py ran OK.
+        # TODO: Verify bash starts without error.
+        # TODO: Verify zsh starts without error.
+        # TODO: Verify vim starts without error.
+        # TODO: Verify neovim starts without error.
+        # TODO: Verify tmux starts without error.
+        return True
+    except subprocess.CalledProcessError as e:
+        logging.exception(
+            f"failed to run test: {e.stdout}",
+            exc_info=e,
+        )
+        return False
+    except subprocess.TimeoutExpired as e:
+        logging.error(
+            "timed out waiting for bootstrap.py - it is probably waiting for stdin", e
+        )
+        return False
+    finally:
+        # Stop the container after tests have completed.
+        subprocess.check_output(["docker", "stop", container_name])
 
 
 def run_pydotlib_tests() -> bool:

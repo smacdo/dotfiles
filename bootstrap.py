@@ -24,7 +24,7 @@ from _pydotlib.bootstrap import (
     is_dotfiles_root,
     safe_symlink,
 )
-from _pydotlib.cli import ColoredLogFormatter
+from _pydotlib.cli import ColoredLogFormatter, confirm, input_field
 from _pydotlib.git import get_repo_root
 from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
