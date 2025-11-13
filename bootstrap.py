@@ -4,9 +4,6 @@
 Author: Scott MacDonald <root@smacdo.com>
 
 This script will configure the dotfiles repo for the current user to use.
-
-TODO: initialize gitconfig via configure_vcs_author
-TODO: initialize git lfs (if installed)
 """
 import os
 import sys
