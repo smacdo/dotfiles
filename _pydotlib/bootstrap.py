@@ -58,9 +58,7 @@ def configure_vcs_author(
                         if git_keys[key] != placeholder
                         else "leave blank to skip"
                     ),
-                    default_value=(
-                        git_keys[key] if git_keys[key] != placeholder else None
-                    ),
+                    default=(git_keys[key] if git_keys[key] != placeholder else None),
                 )
             else:
                 git_keys[key] = default

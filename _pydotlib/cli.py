@@ -9,6 +9,7 @@ import unittest
 
 from io import StringIO
 from contextlib import redirect_stderr
+from unittest import mock
 from unittest.mock import patch
 
 from _pydotlib.colors import Colors
@@ -41,22 +42,26 @@ class ColoredLogFormatter(logging.Formatter):
 
 
 def input_field(
-    message: str, default_message: str | None = None, default_value: str | None = None
+    message: str, default_message: str | None = None, default: str | None = None
 ) -> str | None:
     """Prompt user for input with optional default value.
 
     Args:
         message: Prompt message to display
         default_message: Custom default message (overrides auto-generated)
-        default_value: Value to return if user enters nothing
+        default: Value to return if user enters nothing
 
     Returns:
         User input string or default_value if empty input
     """
+
+    if not sys.stdin.isatty() and default is not None:
+        return default
+
     if default_message is None:
         default_message = (
-            f"[{default_value}]"
-            if (default_value is not None and default_value.strip() != "")
+            f"[{default}]"
+            if (default is not None and default.strip() != "")
             else "(leave blank for none)"
         )
     else:
@@ -65,7 +70,7 @@ def input_field(
     input_result = input(f"{message} {default_message}: ")
 
     if len(input_result.strip()) == 0:
-        return default_value
+        return default
     else:
         return input_result
 
@@ -80,6 +85,10 @@ def confirm(message: str, default: bool | None = None) -> bool:
     Returns:
         True for yes, False for no, default value for empty input
     """
+
+    if not sys.stdin.isatty() and default is not None:
+        return default
+
     while True:
         print(
             f"{message} [{'Y' if default is True else 'y'}/{'N' if default is False else 'n'}] ",
@@ -102,25 +111,64 @@ class InputFieldTests(unittest.TestCase):
         result = input_field("Enter value")
         self.assertEqual(result, "user input")
 
+    @patch("builtins.input")
+    def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
+            "sys.stdin"
+        ) as stdin:
+            stdin.isatty.return_value = False
+
+            self.assertTrue(
+                input_field(message="your value here", default="hello world")
+            )
+
+            captured_stderr = stderr_buffer.getvalue()
+            self.assertEqual("", captured_stderr)
+
+            self.assertFalse(mocked_input.called)
+
+
+class ConfirmTests(unittest.TestCase):
     @patch("builtins.input", return_value="")
-    def test_confirm_prints_message_with_yes_no(self, mocked_input):
+    def test_prints_message_with_yes_no(self, mocked_input):
         with redirect_stderr(StringIO()) as stderr_buffer:
             confirm(message="do something?", default=None)
             captured_stderr = stderr_buffer.getvalue()
 
             self.assertEqual("do something? [y/n] ", captured_stderr)
 
+    @patch("builtins.input")
+    def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
+            "sys.stdin"
+        ) as stdin:
+            stdin.isatty.return_value = False
+
+            self.assertTrue(confirm(message="do something?", default=True))
+            self.assertFalse(confirm(message="do something?", default=False))
+
+            captured_stderr = stderr_buffer.getvalue()
+            self.assertEqual("", captured_stderr)
+
+            self.assertFalse(mocked_input.called)
+
     @patch("builtins.input", return_value="")
-    def test_confirm_prints_upper_y_if_default_true(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer:
+    def test_prints_upper_y_if_default_true(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
+            "sys.stdin"
+        ) as stdin:
+            stdin.isatty.return_value = True
             confirm(message="do something?", default=True)
             captured_stderr = stderr_buffer.getvalue()
 
             self.assertEqual("do something? [Y/n] ", captured_stderr)
 
     @patch("builtins.input", return_value="")
-    def test_confirm_prints_upper_n_if_default_false(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer:
+    def test_prints_upper_n_if_default_false(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
+            "sys.stdin"
+        ) as stdin:
+            stdin.isatty.return_value = True
             confirm(message="do something?", default=False)
             captured_stderr = stderr_buffer.getvalue()
 
@@ -184,7 +232,7 @@ class InputFieldTests(unittest.TestCase):
 
     @patch("builtins.input", return_value="")
     def test_returns_default_value_when_input_empty(self, mock_input):
-        result = input_field("Enter value", default_value="default")
+        result = input_field("Enter value", default="default")
         self.assertEqual(result, "default")
 
     @patch("builtins.input", return_value="")
