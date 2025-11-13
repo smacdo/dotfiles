@@ -22,15 +22,18 @@ from _pydotlib.git import (
 )
 
 
-MY_GITCONFIG_PATH = Path.joinpath(Path.home(), ".my_gitconfig")
 VCS_MISSING_NAME = "TODO_SET_USER_NAME"
 VCS_MISSING_EMAIL = "TODO_SET_EMAIL_ADDRESS"
 
 
-def configure_vcs_author() -> None:
+def configure_vcs_author(
+    gitconfig_path: Path | str, name: str | None = None, email: str | None = None
+) -> None:
     # Create the ~/.my_gitconfig file if it does not exist.
-    if not MY_GITCONFIG_PATH.exists():
-        MY_GITCONFIG_PATH.write_text(
+    gitconfig_path = Path(gitconfig_path)
+
+    if not gitconfig_path.exists():
+        gitconfig_path.write_text(
             f"""[user]
   name = {VCS_MISSING_NAME}
   email = {VCS_MISSING_EMAIL}
@@ -40,27 +43,36 @@ def configure_vcs_author() -> None:
     # Read ~/.my_gitconfig, and replace keys that are marked as `TODO_SET_*`.
     # Any line that is not modified should be written back out exactly as it was.
     def try_update_key(
-        keys: dict[str, str], key: str, default_value: str, prompt: str
+        keys: dict[str, str],
+        key: str,
+        placeholder: str,
+        default: str | None,
+        prompt: str,
     ) -> str | None:
         if key in keys:
-            git_keys[key] = input_field(
-                prompt,
-                default_message=(
-                    git_keys[key]
-                    if git_keys[key] != default_value
-                    else "leave blank to skip"
-                ),
-                default_value=(
-                    git_keys[key] if git_keys[key] != default_value else None
-                ),
-            )
+            if default is None:
+                git_keys[key] = input_field(
+                    prompt,
+                    default_message=(
+                        git_keys[key]
+                        if git_keys[key] != placeholder
+                        else "leave blank to skip"
+                    ),
+                    default_value=(
+                        git_keys[key] if git_keys[key] != placeholder else None
+                    ),
+                )
+            else:
+                git_keys[key] = default
 
-    git_keys = read_git_config_file(MY_GITCONFIG_PATH, ["user:name", "user:email"])
+    git_keys = read_git_config_file(gitconfig_path, ["user:name", "user:email"])
 
-    try_update_key(git_keys, "user:name", VCS_MISSING_NAME, "Enter your git name")
-    try_update_key(git_keys, "user:email", VCS_MISSING_EMAIL, "Enter your git email")
+    try_update_key(git_keys, "user:name", VCS_MISSING_NAME, name, "Enter your git name")
+    try_update_key(
+        git_keys, "user:email", VCS_MISSING_EMAIL, email, "Enter your git email"
+    )
 
-    update_git_config_file(MY_GITCONFIG_PATH, git_keys)
+    update_git_config_file(gitconfig_path, git_keys)
 
 
 def initialize_vim_plugin_manager() -> None:

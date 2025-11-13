@@ -30,6 +30,8 @@ from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
 logger = logging.getLogger(__name__)
 
+MY_GITCONFIG_PATH = Path.joinpath(Path.home(), ".my_gitconfig")
+
 
 def apply_dotfile_symlinks(
     dotfiles_dir: Path, dry_run: bool, files: list[tuple[str | Path, Path]]
@@ -55,6 +57,12 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="Print actions but do not perform any changes",
+    )
+    args_parser.add_argument(
+        "--git-name", type=str, help="Name to use when initializing .my_gitconfig"
+    )
+    args_parser.add_argument(
+        "--git-email", type=str, help="Email to use when initializing .my_gitconfig"
     )
 
     args = args_parser.parse_args()
@@ -128,7 +136,9 @@ def main() -> None:
     )
 
     initialize_vim_plugin_manager()
-    configure_vcs_author()
+    configure_vcs_author(
+        gitconfig_path=MY_GITCONFIG_PATH, name=args.git_name, email=args.git_email
+    )
 
 
 if __name__ == "__main__":
