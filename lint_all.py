@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Author: Scott MacDonald <scott@smacdo.com>
 # Purpose: CI linter for the dotfiles repository.
+
 import argparse
 import logging
 import os
 import shutil
 import subprocess
+import sys
 
 SH_EXTS = [".sh"]
 SH_SHEBANGS = ["#!/bin/sh", "#!/bin/bash"]
@@ -131,7 +133,9 @@ def find_shell_scripts(
 ################################################################################
 # Script main
 ################################################################################
-def main() -> None:
+def main() -> int:
+    has_fatal_lints = False
+
     # Command line arguments.
     parser = argparse.ArgumentParser("dotfiles lint checker")
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose logging")
@@ -146,6 +150,7 @@ def main() -> None:
 
     # Lint shell scripts.
     logging.info("linting shell scripts...")
+
     failed_sh_files = lint_sh_files(
         BASH_CONFIG_FILES
         + DOTFILES_SH_SCRIPTS
@@ -158,31 +163,31 @@ def main() -> None:
 
     # Lint python scripts.
     logging.info("linting python scripts...")
-    failed_py_files = lint_py_files(
-        DOTFILES_PY_SCRIPTS + find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS)
-    )
+
+    failed_py_files = lint_py_files(DOTFILES_PY_SCRIPTS)
 
     if len(failed_py_files) > 0:
-        logging.warning(f"{len(failed_py_files)} python scripts failed linter checks")
+        has_fatal_lints = True
+        logging.error(
+            f"{len(failed_py_files)} core python scripts failed required linter checks"
+        )
 
-    # TODO: Build minimal "bootstrap" docker target which will test that the
-    #       bootstrap process runs correctly, and that people can use either
-    #       bash or zsh without errors.
-    # sudo docker build -t bootstrap -f tests/docker/bootstrap/Dockerfile.debian .
+    failed_py_files += lint_py_files(find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS))
 
-    # TODO: Test bash profile with a docker container.
-    # sudo docker run --rm -it --entrypoint bash bootstrap
-
-    # TODO: Test zsh profile with a docker container.
-    # sudo docker run --rm -it --entrypoint zsh bootstrap
-
-    # TODO: Test bootstrap process in a docker container.
+    if len(failed_py_files) > 0:
+        logging.warning(
+            f"{len(failed_py_files)} python bin scripts failed linter checks"
+        )
 
     # Report if all tests passed or not.
     if len(failed_sh_files) + len(failed_py_files) == 0:
         logging.info("all lint checks passed!")
     else:
-        logging.warning("linter issues found")
+        is_fatal_text = "fatal" if has_fatal_lints else "non-fatal"
+        logging.warning(f"{is_fatal_text} linter issues found")
+
+    return 1 if has_fatal_lints else 0
 
 
-main()
+if __name__ == "__main__":
+    sys.exit(main())

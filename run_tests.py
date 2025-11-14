@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
 This script performs testing for the dotfiles repository.
-
-TODO: Run unit tests for python scripts in bin/
-TODO: Run integration tests after I figure out how to write them using Docker.
 """
 import argparse
 import logging
@@ -151,12 +148,6 @@ def run_docker_test(target: str, flavor: str) -> bool:
             timeout=10,
         )
 
-        # TODO: Verify bootstrap.py ran OK.
-        # TODO: Verify bash starts without error.
-        # TODO: Verify zsh starts without error.
-        # TODO: Verify vim starts without error.
-        # TODO: Verify neovim starts without error.
-        # TODO: Verify tmux starts without error.
         return True
     except subprocess.CalledProcessError as e:
         logging.exception(
@@ -175,7 +166,6 @@ def run_docker_test(target: str, flavor: str) -> bool:
 
 
 def run_pydotlib_tests() -> bool:
-    # TODO: Search for them without having to hardcode the names.
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
 

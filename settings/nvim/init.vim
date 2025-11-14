@@ -100,7 +100,6 @@ set hidden
 set wildmode=list:longest,full
 
 " Make backspace work as expected on some oddly configured platforms. 
-" TODO: Which platforms?
 set backspace=eol,start,indent
 
 " Use case insensitive file name completion.
@@ -246,7 +245,6 @@ endif
 
 " Set a single well known location for vim to store user state (backup, temp,
 " etc) and if those directories don't exist create them.
-" TODO: Probably need different paths for windows.
 " TODO: Create a crontab script to nuke files after ~ 90 days.
 if !isdirectory($HOME."/.local/state/vim/backups")
   call mkdir($HOME."/.local/state/vim/backups", "p", 0770)

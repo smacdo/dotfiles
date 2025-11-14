@@ -123,9 +123,6 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
     symlinked to `source` are skipped. If the target already exists, it will be renamed to
     `.ORIGINAL`
 
-    TODO: Add ability to cancel the backup/delete operation to the interactive prompt.
-    TODO: Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo.
-
     Args:
         source: A dotfiles file to symlink to.
         target: Path in the user's home directory that will be symlinked to `source`.
@@ -229,7 +226,6 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
     Returns:
         True if download succeeded, False otherwise.
     """
-    # TODO: Download to temporary location, and compare to dest. Prompt user if there is mismatch.
     dry_text = "[DRY RUN] " if dry_run else ""
 
     # Try to download the file using Python's builtin urllib module.
