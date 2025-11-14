@@ -48,10 +48,10 @@ def configure_vcs_author(
         placeholder: str,
         default: str | None,
         prompt: str,
-    ) -> str | None:
+    ) -> None:
         if key in keys:
             if default is None:
-                git_keys[key] = input_field(
+                new_value = input_field(
                     prompt,
                     default_message=(
                         git_keys[key]
@@ -60,6 +60,11 @@ def configure_vcs_author(
                     ),
                     default=(git_keys[key] if git_keys[key] != placeholder else None),
                 )
+
+                if new_value:
+                    git_keys[key] = new_value
+                else:
+                    del keys[key]
             else:
                 git_keys[key] = default
 
@@ -273,7 +278,7 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
 
 
 def download_files(
-    urls: list[tuple[str | Path, Path]],
+    urls: list[tuple[str, Path]],
     dry_run: bool,
     skip_if_dest_exists: bool = True,
 ) -> None:

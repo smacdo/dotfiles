@@ -28,7 +28,7 @@ class ColoredLogFormatter(logging.Formatter):
 
     format_strs: dict[int, logging.Formatter]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.format_strs = {}
 
@@ -75,7 +75,7 @@ def input_field(
         return input_result
 
 
-def confirm(message: str, default: bool | None = None) -> bool:
+def confirm(message: str, default: bool | None = None) -> bool | None:
     """Prompt user for yes/no confirmation.
 
     Args:
