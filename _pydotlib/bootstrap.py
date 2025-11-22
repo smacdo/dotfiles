@@ -234,11 +234,13 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
             url, context=ssl.create_default_context()
         ) as response:
             # Create destination directory if it does not already exist.
-            if not dest.exists():
-                if not dry_run:
-                    dest.mkdir(parents=True, exist_ok=True)
+            dest_dir = dest.parent
 
-                logging.info(f"{dry_text}Created dir {dest}")
+            if not dest_dir.exists():
+                if not dry_run:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+
+                logging.info(f"{dry_text}Created dir {dest_dir}")
 
             # Write the downloaded bytes to the destination directory.
             if not dry_run:
