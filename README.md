@@ -46,7 +46,7 @@ this repository.
 
 ```
 git clone git@github.com:smacdo/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles && ./bootstrap.sh
+cd ~/.dotfiles && ./bootstrap.py
 ```	
 
 Restart or reload your shell. This step varies depending on the shell you are
@@ -62,7 +62,7 @@ cd ~/.dotfiles
 ./setup.sh -p core
 ```
 
-**Important note**: For MacOS machines where you want chef to install packages
+**Important note**: For MacOS machines where you want homebrew to install packages
 to your home directory (rather than system wide), you want to add the `-H` flag
 to setup: `./setup.sh -H -p core`.
 
