@@ -147,11 +147,6 @@ endif
 " list.
 call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
 
-" Language server protocol.
-if has('nvim')
-    Plug 'neovim/nvim-lspconfig'
-endif
-
 " Color scheme: Use a custom theme for neovim, and Solarized for vim. Helps to
 " distinguish when neovim is not installed on a machine.
 if has('nvim')
