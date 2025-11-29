@@ -99,8 +99,8 @@ if is_osx; then
   fi
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
-elif [[ -f "$S_DOTFILE_ROOT"/.external/powerlevel10k/powerlevel10k.zsh-theme ]]; then
-    source "$S_DOTFILE_ROOT"/.external/powerlevel10k/powerlevel10k.zsh-theme
+elif [[ -f "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme
 else
     echo "WARNING: powerlevel10k not installed"
 fi
