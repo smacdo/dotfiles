@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Author: Scott MacDonald <scott@smacdo.com>
-# Purpose: Scott's bash shell configuration.
+# Author: Scott MacDonald <root@smacdo.com>
+# Purpose: Shared bash shell configuration.
 ################################################################################
 # bashrc is used to configure a user's shell (aliases, functions, settings, etc)
 # intended for use in an interactive shell.
@@ -15,11 +15,47 @@
 # return immediately if the shell is not interactive.
 [[ -z "$DOTFILE_CI_TEST_MODE" ]] && [[ $- != *i* ]] && return
 
+#==============================================================================#
+# Sources the first valid file from a list of potential source files. Once a
+# valid file is sourced the remaining paths are skipped.
+#
+# Args:
+#    - one or more paths to a bash or shell script file.
+#==============================================================================#
+source_first() {
+  for path in "$@"; do
+    # TODO: double check that `-f` works for symlinked files.
+    # -f checks if the path is a file.
+    # -r checks if the path is readable by the user.
+    if [ -f "${path}" ] && [ -r "${path}" ]; then
+        source "${path}"
+        unset path
+        return
+    fi
+  done
+  unset path
+}
+
 # Export the dotfiles path as an environment variable to avoid hardcoding paths.
 # TODO: Is it possible to support installations other than ~/.dotfiles ?
 if [ -z ${S_DOTFILE_ROOT+x} ]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
+
+# Load optional per-machine override configs before applying additional dotfile
+# configurations.
+#
+# Only use these configurations if you need to specify a per-machine config
+# _prior_ to this custom .bashrc. If your overrides are not order sensitive then
+# see instructions near the bottom of this script.
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_shell_profile.sh" \
+  "${HOME}/.0_my_shell_profile.sh"
+
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_bashrc.sh" \
+  "${HOME}/.0_my_bashrc.sh"
+
 
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
@@ -29,8 +65,7 @@ fi
 # this config.
 for file in $S_DOTFILE_ROOT/shell_profile/\
 {xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh}; do
-    # -r test if readable, -f is file.
-    [ -r "$file" ] && [ -f "$file" ] && source "$file"
+    source_first "$file"
 done;
 unset file
 
@@ -66,7 +101,7 @@ PROMPT_COMMAND="history -a; $PROMPT_COMMAND"  # Append new commands each time pr
 HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 HISTFILESIZE=1000000    # One million entries
 HISTCONTROL=ignoredups  # Do not write duplicate commands to history.
-HISTFILE=$XDG_STATE_HOME/bash_history_actual # Use non-standard name to avoid wiping out history file.
+HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/bash_history_actual # Use non-standard name to avoid wiping out history file.
 
 # Complete hostnames using this file
 export HOSTFILE=~/.ssh/known_hosts
@@ -112,18 +147,24 @@ fi
 
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
-  source "${S_DOTFILE_ROOT}/vendor/iterm2/bash"
+  source "${S_DOTFILE_ROOT:${HOME}/.dotfiles/}/vendor/iterm2/bash"
 fi
 
 # Load fzf support.
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-# Load any optional per-machine config profiles at the end to allow them to
-# override this default config profile.
-if [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]; then
-    source "${HOME}/.my_shell_profile.sh"
-fi
+# Apply optional per-machine configuration settings at the end of .bashrc. These
+# files should not be checked in the dotfiles repo because they are meant to
+# apply to individual machine set ups.
+#
+# You can use the `my_shell_profile.sh` option if you want options to apply to
+# bash and zsh. Otherwise for bash specific changes use `my_bashrc.sh`.
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/my_shell_profile.sh" \
+  "${HOME}/.my_shell_profile.sh"
 
-if [ -r "${HOME}/.my_bashrc.sh" ] && [ -f "${HOME}/.my_bashrc.sh" ]; then
-    source "${HOME}/.my_bashrc.sh"
-fi
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/my_bashrc.sh" \
+  "${HOME}/.my_bashrc.sh"
+
+### end of config - there should be no lines below this one! ###
