@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Author: Scott MacDonald <root@smacdo.com>
 # Purpose: Shared bash shell configuration.
 ################################################################################

@@ -1,11 +1,29 @@
-# Author: Scott MacDonald <scott@smacdo.com>
+# Author: Scott MacDonald <root@smacdo.com>
+# Purpose: Shared zsh shell configuration.
+################################################################################
+# zshrc is used to configure a user's shell (aliases, functions, settings, etc)
+# intended for use in an interactive shell.
+
+#==============================================================================#
+# Sources the first valid file from a list of potential source files. Once a
+# valid file is sourced the remaining paths are skipped.
 #
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+# Args:
+#    - one or more paths to a zsh or shell script file.
+#==============================================================================#
+source_first() {
+  for x in "$@"; do
+    # TODO: double check that `-f` works for symlinked files.
+    # -f checks if the path is a file.
+    # -r checks if the path is readable by the user.
+    if [ -f "${x}" ] && [ -r "${x}" ]; then
+        source "${x}"
+        unset x
+        return
+    fi
+  done
+  unset x
+}
 
 # Export the dotfiles path as an environment variable to avoid hardcoding paths.
 # TODO: Is it possible to support installations other than ~/.dotfiles ?
@@ -13,17 +31,32 @@ if [ -z ${S_DOTFILE_ROOT+x} ]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
 
-#==============================================================================
+# Load optional per-machine override configs before applying additional dotfile
+# configurations.
+#
+# Only use these configurations if you need to specify a per-machine config
+# _prior_ to this custom .zshrc. If your overrides are not order sensitive then
+# see instructions near the bottom of this script.
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_shell_profile.sh" \
+  "${HOME}/.0_my_shell_profile.sh"
+
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_zshrc.sh" \
+  "${HOME}/.0_my_zshrc.sh"
+
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
-#
-# If you want to have machine specific stuff the best place to put it is in
-# ~/.my_shell_profile.sh or ~/.my_zshrc
-for file in "${S_DOTFILE_ROOT}"/shell_profile/\
+for file in "${S_DOTFILE_ROOT:-$HOME/.dotfiles}"/shell_profile/\
 {xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
-    # -r test if FILE exists and is readable.
-    # -f test if FILE exists and is a file.
-    [ -r "$file" ] && [ -f "$file" ] && source "$file"
+    source_first "$file"
 done;
 unset file
 
@@ -128,15 +161,19 @@ fi
 # Finish zsh auto completion init.
 compinit
 
-# Load any optional per-machine config profiles at the end to allow them to
-# override this default config profile.
-if [ -r "${HOME}/.my_shell_profile.sh" ] && [ -f "${HOME}/.my_shell_profile.sh" ]; then
-    source "${HOME}/.my_shell_profile.sh"
-fi
+# Apply optional per-machine configuration settings at the end of .bashrc. These
+# files should not be checked in the dotfiles repo because they are meant to
+# apply to individual machine set ups.
+#
+# You can use the `my_shell_profile.sh` option if you want options to apply to
+# bash and zsh. Otherwise for zsh specific changes use `my_zshrc.sh`.
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/my_shell_profile.sh" \
+  "${HOME}/.my_shell_profile.sh"
 
-if [ -r "${HOME}/.my_zshrc.sh" ] && [ -f "${HOME}/.my_zshrc.sh" ]; then
-    source "${HOME}/.my_zshrc.sh"
-fi
+source_first \
+  "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/my_zshrc.sh" \
+  "${HOME}/.my_zshrc.sh"
 
 # Load zsh syntax highlighting plugin. According to install instructions this
 # line must be last in the .zshrc file.
