@@ -31,6 +31,9 @@ if [ -z ${S_DOTFILE_ROOT+x} ]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
 
+# Load XDG environment variables EARLY so paths resolve correctly.
+source "${S_DOTFILE_ROOT:-$HOME/.dotfiles}/shell_profile/xdg.sh"
+
 # Load optional per-machine override configs before applying additional dotfile
 # configurations.
 #
@@ -45,17 +48,10 @@ source_first \
   "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_zshrc.sh" \
   "${HOME}/.0_my_zshrc.sh"
 
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 for file in "${S_DOTFILE_ROOT:-$HOME/.dotfiles}"/shell_profile/\
-{xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
+{paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
     source_first "$file"
 done;
 unset file
@@ -121,6 +117,12 @@ setopt NOMATCH               # Turn errors back on for empty globbing with init 
 # Use `>|` to override, eg `echo "output" >| file.txt"
 set -o noclobber
 
+# Enable Powerlevel10k instant prompt. Initialization code that may require
+# console input (password prompts, [y/n] confirmations, etc.) must go above this
+# block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
 # Use the powerlevel10k theme or warn if not installed.
 if is_osx; then
   if type brew &>/dev/null; then

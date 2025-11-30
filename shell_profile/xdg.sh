@@ -1,5 +1,6 @@
 #!/bin/bash
 # Configures XDG environment variables if not already configured
+# TODO: Rewrite this for `sh` not `bash`.
 xdg_define()
 {
     ENV_NAME=$1

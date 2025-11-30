@@ -41,6 +41,9 @@ if [ -z ${S_DOTFILE_ROOT+x} ]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
 
+# Load XDG environment variables EARLY so paths resolve correctly.
+source "${S_DOTFILE_ROOT:-$HOME/.dotfiles}/shell_profile/xdg.sh"
+
 # Load optional per-machine override configs before applying additional dotfile
 # configurations.
 #
@@ -62,7 +65,7 @@ source_first \
 # ~/.my_shell_profile.sh or ~/.my_bash_rc. These files are sourced at the end
 # this config.
 for file in $S_DOTFILE_ROOT/shell_profile/\
-{xdg.sh,paths.sh,env.sh,functions.sh,aliases.sh}; do
+{paths.sh,env.sh,functions.sh,aliases.sh}; do
     source_first "$file"
 done;
 unset file
