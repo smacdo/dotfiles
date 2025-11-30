@@ -23,7 +23,6 @@
 #==============================================================================#
 source_first() {
   for path in "$@"; do
-    # TODO: double check that `-f` works for symlinked files.
     # -f checks if the path is a file.
     # -r checks if the path is readable by the user.
     if [ -f "${path}" ] && [ -r "${path}" ]; then
@@ -70,9 +69,6 @@ for file in $S_DOTFILE_ROOT/shell_profile/\
 done;
 unset file
 
-# Flash the screen instead of playing an audio bell.
-set bell-style visible
-
 # Use case insensitive globbing when expanding pathnames.
 shopt -s nocaseglob
 
@@ -86,7 +82,7 @@ if [ "${BASH_VERSINFO:-0}" -ge 4 ]; then
 fi
 
 # Sometimes bash doesn't get the resize signal from a terminal emulator after the terminal
-# window is resized. This opton orces bash to recheck the window size after each command and
+# window is resized. This option forces bash to recheck the window size after each command and
 # update LINES, COLUMNS if needed.
 shopt -s checkwinsize
 
@@ -95,20 +91,29 @@ shopt -s checkwinsize
 set -o noclobber
 
 ## History
+# Append new commands each time prompt is displayed. The `if` statement is used
+# here to prevent adding an extra semi-colon when `PROMPT_COMMAND` is empty.
+if [ -n "$PROMPT_COMMAND" ]; then
+  PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+else
+  PROMPT_COMMAND="history -a"
+fi
+
 # Append to bash history file rather than overwriting it.
 shopt -s histappend
-PROMPT_COMMAND="history -a; $PROMPT_COMMAND"  # Append new commands each time prompt is displayed.
 
+# Store a large number of history lines.
 HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 HISTFILESIZE=1000000    # One million entries
 HISTCONTROL=ignoredups  # Do not write duplicate commands to history.
+HISTTIMEFORMAT='%F %T  ' # Add timestamps to history entries.
 HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/bash_history_actual # Use non-standard name to avoid wiping out history file.
 
 # Complete hostnames using this file
-export HOSTFILE=~/.ssh/known_hosts
+export HOSTFILE=${HOME}/.ssh/known_hosts
 
 # Readline config
-export INPUTRC=~/.inputrc
+export INPUTRC=${HOME}/.inputrc
 
 # Don't print the "you have new mail" notifications.
 unset MAILCHECK
@@ -148,7 +153,7 @@ fi
 
 # Load iTerm2 shell integration
 if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
-  source "${S_DOTFILE_ROOT:${HOME}/.dotfiles/}/vendor/iterm2/bash"
+  source "${S_DOTFILE_ROOT:-${HOME}/.dotfiles}/vendor/iterm2/bash"
 fi
 
 # Load fzf support.

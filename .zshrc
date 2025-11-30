@@ -13,7 +13,6 @@
 #==============================================================================#
 source_first() {
   for x in "$@"; do
-    # TODO: double check that `-f` works for symlinked files.
     # -f checks if the path is a file.
     # -r checks if the path is readable by the user.
     if [[ -f "${x}" ]] && [[ -r "${x}" ]]; then
