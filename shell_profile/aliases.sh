@@ -23,20 +23,20 @@ fi
 
 # List all files (including hidden files).
 #  -a, --all      [do not ignore entries starting with '.']
-alias la='ls -a ${ls_color_flag}'
+alias la='ls -a "${ls_color_flag}"'
 
 # List files in a tabular form.
 #  -a, --all      [do not ignore entries starting with `.`]
 #  -l             [use a long listing format]
 #  -F, --classify [append indicator (*/=>@|) to entries]
-alias ll='ls -alF ${ls_color_flag}'
+alias ll='ls -alF "${ls_color_flag}"'
 
 # List files in a tabular form with human readable sizes.
 #  -a, --all      [do not ignore entries starting with `.`]
 #  -l             [use a long listing format]
 #  -F, --classify [append indicator (*/=>@|) to entries]
 #  -h             [use human readable sizes]
-alias lls='ls -alFh ${ls_color_flag}'
+alias lls='ls -alFh "${ls_color_flag}"'
 
 # go two directories up.
 alias ...='../..'
@@ -51,18 +51,32 @@ alias .....='../../../..'
 alias ..4='../../../..'
 
 # Get my local IP address.
-alias localip="ip -o addr show up primary scope global | grep -o 'inet6\? [0-9a-f\.:]*' | cut -f 2 -d ' '"
+if is_osx; then
+    alias localip="ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1'"
+else
+    alias localip="ip -o addr show up primary scope global | grep -o 'inet6\? [0-9a-f\.:]*' | cut -f 2 -d ' '"
+fi
 
 # Show active network interfaces.
-alias ifactive="ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active'"
+# TODO: Make this work on Linux.
+if is_osx; then
+    alias ifactive="ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active'"
+fi
 
 # Show a list of open ports on this machine.
-# TODO: Make this work on MacOS (looks like it needs short flags).
-alias openports='netstat --all --numeric --programs --inet --inet6'
+if is_osx; then
+    alias openports='netstat -an -p tcp -p udp'
+else
+    alias openports='netstat --all --numeric --programs --inet --inet6'
+fi
 
 # Get the size of a file in bytes.
 # TODO: Find a way to report file size in largest useful increment (byte, kilo, mega etc).
-alias filesize="stat -f '%z bytes'"
+if is_osx; then
+    alias filesize="stat -f '%z bytes'"
+else
+    alias filesize="stat -c '%s bytes'"
+fi
 
 # Get a report on free disk space.
 #  -h: Human readable output.
@@ -89,20 +103,11 @@ alias zfgrep='zfgrep --color=auto'
 #   sleep 10; alert
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
-# Prints the current path, with on directory per line.
-alias printpath='echo -e ${PATH//:\\n}'
+# Prints the current path, with one directory per line.
+alias printpath='echo -e ${PATH//:/\\n}'
 
 # Force shell to reload. This is brute force, not sure if recommended...
 alias reloadshell="exec \"\${SHELL}\" -l"
-
-# Copy contents to system clipboard.
-if is_osx; then
-    alias clip="pbcopy"
-elif is_linux; then
-    alias clip="xclip -select c"
-else
-    alias clip="echo 'TODO: Implement me'"
-fi
 
 # Start the screen saver.
 if is_osx; then

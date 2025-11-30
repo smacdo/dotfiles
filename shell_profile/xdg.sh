@@ -19,11 +19,14 @@ xdg_define()
     # Export environment variable if one does not exist.
     if [ -z "${CURRENT_VAL}" ]; then
         export "${ENV_NAME}"="${DEFAULT_DIR}"
+        ACTUAL_VAL="${DEFAULT_DIR}"
+    else
+        ACTUAL_VAL="${CURRENT_VAL}"
     fi
 
-    # Create directory for value if it does not exist.
-    if [ ! -d "${DEFAULT_DIR}" ]; then
-        mkdir -p "${DEFAULT_DIR}"
+    # Create the directory if it does not exist.
+    if [ ! -d "${ACTUAL_VAL}" ]; then
+        mkdir -p "${ACTUAL_VAL}"
     fi
 }
 

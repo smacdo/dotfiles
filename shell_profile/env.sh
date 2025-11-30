@@ -8,7 +8,7 @@
 # Set the dotfile path if it hasn't already been defined.
 # TODO: Is it possible to support installations other than ~/.dotfiles ?
 
-if [ -z ${S_DOTFILE_ROOT+x} ]; then
+if [ -z "${S_DOTFILE_ROOT+x}" ]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
 
@@ -30,14 +30,13 @@ else
 fi
 
 ### TODO: Only apply these settings for interactive shells. ###
-# Hide the “default interactive shell is now zsh” warning on macOS.
+# Hide the "default interactive shell is now zsh" warning on macOS.
 export BASH_SILENCE_DEPRECATION_WARNING=1
 
 # Some programs require this environment variable to show color.
 export CLICOLOR=1
 
 # ls colors (MacOS)
-export CLICOLOR=1
 export LSCOLORS=ExFxCxDxBxegedabagacad
 
 # View more types of files with `less` if `lesspipe` is installed.

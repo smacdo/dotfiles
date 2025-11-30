@@ -1,5 +1,5 @@
 #!/bin/sh
-## Author: Scott MacDonald <root@smacdo.com
+## Author: Scott MacDonald <root@smacdo.com>
 ## Created: 09/29/2020
 ## Purpose: Shell functions shared between bash/zsh/etc.
 
@@ -213,10 +213,20 @@ osinfo() {
 # Fuzzy search current processes and kill selected entries.
 ################################################################################
 fkill() {
-  if [ "$(id -u)" != "0" ]; then
-    pid=$(ps -fH -u "$(id -u)" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+  if is_osx; then
+    # macOS uses BSD ps with different flags
+    if [ "$(id -u)" != "0" ]; then
+      pid=$(ps -u "$(id -u)" -o pid,command | sed 1d | fzf -m | awk '{print $1}')
+    else
+      pid=$(ps -e -o pid,command | sed 1d | fzf -m | awk '{print $1}')
+    fi
   else
-    pid=$(ps -efH --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+    # Linux uses GNU ps
+    if [ "$(id -u)" != "0" ]; then
+      pid=$(ps -fH -u "$(id -u)" --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+    else
+      pid=$(ps -efH --sort -pid | sed 1d | fzf -m | awk '{print $2}')
+    fi
   fi
 
   if [ -n "$pid" ]; then
