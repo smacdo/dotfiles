@@ -16,7 +16,7 @@ source_first() {
     # TODO: double check that `-f` works for symlinked files.
     # -f checks if the path is a file.
     # -r checks if the path is readable by the user.
-    if [ -f "${x}" ] && [ -r "${x}" ]; then
+    if [[ -f "${x}" ]] && [[ -r "${x}" ]]; then
         source "${x}"
         unset x
         return
@@ -27,7 +27,7 @@ source_first() {
 
 # Export the dotfiles path as an environment variable to avoid hardcoding paths.
 # TODO: Is it possible to support installations other than ~/.dotfiles ?
-if [ -z ${S_DOTFILE_ROOT+x} ]; then
+if [[ -z ${S_DOTFILE_ROOT+x} ]]; then
   export S_DOTFILE_ROOT="$HOME/.dotfiles"
 fi
 
@@ -50,20 +50,22 @@ source_first \
 
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
-for file in "${S_DOTFILE_ROOT:-$HOME/.dotfiles}"/shell_profile/\
-{paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
+for file in "${S_DOTFILE_ROOT:-$HOME/.dotfiles}"/shell_profile/{paths.sh,env.sh,functions.sh,aliases.sh,private_branch.sh}; do
     source_first "$file"
 done;
 unset file
 
-# Load .dotfiles shared zsh modules.
-for file in ~/.zsh/*.zsh; do
+# Load .dotfiles shared zsh modules. The `(N)` suffix tells zsh to expand
+# the glob to a empty string if directory `~/zsh/` does not exist.
+for file in ~/.zsh/*.zsh(N); do
     . "$file"
 done
 unset file
 
-#==============================================================================
-# Make sure we can store a decent amount of history lines
+# Ensure the history directory exists otherwise zsh won't write to it.
+[[ -d "${XDG_STATE_HOME:-${HOME}/.local/state}" ]] || mkdir -p "${XDG_STATE_HOME:-${HOME}/.local/state}"
+
+# Store a large number of history lines.
 HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 SAVEHIST=1000000        # One million entries
 HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/zsh_history
@@ -99,7 +101,7 @@ zstyle ':completion:*:options' auto-description '%d'
 
 # use completion caching
 zstyle ':completion:*' use-cache on
-zstyle ':completion:*' cache-path "${HOME}/.zsh_cache"
+zstyle ':completion:*' cache-path "${XDG_CACHE_HOME:-${HOME}/.cache}/zsh"
 
 # case-insensitive completion (uppercase from lowercase & underscores from dashes)
 zstyle ':completion:*' matcher-list 'm:{a-z-}={A-Z_}'
@@ -107,15 +109,15 @@ zstyle ':completion:*' matcher-list 'm:{a-z-}={A-Z_}'
 # enable powerful pattern-based renaming
 autoload zmv
 
-setopt autocd                # change to a diretory if typed alone
+setopt autocd                # change to a directory if typed alone
 setopt no_beep               # disable beep on all errors
 setopt EXTENDED_GLOB
-setopt CORRECT_ALL           # Suggest corrections to mistyped commands and paths.
+setopt CORRECT               # Suggest corrections to mistyped commands.
 setopt NOMATCH               # Turn errors back on for empty globbing with init finished.
 
 # Prevent shell output from overwriting regular files.
 # Use `>|` to override, eg `echo "output" >| file.txt"
-set -o noclobber
+setopt NO_CLOBBER
 
 # Enable Powerlevel10k instant prompt. Initialization code that may require
 # console input (password prompts, [y/n] confirmations, etc.) must go above this
@@ -123,17 +125,19 @@ set -o noclobber
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
+
 # Use the powerlevel10k theme or warn if not installed.
 if is_osx; then
   if type brew &>/dev/null; then
-    if [[ -f "$(brew --prefix)/share/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-        source "$(brew --prefix)/share/powerlevel10k/powerlevel10k.zsh-theme"
-    elif [[ -f "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-        source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
+    BREW_PREFIX="$(brew --prefix)"
+    if [[ -f "${BREW_PREFIX}/share/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+        source "${BREW_PREFIX}/share/powerlevel10k/powerlevel10k.zsh-theme"
+    elif [[ -f "${BREW_PREFIX}/opt/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+        source "${BREW_PREFIX}/opt/powerlevel10k/powerlevel10k.zsh-theme"
     fi
   fi
-elif [[ -f "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme ]]; then
-    source "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme
+elif [[ -f "${XDG_DATA_HOME:-${HOME}/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source "${XDG_DATA_HOME:-${HOME}/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme
 elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 fi
@@ -143,29 +147,29 @@ fi
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # Make less more friendly for non-text input files, see lesspipe(1).
-[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+[[ -x /usr/bin/lesspipe ]] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # Additional ZSH completions.
 # TODO: Finish this for debian, fedora, ubuntu installs.
 if is_osx; then
   if type brew &>/dev/null; then
-    FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+    FPATH=${BREW_PREFIX}/share/zsh-completions:$FPATH
     autoload -Uz compinit
   fi
 fi
 
 # Load iTerm2 shell integration script.
-if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
+if [[ "${TERM_PROGRAM}" = "iTerm.app" ]]; then
     source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
 fi
 
 # Load fzf support.
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+[[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
 
 # Finish zsh auto completion init.
 compinit
 
-# Apply optional per-machine configuration settings at the end of .bashrc. These
+# Apply optional per-machine configuration settings at the end of .zshrc. These
 # files should not be checked in the dotfiles repo because they are meant to
 # apply to individual machine set ups.
 #
@@ -184,8 +188,8 @@ source_first \
 # TODO: Source the correct path on Debian, Fedora, Windows.
 if is_osx; then
   if type brew &>/dev/null; then
-    [[ ! -f "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
-      || source "$(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+    [[ ! -f "${BREW_PREFIX}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
+      || source "${BREW_PREFIX}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
   fi
 else
   [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
