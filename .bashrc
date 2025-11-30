@@ -55,7 +55,6 @@ source_first \
   "${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/0_my_bashrc.sh" \
   "${HOME}/.0_my_bashrc.sh"
 
-
 # Source shell vendor neutral configuration files. These files are shared
 # between the different shells like bash, and zsh to reduce duplication.
 #
@@ -133,7 +132,7 @@ set_colored_prompt
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # Load bash auto-completions.
-# TODO: Finish this for debian, fedora, windows installs.
+# TODO: Finish this for debian, fedora, ubuntu installs.
 if is_osx; then
   if type brew &>/dev/null; then
     [[ -r "$(brew --prefix)/etc/profile.d/bash_completion.sh" ]] && \

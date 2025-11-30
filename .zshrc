@@ -68,9 +68,9 @@ unset file
 
 #==============================================================================
 # Make sure we can store a decent amount of history lines
-HISTSIZE=20000
-SAVEHIST=20000
-HISTFILE=~/.local/state/zsh_history
+HISTSIZE=10000          # Ten thousand entries for in-memory storage.
+SAVEHIST=1000000        # One million entries
+HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/zsh_history
 
 setopt SHARE_HISTORY      # Share history across multiple zsh sessions.
 setopt APPEND_HISTORY     # Append to history file instead of overwriting.
@@ -130,29 +130,31 @@ if is_osx; then
         source "$(brew --prefix)/opt/powerlevel10k/powerlevel10k.zsh-theme"
     fi
   fi
-elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
-    source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 elif [[ -f "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme ]]; then
     source "${XDG_DATA_HOME:-~/.local/share}"/powerlevel10k/powerlevel10k.zsh-theme
-else
-    echo "WARNING: powerlevel10k not installed"
+elif [[ -f /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme ]]; then
+    source /usr/local/opt/powerlevel10k/powerlevel10k.zsh-theme
 fi
 
 # Load powerlevel10k, a ZSH plugin for making fancy prompts.
 # To customize run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-# Load iTerm2 shell integration script.
-if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
-    source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
-fi
+# Make less more friendly for non-text input files, see lesspipe(1).
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
 
 # Additional ZSH completions.
+# TODO: Finish this for debian, fedora, ubuntu installs.
 if is_osx; then
   if type brew &>/dev/null; then
     FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
     autoload -Uz compinit
   fi
+fi
+
+# Load iTerm2 shell integration script.
+if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
+    source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
 fi
 
 # Load fzf support.
@@ -187,3 +189,5 @@ else
   [[ ! -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]\
     || source "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 fi
+
+### end of config - there should be no lines below this one! ###
