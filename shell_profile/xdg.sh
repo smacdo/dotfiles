@@ -1,6 +1,15 @@
-#!/bin/bash
+#!/bin/sh
 # Configures XDG environment variables if not already configured
-# TODO: Rewrite this for `sh` not `bash`.
+
+#==============================================================================#
+# Defines an XDG environment variable, if it was not already defined. The XDG
+# directory will be created if it does not exist.
+#
+# Argument:
+#  $1: The XDG environment variable name.
+#  $2: The current value of the XDG environment variable.
+#  $3: A default value to use if there is not existing value.
+#==============================================================================#
 xdg_define()
 {
     ENV_NAME=$1
@@ -8,12 +17,12 @@ xdg_define()
     DEFAULT_DIR=$3
 
     # Export environment variable if one does not exist.
-    if [[ -z "${CURRENT_VAL}" ]]; then
+    if [ -z "${CURRENT_VAL}" ]; then
         export "${ENV_NAME}"="${DEFAULT_DIR}"
     fi
 
     # Create directory for value if it does not exist.
-    if [[ ! -d "${DEFAULT_DIR}" ]]; then
+    if [ ! -d "${DEFAULT_DIR}" ]; then
         mkdir -p "${DEFAULT_DIR}"
     fi
 }
