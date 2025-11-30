@@ -52,6 +52,9 @@ add_path_back "$HOME/.cargo/bin"
 # UV installs tools to the user's home directory as well.
 add_path_back "$HOME/.local/share/uv/tools"
 
+# Some tools like to install to .local/bin
+add_path_back "$HOME/.local/bin"
+
 # Support local homebrew installs (~/homebrew)
 #
 # NOTE: The new preferred local dir for homebrew is `.homebrew`. Continue to
