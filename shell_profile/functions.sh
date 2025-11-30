@@ -1,6 +1,6 @@
-#!/bin/bash
-## Author: Scott MacDonald <scott@smacdo.com
-## Created: 09/29/2020 
+#!/bin/sh
+## Author: Scott MacDonald <root@smacdo.com
+## Created: 09/29/2020
 ## Purpose: Shell functions shared between bash/zsh/etc.
 
 ### Operating system check functions.
@@ -103,7 +103,8 @@ show_path() {
 # First parameter is the text to confirm with.
 prompt_confirm() {
     while true; do
-        read -r -n 1 -p "${1:-Continue?} [y|n]: " REPLY
+        printf "%s [y|n]: " "${1:-Continue?}"
+        read -r REPLY
         case $REPLY in
             [yY]) echo ; return 0 ;;
             [nN]) echo ; return 1 ;;
@@ -246,4 +247,3 @@ man() {
     GROFF_NO_SGR=1                                             \
     man "$@"
 }
-
