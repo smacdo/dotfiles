@@ -228,9 +228,18 @@ mkd() {
 
 #------------------------------------------------------------------------------#
 # Create a directory in /tmp and enter it.                                     #
+#                                                                              #
+# The directory is pushed on to the dirs stack, so you can use `popd` to return#
+# to the previous directory when you are done with the temp directory.         #
 #------------------------------------------------------------------------------#
 mktmp() {
-    cd "$(mktemp -d)" || return
+    temp_dir="$(mktemp -d)"
+    if type pushd >/dev/null ; then
+      # shellcheck disable=SC3044
+      pushd "$temp_dir" >/dev/null || return
+    else
+      cd "$temp_dir" || return
+    fi
 }
 
 #------------------------------------------------------------------------------#
