@@ -1,6 +1,10 @@
 #!/bin/sh
-# Author: Scott MacDonald
-# Purpose: Lock the desktop screen and require a password to unlock.
+#==============================================================================#
+# Author: Scott MacDonald <root@smacdo.com>
+# Purpose: Lock the desktop screen.
+#==============================================================================#
+# vim: set filetype=python
+
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
@@ -24,8 +28,8 @@ main() {
      esac
   done
 
-  # Try to use a native tool to lock the screen before using a platform
-  # specific invocation.
+  # Try to use a native tool to lock the screen before using platform specific
+  # command line calls.
   if command -v screenlocker > /dev/null 2>&1 ; then
     verbose "using screenlocker to lock the screen"
     screenlocker
@@ -41,9 +45,11 @@ main() {
       # Can also use `pmset displaysleepnow` but unsure of technical differences.
       verbose "Using fallback emulation"
       pmset sleepnow
+    elif is_wsl ; then
+      rundll32.exe user32.dll,LockWorkStation
     else
-      # TODO: Implement Linux, Windows.
-      exit_with_message 2 "This platform is not supported yet"
+      # TODO: Support Linux (KDE, Gnome).
+      exit_with_message 2 "This platform is not supported"
     fi
   fi
 }
