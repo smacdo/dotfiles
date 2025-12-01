@@ -1,0 +1,18 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald <root@smacdo.com>
+# Purpose: Execute commands in a Windows powershell environment for WSL
+# installations.
+#==============================================================================#
+# vim: set filetype=python
+
+if which pwsw.exe >/dev/null; then
+  pwsh_shell=pwsw.exe
+elif which powershell.exe >/dev/null; then
+  pwsh_shell=powershell.exe
+else
+  print "pwse ERROR: could not locate pwse.exe or powershell.exe on the path"
+  exit 2
+fi
+
+${pwsh_shell} -NoProfile -NoLogo -NonInteractive -command "$*"

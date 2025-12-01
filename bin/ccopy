@@ -1,6 +1,10 @@
 #!/bin/sh
+#==============================================================================#
 # Author: Scott MacDonald
 # Purpose: Cross platform script to copy text to the system clipboard.
+#==============================================================================#
+# vim: set filetype=python
+
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
@@ -43,6 +47,8 @@ main() {
 
     if is_osx; then
       pbcopy < "$input_file"
+    elif is_wsl; then
+      clip.exe < "$input_file"
     elif is_linux; then
       xsel -i < "$input_file"
     else
@@ -53,6 +59,10 @@ main() {
 
     if is_osx; then
       echo "$*" | pbcopy
+    elif is_wsl; then
+      # Powershell version below works fine, but clip.exe is simpler!
+      #pwsh.exe -NoProfile -NoLogo -NonInteractive -command "Set-Clipboard -Value \"$(printf "%s" "$*")\""
+      echo "$*" | clip.exe
     elif is_linux; then
       echo "$*" | xsel -i
     else
@@ -63,6 +73,8 @@ main() {
 
     if is_osx; then
       pbcopy
+    elif is_wsl; then
+      cat | clip.exe
     elif is_linux; then
       xsel -i
     else

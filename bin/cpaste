@@ -1,6 +1,10 @@
 #!/bin/sh
+#==============================================================================#
 # Author: Scott MacDonald
 # Purpose: Cross platform script to paste text from the system clipboard.
+#==============================================================================#
+# vim: set filetype=python
+
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 . "$S_DOTFILE_ROOT"/sh/cli.sh
 
@@ -30,10 +34,12 @@ main() {
   # Command to copy is different on different platforms.
   if is_osx ; then
     pbpaste
+  elif is_wsl ; then
+    pwsh Get-Clipboard | sed 's/\r$//' | head -c -1
   elif is_linux ; then
     xsel -o
   else
-    exit_with_message 2 "This platform is not supported yet"
+    exit_with_message 2 "This platform is not supported"
   fi
 }
 
