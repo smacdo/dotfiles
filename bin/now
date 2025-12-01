@@ -1,0 +1,7 @@
+#!/bin/sh
+# Purpose: Show the current date, time and a calendar of the current month.
+# vim: set filetype=sh
+
+date "+%l:%M%p on %A %B %e, %Y"
+echo
+cal | grep -E --color=always "\b$(date '+%e')\b| "
