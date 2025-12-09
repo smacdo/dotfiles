@@ -157,7 +157,11 @@ if [ "${TERM_PROGRAM}" = "iTerm.app" ]; then
 fi
 
 # Load fzf support.
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+if is_osx; then
+  source_first ~/.fzf.bash "$(brew --prefix)/opt/fzf/shell/key-bindings.bash"
+else
+  source_first ~/.fzf.bash /usr/share/fzf/shell/key-bindings.bash
+fi
 
 # Apply optional per-machine configuration settings at the end of .bashrc. These
 # files should not be checked in the dotfiles repo because they are meant to

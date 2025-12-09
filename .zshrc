@@ -163,7 +163,11 @@ if [[ "${TERM_PROGRAM}" = "iTerm.app" ]]; then
 fi
 
 # Load fzf support.
-[[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
+if is_osx; then
+  source_first ~/.fzf.zsh "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
+else
+  source_first ~/.fzf.zsh /usr/share/fzf/shell/key-bindings.zsh
+fi
 
 # Finish zsh auto completion init.
 compinit
