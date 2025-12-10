@@ -158,9 +158,11 @@ fi
 
 # Load fzf support.
 if is_osx; then
-  source_first ~/.fzf.bash "$(brew --prefix)/opt/fzf/shell/key-bindings.bash"
+  source_first "$(brew --prefix)/opt/fzf/shell/completion.bash"
+  source_first "$(brew --prefix)/opt/fzf/shell/key-bindings.bash"
 else
-  source_first ~/.fzf.bash /usr/share/fzf/shell/key-bindings.bash
+  source_first /usr/share/fzf/shell/completion.bash
+  source_first /usr/share/fzf/shell/key-bindings.bash
 fi
 
 # Apply optional per-machine configuration settings at the end of .bashrc. These

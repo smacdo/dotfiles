@@ -164,9 +164,11 @@ fi
 
 # Load fzf support.
 if is_osx; then
-  source_first ~/.fzf.zsh "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
+  source_first "${BREW_PREFIX}/opt/fzf/shell/completion.zsh"
+  source_first "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
 else
-  source_first ~/.fzf.zsh /usr/share/fzf/shell/key-bindings.zsh
+  source_first /usr/share/fzf/shell/completion.zsh
+  source_first /usr/share/fzf/shell/key-bindings.zsh
 fi
 
 # Finish zsh auto completion init.
