@@ -167,8 +167,12 @@ if is_osx; then
   source_first "${BREW_PREFIX}/opt/fzf/shell/completion.zsh"
   source_first "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
 else
-  source_first /usr/share/fzf/shell/completion.zsh
-  source_first /usr/share/fzf/shell/key-bindings.zsh
+  source_first \
+    /usr/share/fzf/shell/completion.zsh \
+    /usr/share/doc/fzf/examples/completion.zsh
+  source_first \
+    /usr/share/fzf/shell/key-bindings.zsh \
+    /usr/share/doc/fzf/examples/key-bindings.zsh
 fi
 
 # Finish zsh auto completion init.

@@ -161,8 +161,12 @@ if is_osx; then
   source_first "$(brew --prefix)/opt/fzf/shell/completion.bash"
   source_first "$(brew --prefix)/opt/fzf/shell/key-bindings.bash"
 else
-  source_first /usr/share/fzf/shell/completion.bash
-  source_first /usr/share/fzf/shell/key-bindings.bash
+  source_first \
+    /usr/share/fzf/shell/completion.bash \
+    /usr/share/doc/fzf/examples/completion.bash
+  source_first \
+    /usr/share/fzf/shell/key-bindings.bash \
+    /usr/share/doc/fzf/examples/key-bindings.bash
 fi
 
 # Apply optional per-machine configuration settings at the end of .bashrc. These
