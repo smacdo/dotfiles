@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+# vim: set filetype=py
+import base64
+
+# Other notes for things to check in the future:
+#  - if in tmux, the term should be `tmux-256color` not `screen`
+#  - consider printing term and having user confirm it looks right
+#  - print a list of things that can be checked (arg parsing)
+
+def test_clipboard():
+    print("# Clipboard support")
+    text = "testing 123"
+    encoded = base64.b64encode(text.encode()).decode()
+    print(f"\x1b]52;;{encoded}\x07", end="")
+
+    print(f"does the clipboard contain `{text}`?")
+
+def test_hyperlink():
+    print("# Hyperlink support")
+
+    text = "Click me!"
+    link = "http://google.com"
+    print(f"\x1b]8;;{link}\x1b\\{text}\x1b]8;;\x1b\\\n")
+
+    print(f"does `{text}` open a browser to {link}?")
+
+def test_configurable_16_colors():
+    # NOTE: These colors are configurable by your terminal (eg, themes)!
+    header = [
+        "NORMAL", "bold", "dim", "itali", "under", "rever", "strik",
+        "BRIGHT", "bold", "dim", "itali", "under", "rever", "strik"
+    ]
+
+    print("# Terminal 16 color support")
+    print(" ".join(header))
+
+    for color in range(8):
+        for intensity in [3, 9]:  # 3: normal, 9: bright
+            escapes = f"{intensity}{color}"
+            # Print color with no style
+            print(f"\033[{escapes}m\\033[{escapes}m\033[0m ", end="")
+            # Print color with each style
+            for style in [1, 2, 3, 4, 7, 9]:  # bold, dim, italic, underline, reverse, strikethrough
+                escapes_with_style = f"{intensity}{color};{style}"
+                print(f"\033[{escapes_with_style}m\\033[{escapes_with_style}m\033[0m ", end="")
+            print(" ", end="")
+        print()
+
+def test_256_color():
+    print("# 256 color support")
+
+    for i in range(16, 256):
+        # Print colored block with color code
+        print(f"\x1b[48;5;{i}m{str(i).rjust(3)}\x1b[0m ", end="")
+
+        # Newline every 6 colors
+        if (i - 15) % 6 == 0:
+            print()
+
+
+def test_true_color():
+    print("# True color support")
+
+    columns = 78
+    step = columns / 6
+    for hue in range(columns):
+        x = (hue % step) * 255 / step
+        if hue < step:
+            r, g, b = 255, int(x), 0
+        elif hue < step * 2:
+            r, g, b = int(255 - x), 255, 0
+        elif hue < step * 3:
+            r, g, b = 0, 255, int(x)
+        elif hue < step * 4:
+            r, g, b = 0, int(255 - x), 255
+        elif hue < step * 5:
+            r, g, b = int(x), 0, 255
+        else:
+            r, g, b = 255, 0, int(255 - x)
+        # Foreground is the inverse color
+        fr, fg, fb = 255 - r, 255 - g, 255 - b
+        # Print colored block
+        print(f"\033[48;2;{r};{g};{b}m\033[38;2;{fr};{fg};{fb}m \033[0m", end="")
+    print()
+
+    print("do you see a gradient orange -> yellow -> green -> blue -> purple -> red?")
+
+def main():
+    test_configurable_16_colors()
+    test_256_color()
+    test_true_color()
+    #test_hyperlink()
+    #test_clipboard()
+
+if __name__ == "__main__":
+    main()
