@@ -113,9 +113,10 @@ class InputFieldTests(unittest.TestCase):
 
     @patch("builtins.input")
     def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
-            "sys.stdin"
-        ) as stdin:
+        with (
+            redirect_stderr(StringIO()) as stderr_buffer,
+            mock.patch("sys.stdin") as stdin,
+        ):
             stdin.isatty.return_value = False
 
             self.assertTrue(
@@ -139,9 +140,10 @@ class ConfirmTests(unittest.TestCase):
 
     @patch("builtins.input")
     def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
-            "sys.stdin"
-        ) as stdin:
+        with (
+            redirect_stderr(StringIO()) as stderr_buffer,
+            mock.patch("sys.stdin") as stdin,
+        ):
             stdin.isatty.return_value = False
 
             self.assertTrue(confirm(message="do something?", default=True))
@@ -154,9 +156,10 @@ class ConfirmTests(unittest.TestCase):
 
     @patch("builtins.input", return_value="")
     def test_prints_upper_y_if_default_true(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
-            "sys.stdin"
-        ) as stdin:
+        with (
+            redirect_stderr(StringIO()) as stderr_buffer,
+            mock.patch("sys.stdin") as stdin,
+        ):
             stdin.isatty.return_value = True
             confirm(message="do something?", default=True)
             captured_stderr = stderr_buffer.getvalue()
@@ -165,9 +168,10 @@ class ConfirmTests(unittest.TestCase):
 
     @patch("builtins.input", return_value="")
     def test_prints_upper_n_if_default_false(self, mocked_input):
-        with redirect_stderr(StringIO()) as stderr_buffer, mock.patch(
-            "sys.stdin"
-        ) as stdin:
+        with (
+            redirect_stderr(StringIO()) as stderr_buffer,
+            mock.patch("sys.stdin") as stdin,
+        ):
             stdin.isatty.return_value = True
             confirm(message="do something?", default=False)
             captured_stderr = stderr_buffer.getvalue()

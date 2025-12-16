@@ -5,6 +5,7 @@ Author: Scott MacDonald <root@smacdo.com>
 
 This script will configure the dotfiles repo for the current user to use.
 """
+
 import os
 import sys
 

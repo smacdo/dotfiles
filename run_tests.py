@@ -2,6 +2,7 @@
 """
 This script performs testing for the dotfiles repository.
 """
+
 import argparse
 import logging
 import shutil
