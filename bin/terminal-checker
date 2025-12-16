@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # vim: set filetype=py
+import argparse
 import base64
+import sys
 
 # Other notes for things to check in the future:
 #  - if in tmux, the term should be `tmux-256color` not `screen`
 #  - consider printing term and having user confirm it looks right
-#  - print a list of things that can be checked (arg parsing)
 
 def test_clipboard():
     print("# Clipboard support")
@@ -86,11 +87,43 @@ def test_true_color():
     print("do you see a gradient orange -> yellow -> green -> blue -> purple -> red?")
 
 def main():
-    test_configurable_16_colors()
-    test_256_color()
-    test_true_color()
-    #test_hyperlink()
-    #test_clipboard()
+    parser = argparse.ArgumentParser(description="Tests features to see if they are supported by your terminal")
+    
+    parser.add_argument("-a", "--all", action="store_true", help="run all checks")
+    parser.add_argument("-C", "--color", action="store_true", help="check color support")
+    parser.add_argument("--color16", action="store_true", help="check configurable 16 color support")
+    parser.add_argument("--color256", action="store_true", help="check 256 color support")
+    parser.add_argument("--truecolor", action="store_true", help="check truecolor support")
+    parser.add_argument("-l", "--link", action="store_true", help="check clickable text urls")
+    parser.add_argument("-c", "--clipboard", action="store_true", help="check copy to clipboard")
+
+    args = parser.parse_args()
+
+    check_all_colors = args.all or args.color
+    checked_any = False
+
+    if check_all_colors or args.color16:
+        test_configurable_16_colors()
+        checked_any = True
+
+    if check_all_colors or args.color256:
+        test_256_color()
+        checked_any = True
+
+    if check_all_colors or args.truecolor:
+        test_true_color()
+        checked_any = True
+
+    if args.all or args.link:
+        test_hyperlink()
+        checked_any = True
+
+    if args.all or args.clipboard:
+        test_clipboard()
+        checked_any = True
+
+    if not checked_any:
+        parser.print_help(sys.stdout)
 
 if __name__ == "__main__":
     main()
