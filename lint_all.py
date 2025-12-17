@@ -50,6 +50,36 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
     return files_failed
 
 
+# TODO: documentation
+def typecheck_py_file(file_path: str) -> (bool, str):
+    result = subprocess.run(
+        ["uvx", "ty", "check", "--no-progress", "--color", "always", file_path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    return (result.returncode == 0, result.stdout)
+
+
+# TODO: documentation
+def ruff_lint_py_file(file_path: str, auto_fix=False) -> (bool, str):
+    fix_arg = "--fix" if auto_fix else "--no-fix"
+
+    custom_env = os.environ.copy()
+    custom_env["FORCE_COLOR"] = "1"
+
+    result = subprocess.run(
+        ["uvx", "ruff", "check", fix_arg, file_path],
+        env=custom_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    return (result.returncode == 0, result.stdout)
+
+
 ################################################################################
 # Lint a list of python files, and return a list of the files that failed a
 # linter check.
@@ -59,29 +89,28 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
 ################################################################################
 def lint_py_files(file_paths: list[str]) -> list[str]:
     # Make sure Python linter tools are available.
-    if shutil.which("mypy") is None:
-        raise Exception("cannot lint python scripts - mypy not found")
-    if shutil.which("ruff") is None:
-        raise Exception("cannot lint python scripts - ruff not found")
+    if shutil.which("uv") is None:
+        raise Exception("`uv` is required for linting python scripts")
 
     # Lint each file individually.
     files_failed: list[str] = []
 
     for file_path in file_paths:
         # Typecheck the python file.
-        result = subprocess.run(
-            ["mypy", "--no-error-summary", "--disallow-untyped-calls", file_path]
-        )
+        typecheck_ok, typecheck_output = typecheck_py_file(file_path)
 
-        if result.returncode != 0:
+        if not typecheck_ok:
+            print(typecheck_output)
             files_failed.append(file_path)
             continue
 
         # Apply standard linting rules with Ruff.
-        result = subprocess.run(["ruff", "check", file_path])
+        ruff_ok, ruff_output = ruff_lint_py_file(file_path)
 
-        if result.returncode != 0:
+        if not ruff_ok:
+            print(ruff_output)
             files_failed.append(file_path)
+            continue
 
         # File is good
         logging.debug(f"{file_path}: OK")
@@ -162,6 +191,7 @@ def main() -> int:
         logging.warning(f"{len(failed_sh_files)} shell scripts failed linter checks")
 
     # Lint python scripts.
+    # TODO: Apply auto fixes if --fix is passed.
     logging.info("linting python scripts...")
 
     failed_py_files = lint_py_files(DOTFILES_PY_SCRIPTS)
@@ -179,6 +209,9 @@ def main() -> int:
             f"{len(failed_py_files)} python bin scripts failed linter checks"
         )
 
+    # TODO: Auto-format files if --format is passed. Apply formatting to any file for which there
+    #       are no linting errors, even if other files failed.
+
     # Report if all tests passed or not.
     if len(failed_sh_files) + len(failed_py_files) == 0:
         logging.info("all lint checks passed!")
@@ -187,6 +220,15 @@ def main() -> int:
         logging.warning(f"{is_fatal_text} linter issues found")
 
     return 1 if has_fatal_lints else 0
+
+
+# TODO: Move functions into _pydotlib modules
+# TODO: Use the _pydotlib shared logger with color
+# TODO: Add an argument to report which shell and python scripts are detected
+# TODO: Add auto-formatting to this script (or new `./format_all`)
+# TODO: Add ability to lint / format only a specific script
+# TODO: Add ability to execlude known problematic scripts.
+# TODO: Turn color on/off rather than force.
 
 
 if __name__ == "__main__":
