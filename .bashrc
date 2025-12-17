@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Author: Scott MacDonald <root@smacdo.com>
 # Purpose: Shared bash shell configuration.
 ################################################################################

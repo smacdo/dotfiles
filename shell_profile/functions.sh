@@ -62,7 +62,7 @@ detect_os() {
 
   elif [ "$UNAME" = "darwin" ] ; then
       export DOT_OS="macos"
-      export DOT_DIST=$UNAME
+      export DOT_DIST="$UNAME"
       DOT_DIST_VERSION=$(sysctl kern.osrelease | cut -c 17- )
       export DOT_DIST_VERSION
       DOT_DIST_REVISION=$(sysctl kern.osrevision | cut -c 18- )
@@ -223,7 +223,8 @@ cdd() {
 # Create a directory and enter it.                                             #
 #------------------------------------------------------------------------------#
 mkd() {
-    mkdir -p "$@" && cd "$_" || return
+    # NOTE: this was `cd "$_"` but `$_` is not supported in POSIX sh.
+    mkdir -p "$@" && cd "$@" || return
 }
 
 #------------------------------------------------------------------------------#
