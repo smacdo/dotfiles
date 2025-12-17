@@ -51,7 +51,7 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
 
 
 # TODO: documentation
-def typecheck_py_file(file_path: str) -> (bool, str):
+def typecheck_py_file(file_path: str) -> tuple[bool, str]:
     result = subprocess.run(
         ["uvx", "ty", "check", "--no-progress", "--color", "always", file_path],
         stdout=subprocess.PIPE,
@@ -63,7 +63,7 @@ def typecheck_py_file(file_path: str) -> (bool, str):
 
 
 # TODO: documentation
-def ruff_lint_py_file(file_path: str, auto_fix=False) -> (bool, str):
+def ruff_lint_py_file(file_path: str, auto_fix=False) -> tuple[bool, str]:
     fix_arg = "--fix" if auto_fix else "--no-fix"
 
     custom_env = os.environ.copy()

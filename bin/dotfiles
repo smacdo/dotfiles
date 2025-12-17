@@ -36,13 +36,13 @@ def main() -> None:
     
     argparser.add_argument("-v", "--verbose", action='store_true', help='Enable verbose output (DEBUG level logging)')
 
-    path_command = subparser.add_parser(
+    subparser.add_parser(
         "path", help="Show the path to the dotfiles checkout"
     )
-    status_command = subparser.add_parser(
+    subparser.add_parser(
         "syncstate", help="Display information about the state of the git checkout"
     )
-    update_command = subparser.add_parser(
+    subparser.add_parser(
         "update", help="Update the dotfiles checkout with upstream changes"
     )
 
@@ -68,7 +68,12 @@ def main() -> None:
         sys.exit(status_cmd())
 
 def status_cmd() -> bool:
-    repo_status = RepoCheckoutStatus.from_dir(get_dotfiles_dir())
+    dotfiles_dir = get_dotfiles_dir()
+
+    if not dotfiles_dir:
+        return False
+
+    repo_status = RepoCheckoutStatus.from_dir(dotfiles_dir)
     ahead = repo_status.commits_ahead
     behind = repo_status.commits_behind
 
@@ -97,7 +102,7 @@ def update_cmd() -> bool:
     result = subprocess.run(["git", "fetch", "origin"], check=False)
     
     if result.returncode != 0:
-        logger.warning(f"Errors encountered when running `git fetch origin`! Please update manually")
+        logger.warning("Errors encountered when running `git fetch origin`! Please update manually")
         return False
 
     logger.debug("rebasing on changes from origin/master")

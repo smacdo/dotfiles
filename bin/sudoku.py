@@ -175,7 +175,7 @@ class Cell:
     def try_eliminate(self, digit: int) -> bool:
         return self._eliminate(digit, throw_if_missing=False)
 
-    def __contains__(self, item: any) -> bool:
+    def __contains__(self, item) -> bool:
         return item in self.digits
 
     def __len__(self) -> int:
@@ -250,7 +250,7 @@ class Sudoku:
     def __getitem__(self, key: tuple[int, int]) -> Cell:
         return self.cells[key[0]][key[1]]
 
-    def __setitem__(self, key: any, value: any) -> None:
+    def __setitem__(self, key, value) -> None:
         raise NotImplementedError()
 
     def __delitem__(self, key):

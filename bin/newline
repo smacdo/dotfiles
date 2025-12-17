@@ -170,7 +170,9 @@ def main() -> None:
         else:
             if args.convert == "auto":
                 from_ending = detect(input_reader)
-                to_ending = from_ending.opposite()
+
+                if from_ending is not None:
+                    to_ending = from_ending.opposite()
             else:
                 to_ending = LineEnding.parse(args.convert)
 

@@ -42,7 +42,7 @@ def apply_dotfile_symlinks(
         )
 
 
-def main() -> None:
+def main() -> int:
     # Argument parsing.
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument(
@@ -76,15 +76,15 @@ def main() -> None:
     git_root = get_repo_root(Path(os.getcwd()).resolve())
     logging.debug(f"current git repo root is {git_root}")
 
-    if not git_root:
+    if git_root is None:
         logging.error(f"{__file__} must be run from the root of a git repository")
-        sys.exit(1)
-
+        return 1
+    
     logging.debug(f"current git repo is dotfiles root: {is_dotfiles_root(git_root)}")
 
     if not is_dotfiles_root(git_root):
         logging.error(f"{__file__} must be run from the root of a dotfiles repository")
-        sys.exit(1)
+        return 1
 
     # Run installation commands.
     home_dir = Path.home()
@@ -142,6 +142,8 @@ def main() -> None:
         gitconfig_path=MY_GITCONFIG_PATH, name=args.git_name, email=args.git_email
     )
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
