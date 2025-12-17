@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # vim: set ft=python
-import typing
 from enum import Enum
 from pathlib import Path
 
 import argparse
 import io
 import sys
+import typing
 import unittest
 
 # TODO: Tests
@@ -104,7 +104,7 @@ def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
 
 def perform_convert(
     input_file: io.BufferedReader | Path,
-    output_file: io.BufferedWriter | Path,
+    output_file: typing.TextIO | io.BufferedWriter | Path,
     to_ending: LineEnding,
 ) -> None:
     # Load the file to memory.
@@ -123,8 +123,10 @@ def perform_convert(
     if isinstance(output_file, Path):
         with open(output_file, "wb") as file:
             file.write(file_contents)
-    else:
+    if isinstance(output_file, io.BufferedWriter):
         output_file.write(file_contents)
+    else:
+        output_file.write(str(file_contents))
 
 
 # ==============================================================================#
