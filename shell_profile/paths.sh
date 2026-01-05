@@ -57,16 +57,10 @@ add_path_back "$HOME/.cargo/bin"
 add_path_back "$HOME/.local/share/uv/tools"
 
 # Support default Homebrew installations as well as installations to $HOME.
-#
-# NOTE: The new preferred local dir for homebrew is `.homebrew`. Continue to
-#       support the older directory but only add it if it is detected. Add the
-#       other path by default to allow the case of booting into this profile,
-#       installing Homebrew locally and then commands should "just work".
 if [ "$(uname)" = "Darwin" ]; then
-  add_path_front "/opt/homebrew/bin"
+  add_path_front "/opt/homebrew/bin" -f
   add_path_front "$HOME/.homebrew/bin"
   add_path_front "$HOME/.homebrew/sbin"
-  add_path_front "$HOME/homebrew/bin"
 fi
 
 # Dotfiles scripts (this will override ~/homebrew).
