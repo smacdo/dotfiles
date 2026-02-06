@@ -47,4 +47,6 @@
 
 # Bin Scripts
 - Script that line breaks excessively long command lines
-- backuo: Simple script that creates foo.bak_N while avoiding race conditions
+- backup: Simple script that creates foo.bak_N while avoiding race conditions
+- mksh:
+  - source the author name for an dotfile envvar $S_DEFAULT_AUTHOR

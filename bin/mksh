@@ -1,0 +1,75 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: Generates the skeleton of a new shell script for the user.
+# Usage: ./mksh name_of_shell_script [path/to/dest/dir]
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# shellcheck disable=SC3040
+(set -o pipefail 2> /dev/null) && set -o pipefail 
+
+# read arguments
+#  1: $script_name
+#  2: $dest_dir      (optional, defaults to $S_DOTFILE_ROOT/bin)
+if [ $# -eq 1 ]; then
+  script_name="$1"
+  dest_dir="$S_DOTFILE_ROOT/bin"
+elif [ $# -eq 2 ]; then
+  script_name="$1"
+  dest_dir="$2"
+
+  if [ ! -d "$dest_dir" ]; then
+    echo "destination dir $dest_dir does not exist" 1>&2
+    exit 1
+  fi
+else
+  echo "usage: ./$(basename "$0") name_of_shell_script [path/to/dest/dir]"
+  exit 1
+fi
+
+# Check that this script will not clobber an existing script.
+script_filepath="$dest_dir/$script_name"
+if [ -e "$script_filepath" ]; then
+  echo "$script_name already exists" 1>&2
+  exit 1
+fi
+
+# Write the skeleton out.
+# 
+#   set -e             # exit if any command returns non-zero
+#   set -u             # treat unset variables as an error and exit
+#   set -o pipefail    # exit if any pipeline command returns non-zero
+#
+cat <<EOF > "$script_filepath"
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: 
+# Usage: ./$(basename "$script_name")
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# shellcheck disable=SC3040
+(set -o pipefail 2> /dev/null) && set -o pipefail 
+
+
+EOF
+
+# Make sure the new script is executable.
+chmod u+x "$script_filepath"
+
+# Let the user continue editing the file.
+case "$EDITOR" in
+  *nvim*|*neovim*|*vim*)
+    # open the file to line 9 when using vim or neovim
+    "$EDITOR" +14 "$script_filepath"
+    ;;
+  *)
+    "$EDITOR" "$script_filepath"
+    ;;
+esac
