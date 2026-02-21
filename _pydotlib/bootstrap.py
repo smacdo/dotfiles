@@ -11,6 +11,7 @@ import tempfile
 import unittest
 import urllib.request
 import urllib.error
+from unittest.mock import MagicMock, patch
 
 from datetime import datetime
 from pathlib import Path
@@ -291,6 +292,56 @@ def download_files(
             download_file(url=url, dest=target, dry_run=dry_run)
 
 
+def git_clone(url: str, dest: Path, dry_run: bool, depth: int | None = None) -> bool:
+    """
+    Clone a git repository to a destination path.
+
+    Args:
+        url: Git repository URL to clone.
+        dest: Destination directory for the cloned repository.
+        dry_run: Print the action but don't actually do it.
+        depth: If specified, create a shallow clone with this history depth.
+
+    Returns:
+        True if clone succeeded, False otherwise.
+    """
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    cmd = ["git", "clone"]
+    if depth is not None:
+        cmd += ["--depth", str(depth)]
+    cmd += [url, str(dest)]
+
+    logging.info(f"{dry_text}Cloning {url} to {dest}")
+
+    if not dry_run:
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(cmd, check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Failed to clone {url}: {e.stderr.decode().strip()}")
+            return False
+
+    return True
+
+
+def git_clone_repos(
+    repos: list[tuple[str, Path]],
+    dry_run: bool,
+    skip_if_dest_exists: bool = True,
+    depth: int | None = None,
+) -> None:
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    for url, dest in repos:
+        dest = Path(dest)
+
+        if skip_if_dest_exists and dest.exists():
+            logging.info(f"{dry_text}{dest} already exists - skipping clone")
+        else:
+            git_clone(url=url, dest=dest, dry_run=dry_run, depth=depth)
+
+
 class TestIsDotfilesRoot(unittest.TestCase):
     def test_returns_true_when_marker_file_exists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -328,3 +379,92 @@ class TestCreateBackupFilename(unittest.TestCase):
 
             filename = backup.name
             self.assertRegex(filename, r"\.bashrc_\d+\.ORIGINAL")
+
+
+class TestGitClone(unittest.TestCase):
+    @patch("subprocess.run")
+    def test_clones_repo_to_dest(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "repo"
+            result = git_clone("https://example.com/repo.git", dest, dry_run=False)
+
+            self.assertTrue(result)
+            mock_run.assert_called_once_with(
+                ["git", "clone", "https://example.com/repo.git", str(dest)],
+                check=True,
+                capture_output=True,
+            )
+
+    @patch("subprocess.run")
+    def test_clones_with_depth(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "repo"
+            result = git_clone(
+                "https://example.com/repo.git", dest, dry_run=False, depth=1
+            )
+
+            self.assertTrue(result)
+            mock_run.assert_called_once_with(
+                [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "https://example.com/repo.git",
+                    str(dest),
+                ],
+                check=True,
+                capture_output=True,
+            )
+
+    @patch("subprocess.run")
+    def test_dry_run_skips_clone(self, mock_run):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "repo"
+            result = git_clone("https://example.com/repo.git", dest, dry_run=True)
+
+            self.assertTrue(result)
+            mock_run.assert_not_called()
+
+    @patch("subprocess.run")
+    def test_returns_false_on_error(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=128,
+            cmd=["git", "clone"],
+            stderr=b"fatal: repository not found",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "repo"
+            result = git_clone("https://example.com/repo.git", dest, dry_run=False)
+
+            self.assertFalse(result)
+
+    @patch("subprocess.run")
+    def test_git_clone_repos_skips_existing_dest(self, mock_run):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "existing"
+            dest.mkdir()
+
+            git_clone_repos(
+                [("https://example.com/repo.git", dest)], dry_run=False
+            )
+
+            mock_run.assert_not_called()
+
+    @patch("subprocess.run")
+    def test_git_clone_repos_clones_when_dest_missing(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "repo"
+
+            git_clone_repos(
+                [("https://example.com/repo.git", dest)], dry_run=False
+            )
+
+            mock_run.assert_called_once()

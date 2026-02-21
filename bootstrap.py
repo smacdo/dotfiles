@@ -18,6 +18,7 @@ from _pydotlib.bootstrap import (
     configure_vcs_author,
     create_dirs,
     download_files,
+    git_clone_repos,
     initialize_vim_plugin_manager,
     is_dotfiles_root,
     safe_symlink,
@@ -133,6 +134,17 @@ def main() -> int:
             (
                 "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
                 xdg_data_dir() / "nvim/site/autoload/plug.vim",
+            ),
+        ],
+    )
+
+    git_clone_repos(
+        dry_run=args.dry_run,
+        depth=1,
+        repos=[
+            (
+                "https://gitee.com/romkatv/powerlevel10k.git",
+                xdg_data_dir() / "powerlevel10k",
             ),
         ],
     )
