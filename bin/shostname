@@ -1,0 +1,15 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: Shorten long hostnames by removing nonvarying parent domains
+# Usage: ./shostname
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# shellcheck disable=SC3040
+(set -o pipefail 2> /dev/null) && set -o pipefail 
+
+echo "$HOSTNAME" | sed -E 's/(home.smacdo.com|\.facebook\.com|\.fbinfra\.net)$//'
+
