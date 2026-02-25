@@ -167,12 +167,15 @@ if is_osx; then
   source_first "${BREW_PREFIX}/opt/fzf/shell/completion.zsh"
   source_first "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
 else
-  source_first \
-    /usr/share/fzf/shell/completion.zsh \
-    /usr/share/doc/fzf/examples/completion.zsh
-  source_first \
-    /usr/share/fzf/shell/key-bindings.zsh \
-    /usr/share/doc/fzf/examples/key-bindings.zsh
+  if [[ -f /usr/share/fzf/shell/key-bindings.zsh ]]; then
+    source /usr/share/fzf/shell/completion.zsh 2>/dev/null
+    source /usr/share/fzf/shell/key-bindings.zsh
+  elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+    source /usr/share/doc/fzf/examples/completion.zsh 2>/dev/null
+    source /usr/share/doc/fzf/examples/key-bindings.zsh
+  elif command -v fzf &>/dev/null; then
+    eval "$(fzf --zsh)"
+  fi
 fi
 
 # Finish zsh auto completion init.
