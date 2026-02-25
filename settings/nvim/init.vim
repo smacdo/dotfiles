@@ -99,7 +99,7 @@ set hidden
 " Use bash-like tab completion when in command prompt.
 set wildmode=list:longest,full
 
-" Make backspace work as expected on some oddly configured platforms. 
+" Make backspace work as expected on some oddly configured platforms.
 set backspace=eol,start,indent
 
 " Use case insensitive file name completion.
@@ -145,28 +145,23 @@ endif
 "===============================================================================
 " Note to readers: Make sure to call :PlugInstall after updating the plugin
 " list.
-call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
-
-" Color scheme: Use a custom theme for neovim, and Solarized for vim. Helps to
-" distinguish when neovim is not installed on a machine.
 if has('nvim')
+  call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
+
   Plug 'catppuccin/nvim', { 'as': 'catppuccin' }
-else
 
+  Plug 'vim-airline/vim-airline'
+  Plug 'vim-airline/vim-airline-themes'
+
+  " Show buffers in the command bar.
+  Plug 'bling/vim-bufferline'
+
+  " Git integration.
+  Plug 'tpope/vim-fugitive'
+
+  " List ends here. Plugins become visible to Vim after this call.
+  call plug#end()
 endif
-
-" Pretty status bar.
-Plug 'vim-airline/vim-airline'
-Plug 'vim-airline/vim-airline-themes'
-
-" Show buffers in the command bar.
-Plug 'bling/vim-bufferline'
-
-" Git integration.
-Plug 'tpope/vim-fugitive'
-
-" List ends here. Plugins become visible to Vim after this call.
-call plug#end()
 
 "===============================================================================
 " Colorscheme
