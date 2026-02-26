@@ -34,10 +34,12 @@ The repo supports both **zsh** (primary) and **bash**. Both shells share vendor-
 - **`shell_profile/`** -- Vendor-neutral shell modules shared between bash and zsh: `paths.sh`, `env.sh`, `functions.sh`, `aliases.sh`, `xdg.sh`
 - **`zsh_files/`** -- Zsh-only config (symlinked to `~/.zsh/`): keybindings, zsh functions
 - **`sh/`** -- Shell script library (`cli.sh`, `git.sh`) sourced by bin scripts
+  - this is deprecated; shell scripts needing reusable utils should switch to python
 - **`bin/`** -- Custom scripts added to `$PATH` via `shell_profile/paths.sh`
 - **`settings/`** -- Editor/tool configs (nvim, VSCode, Ghostty, Wezterm, clang-format)
-- **`_pydotlib/`** -- Python utility library used by `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `bin/dotfiles`
-- **`.vim/`** -- Vim runtime (colorschemes, ftplugins, spell files, native packages)
+- **`_pydotlib/`** -- Python utility library used by `bootstrap.py`, `lint_all.py`, `run_tests.py`,
+  `bin/` and `tools/`.
+- **`.vim/`** -- Vim configs (colorschemes, ftplugins, spell files, native packages)
 
 ### Bootstrap System
 
@@ -63,6 +65,24 @@ Local customizations (not checked in) are loaded from:
 
 ### Conventions
 
-- New shell scripts in `bin/` should source `$S_DOTFILE_ROOT/sh/cli.sh` for error handling helpers (`error()`, `exit_with_message()`, `set_verbose()`)
-- The `mksh` script generates new shell scripts from a template
+- New shell scripts must use the skeleton from `bin/mksh`. The template is:
+  ```sh
+  #!/bin/sh
+  #==============================================================================#
+  # Author: Scott MacDonald
+  # Purpose: <description>
+  # Usage: ./<script_name>
+  #==============================================================================#
+  # vim: set filetype=sh :
+  set -e
+  set -u
+
+  # shellcheck disable=SC3040
+  (set -o pipefail 2> /dev/null) && set -o pipefail
+  ```
+
+- Non-trivial scripts should be python
+- Python scripts only use builtin modules
+- Shell scripts use POSIX sh, not bash
+- Do not source `sh/cli.sh` (deprecated). Define any needed helpers (e.g. `error()`) inline in the script
 - Vim/Neovim share a single `init.vim` (at `settings/nvim/init.vim`) symlinked to both `~/.vimrc` and `~/.config/nvim/init.vim`
