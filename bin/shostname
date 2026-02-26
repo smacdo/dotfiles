@@ -11,5 +11,5 @@ set -u
 # shellcheck disable=SC3040
 (set -o pipefail 2> /dev/null) && set -o pipefail 
 
-echo "$HOSTNAME" | sed -E 's/(home.smacdo.com|\.facebook\.com|\.fbinfra\.net)$//'
+hostname | sed -E 's/(home.smacdo.com|\.facebook\.com|\.fbinfra\.net)$//'
 
