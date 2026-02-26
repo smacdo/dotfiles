@@ -8,6 +8,9 @@ config.font = wezterm.font_with_fallback {
 
 config.color_scheme = 'Catppuccin Mocha'
 
+-- Allow hyperlinks.
+config.hyperlink_rules = wezterm.default_hyperlink_rules()
+
 -- Hide the title bar but keep resizable borders
 config.window_decorations = "RESIZE"
 
