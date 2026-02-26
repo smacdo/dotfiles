@@ -1,0 +1,111 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: Print status bar information
+# Usage: ./print_status <name>
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# shellcheck disable=SC3040
+(set -o pipefail 2> /dev/null) && set -o pipefail
+
+error() { echo "print_status: $*" >&2; }
+
+#==============================================================================#
+# Detect the current operating system and set _OS, _DIST, and _WSL.
+#==============================================================================#
+detect_os() {
+  UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+
+  if [ "$UNAME" = "linux" ]; then
+    _OS="linux"
+
+    # Identify distribution.
+    if [ -f /etc/os-release ]; then
+      # shellcheck disable=SC1091
+      _DIST=$(. /etc/os-release && echo "$ID")
+    elif [ -f /etc/redhat-release ]; then
+      _DIST="redhat"
+    elif [ -f /etc/debian_version ]; then
+      _DIST="debian"
+    else
+      _DIST="linux"
+    fi
+
+    # Check for WSL.
+    _WSL=""
+    KERNEL_RELEASE=$(uname -r)
+    case "$KERNEL_RELEASE" in
+      *microsoft-standard-WSL2*) _WSL=2 ;;
+      *Microsoft*)               _WSL=1 ;;
+    esac
+
+  elif [ "$UNAME" = "darwin" ]; then
+    _OS="macos"
+    _DIST="darwin"
+    _WSL=""
+  else
+    _OS="unknown"
+    _DIST="unknown"
+    _WSL=""
+  fi
+}
+
+#==============================================================================#
+# Print an icon representing the current operating system.
+#==============================================================================#
+status_os() {
+  detect_os
+
+  if [ -n "$_WSL" ]; then
+    printf '󰖳'
+  else
+    case "$_DIST" in
+      darwin)  printf '󰀵' ;;
+      ubuntu)  printf '' ;;
+      debian)  printf '󰣚' ;;
+      fedora)  printf '󰣛' ;;
+      redhat)  printf '󱄛' ;;
+      arch)    printf '󰣇' ;;
+      linux)   printf '' ;;
+      *)       printf '' ;;
+    esac
+  fi
+}
+
+#==============================================================================#
+# Print an icon indicating whether this is an SSH or local session.
+#==============================================================================#
+status_ssh() {
+  if [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_TTY:-}" ]; then
+    printf '󰣀'
+  else
+    printf '󰋜'
+  fi
+}
+
+#==============================================================================#
+# Print usage information.
+#==============================================================================#
+usage() {
+  echo "Usage: print_status <name>"
+  echo ""
+  echo "Available status names:"
+  echo "  os    Operating system icon"
+  echo "  ssh   SSH or local session icon"
+}
+
+#==============================================================================#
+# Main dispatch
+#==============================================================================#
+case "${1:-}" in
+  os)  status_os ;;
+  ssh) status_ssh ;;
+  *)
+    error "unknown status name: '${1:-}'"
+    usage >&2
+    exit 1
+    ;;
+esac
