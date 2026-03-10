@@ -330,6 +330,40 @@ fkill() {
 }
 
 #------------------------------------------------------------------------------#
+# Wrapper for claude that requires tmux when in an SSH session.                #
+#------------------------------------------------------------------------------#
+claude() {
+  force=0
+
+  for arg in "$@"; do
+    case "$arg" in
+      -f|--force) force=1 ;;
+    esac
+  done
+
+  if [ "$force" = 0 ] && [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] && [ -z "${TMUX:-}" ]; then
+    echo "ERROR: claude should be run inside tmux when using SSH." >&2
+    echo "" >&2
+    echo "  tmux new -s claude" >&2
+    echo "" >&2
+    echo "Use 'claude -f' or 'claude --force' to override." >&2
+    return 1
+  fi
+
+  # Strip -f/--force before forwarding
+  args=""
+  for arg in "$@"; do
+    case "$arg" in
+      -f|--force) ;;
+      *) args="$args $arg" ;;
+    esac
+  done
+
+  # shellcheck disable=SC2086
+  command claude $args
+}
+
+#------------------------------------------------------------------------------#
 # Colored man pages.                                                           #
 #------------------------------------------------------------------------------#
 man() {
