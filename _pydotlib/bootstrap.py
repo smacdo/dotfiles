@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import ssl
 import subprocess
 import tempfile
@@ -288,7 +289,7 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
     # Try to download the file using Python's builtin urllib module.
     try:
         with urllib.request.urlopen(
-            url, context=ssl.create_default_context()
+            url, context=ssl.create_default_context(), timeout=10
         ) as response:
             # Create destination directory if it does not already exist.
             dest_dir = dest.parent
@@ -313,7 +314,7 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
 
         try:
             result = subprocess.run(
-                ["curl", "-fLo", str(dest), "--create-dirs", url],
+                ["curl", "-fLo", str(dest), "--create-dirs", "--connect-timeout", "10", url],
                 capture_output=True,
                 check=True,
             )
@@ -332,12 +333,24 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
         return False
 
 
+def _has_internet(timeout: float = 5) -> bool:
+    try:
+        socket.create_connection(("github.com", 443), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
 def download_files(
     urls: list[tuple[str, Path]],
     dry_run: bool,
     skip_if_dest_exists: bool = True,
 ) -> None:
     dry_text = "[DRY RUN] " if dry_run else ""
+
+    if not dry_run and not _has_internet():
+        logging.warning("No internet connectivity detected - skipping downloads")
+        return
 
     for url, target in urls:
         target = Path(target)
@@ -388,6 +401,10 @@ def git_clone_repos(
     depth: int | None = None,
 ) -> None:
     dry_text = "[DRY RUN] " if dry_run else ""
+
+    if not dry_run and not _has_internet():
+        logging.warning("No internet connectivity detected - skipping git clones")
+        return
 
     for url, dest in repos:
         dest = Path(dest)
@@ -530,8 +547,9 @@ class TestGitClone(unittest.TestCase):
 
             mock_run.assert_not_called()
 
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
     @patch("subprocess.run")
-    def test_git_clone_repos_clones_when_dest_missing(self, mock_run):
+    def test_git_clone_repos_clones_when_dest_missing(self, mock_run, _):
         mock_run.return_value = MagicMock(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmpdir:
