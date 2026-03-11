@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+# vim: set ft=python :
+"""
+Editor wrapper for Claude Code that shows Claude's last response as quoted
+comment lines (#> ...) in the editor buffer. Inline replies between comment
+lines are preserved; original comment lines are stripped via sidecar matching.
+
+Set as $EDITOR only inside Claude Code's env (settings.json), so it never
+affects git commit, crontab -e, etc.
+
+Flow:
+  1. Locate the most-recently-modified session JSONL
+  2. Extract the last assistant text block (scanning from end of file)
+  3. Prepend it as #> comment lines into the prompt temp file
+  4. Open the real editor
+  5. Strip the original comment lines, keeping any user-typed text
+"""
+
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+COMMENT_PREFIX = "#> "
+DEFAULT_MAX_LINES = 50
+TRUNCATION_NOTICE = "#> ... (truncated, {n} more lines above)"
+
+# Claude Code writes prompts to files matching this pattern
+PROMPT_FILE_RE = re.compile(r"/tmp/claude-prompt-.*\.md$")
+
+
+def get_real_editor() -> str:
+    return os.environ.get("REAL_EDITOR", "vim")
+
+
+def find_session_jsonl() -> Path | None:
+    pattern = str(Path.home() / ".claude" / "projects" / "*" / "*.jsonl")
+    matches = glob.glob(pattern)
+    if not matches:
+        return None
+    matches.sort(key=os.path.getmtime, reverse=True)
+    return Path(matches[0])
+
+
+def _parse_assistant_text(line: str) -> str | None:
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if record.get("type") != "assistant":
+        return None
+    content = record.get("message", {}).get("content", [])
+    text_blocks = [b["text"] for b in content if b.get("type") == "text"]
+    if text_blocks:
+        final_text = text_blocks[-1].strip()
+        if final_text:
+            return final_text
+    return None
+
+
+def extract_last_response(jsonl_path: Path) -> str | None:
+    """Return the text of the last assistant message, scanning from EOF."""
+    with open(jsonl_path, "rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        if size == 0:
+            return None
+
+        chunk_size = 64 * 1024
+        remainder = b""
+        pos = size
+
+        while pos > 0:
+            read_size = min(chunk_size, pos)
+            pos -= read_size
+            f.seek(pos)
+            chunk = f.read(read_size) + remainder
+
+            lines = chunk.split(b"\n")
+            # First element may be a partial line if not at file start
+            if pos > 0:
+                remainder = lines[0]
+                start = 1
+            else:
+                remainder = b""
+                start = 0
+
+            for i in range(len(lines) - 1, start - 1, -1):
+                line = lines[i].decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                result = _parse_assistant_text(line)
+                if result is not None:
+                    return result
+
+    return None
+
+
+def build_comment_lines(text: str, max_lines: int) -> list[str]:
+    raw_lines = text.splitlines()
+    total = len(raw_lines)
+
+    if total > max_lines:
+        raw_lines = raw_lines[total - max_lines :]
+        truncated_count = total - max_lines
+        comment_lines = [TRUNCATION_NOTICE.format(n=truncated_count)]
+    else:
+        comment_lines = []
+
+    for raw_line in raw_lines:
+        if raw_line:
+            comment_lines.append(f"{COMMENT_PREFIX}{raw_line}")
+        else:
+            comment_lines.append(COMMENT_PREFIX.rstrip())
+
+    return comment_lines
+
+
+def run_editor(editor: str, extra_args: list[str], filepath: str) -> int:
+    return subprocess.call([editor] + extra_args + [filepath])
+
+
+def _run_editor_plain(editor: str) -> int:
+    """Fallback: open the editor with original args, no prepend."""
+    return subprocess.call([editor] + sys.argv[1:])
+
+
+def main() -> int:
+    editor = get_real_editor()
+
+    if len(sys.argv) < 2:
+        return _run_editor_plain(editor)
+
+    target_file = sys.argv[-1]
+    extra_args = sys.argv[1:-1]
+
+    if not PROMPT_FILE_RE.search(target_file):
+        return _run_editor_plain(editor)
+
+    jsonl_path = find_session_jsonl()
+    if jsonl_path is None:
+        return _run_editor_plain(editor)
+
+    last_response = extract_last_response(jsonl_path)
+    if not last_response:
+        return _run_editor_plain(editor)
+
+    max_lines = int(
+        os.environ.get("CLAUDE_EDITOR_MAX_LINES", str(DEFAULT_MAX_LINES))
+    )
+    comment_lines = build_comment_lines(last_response, max_lines)
+
+    # Build sidecar set in memory for stripping after edit
+    sidecar_set: set[str] = set(comment_lines)
+
+    original_content = ""
+    if os.path.exists(target_file):
+        with open(target_file) as f:
+            original_content = f.read()
+
+    # Prepend comment lines so the user sees context in the editor
+    prepended = "\n".join(comment_lines) + "\n\n" + original_content
+    with open(target_file, "w") as f:
+        f.write(prepended)
+
+    # Position cursor on the first editable line (after comments + blank line)
+    # +line syntax is vim/nvim/vi only
+    editor_base = os.path.basename(editor)
+    if editor_base in ("vim", "nvim", "vi") and not any(
+        a.startswith("+") for a in extra_args
+    ):
+        extra_args = [f"+{len(comment_lines) + 2}"] + extra_args
+
+    exit_code = run_editor(editor, extra_args, target_file)
+
+    # Strip original comment lines, keeping any user-typed text between them
+    with open(target_file) as f:
+        edited_content = f.read()
+
+    stripped_lines: list[str] = []
+    for line in edited_content.splitlines():
+        if line in sidecar_set:
+            continue
+        stripped_lines.append(line)
+
+    while stripped_lines and stripped_lines[0] == "":
+        stripped_lines.pop(0)
+
+    with open(target_file, "w") as f:
+        f.write("\n".join(stripped_lines))
+        if stripped_lines:
+            f.write("\n")
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
