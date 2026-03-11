@@ -130,22 +130,25 @@ def configure_claude_code(
         settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
-def initialize_vim_plugin_manager() -> None:
+def initialize_vim_plugin_manager(dry_run: bool) -> None:
     """
     Initializes the vim-plug plugin manager for vim and neovim, if they are installed on the system.
     """
+    dry_text = "[DRY RUN] " if dry_run else ""
 
-    if shutil.which("nvim") is not None:
-        logging.info("Initializing vim-plug for neovim")
-        subprocess.check_call(["nvim", "+'PlugInstall --sync'", "+qa"])
-    else:
-        logging.info("neovim not installed - skip initializing vim-plug for neovim")
+    if not dry_run and not _has_internet():
+        logging.warning("No internet connectivity detected - skipping vim plugin install")
+        return
 
-    if shutil.which("vim") is not None:
-        logging.info("Initializing vim-plug for vim")
-        subprocess.check_call(["vim", "+'PlugInstall --sync'", "+qa"])
-    else:
-        logging.info("vim not installed - skip initializing vim-plug for vim")
+    for editor in ("nvim", "vim"):
+        if shutil.which(editor) is None:
+            logging.info(f"{dry_text}{editor} not installed - skip initializing vim-plug")
+            continue
+
+        logging.info(f"{dry_text}Initializing vim-plug for {editor}")
+
+        if not dry_run:
+            subprocess.check_call([editor, "+'PlugInstall --sync'", "+qa"])
 
 
 def is_dotfiles_root(path: Path) -> bool:

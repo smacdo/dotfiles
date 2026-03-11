@@ -150,7 +150,7 @@ def main() -> int:
         ],
     )
 
-    initialize_vim_plugin_manager()
+    initialize_vim_plugin_manager(dry_run=args.dry_run)
     configure_vcs_author(
         gitconfig_path=MY_GITCONFIG_PATH, name=args.git_name, email=args.git_email
     )
