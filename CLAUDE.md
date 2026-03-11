@@ -81,6 +81,7 @@ Local customizations (not checked in) are loaded from:
   (set -o pipefail 2> /dev/null) && set -o pipefail
   ```
 
+- Scripts should be well commented for maintainability (docstrings, inline comments for non-obvious logic and flow)
 - Non-trivial scripts should be python
 - Python scripts only use builtin modules
 - Shell scripts use POSIX sh, not bash
