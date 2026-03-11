@@ -193,7 +193,7 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
         if not dry_run:
             target.parent.mkdir(parents=True, exist_ok=True)
 
-        logging.info(f"{dry_text}Created dir {target}")
+        logging.info(f"{dry_text}Created dir {target.parent}")
 
     # Skip if the target is already symlinked to source.
     if target.is_symlink() and target.resolve() == source.resolve():
