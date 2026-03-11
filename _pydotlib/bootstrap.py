@@ -294,42 +294,32 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
     Returns:
         True if download succeeded, False otherwise.
     """
-    dry_text = "[DRY RUN] " if dry_run else ""
+    if dry_run:
+        logging.info(f"[DRY RUN] Would download {url} to {dest}")
+        return True
 
-    # Try to download the file using Python's builtin urllib module.
     try:
         with urllib.request.urlopen(
             url, context=ssl.create_default_context(), timeout=10
         ) as response:
-            # Create destination directory if it does not already exist.
-            dest_dir = dest.parent
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(response.read())
 
-            if not dest_dir.exists():
-                if not dry_run:
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-
-                logging.info(f"{dry_text}Created dir {dest_dir}")
-
-            # Write the downloaded bytes to the destination directory.
-            if not dry_run:
-                dest.write_bytes(response.read())
-
-            logging.info(f"{dry_text}Downloaded {url} to {dest}")
+            logging.info(f"Downloaded {url} to {dest}")
             return True
-    # Fallback to curl if exceptions are encountered.
     except (ssl.SSLError, urllib.error.URLError) as e:
         logging.info(
-            f"{dry_text}downloading with urllib failed, will try curl instead. (exception: {e})"
+            f"downloading with urllib failed, will try curl instead. (exception: {e})"
         )
 
         try:
-            result = subprocess.run(
+            subprocess.run(
                 ["curl", "-fLo", str(dest), "--create-dirs", "--connect-timeout", "10", url],
                 capture_output=True,
                 check=True,
             )
 
-            logging.info(f"{dry_text}Downloaded {url} to {dest} with curl")
+            logging.info(f"Downloaded {url} to {dest} with curl")
             return True
         except subprocess.CalledProcessError as curl_error:
             logging.exception(f"Failed to download {url} with curl", exc_info=e)
