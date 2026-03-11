@@ -31,21 +31,28 @@ VCS_MISSING_EMAIL = "TODO_SET_EMAIL_ADDRESS"
 
 
 def configure_vcs_author(
-    gitconfig_path: Path | str, name: str | None = None, email: str | None = None
+    gitconfig_path: Path | str,
+    name: str | None = None,
+    email: str | None = None,
+    dry_run: bool = False,
 ) -> None:
-    # Create the ~/.my_gitconfig file if it does not exist.
     gitconfig_path = Path(gitconfig_path)
+    dry_text = "[DRY RUN] " if dry_run else ""
 
-    if not gitconfig_path.exists():
+    if gitconfig_path.exists():
+        if dry_run:
+            logging.info(f"{dry_text}{gitconfig_path} already exists")
+            return
+    else:
+        if dry_run:
+            logging.info(f"{dry_text}Would create {gitconfig_path} with git author config")
+            return
         gitconfig_path.write_text(
             f"""[user]
   name = {VCS_MISSING_NAME}
   email = {VCS_MISSING_EMAIL}
 """
         )
-
-    # Read ~/.my_gitconfig, and replace keys that are marked as `TODO_SET_*`.
-    # Any line that is not modified should be written back out exactly as it was.
     def try_update_key(
         keys: dict[str, str],
         key: str,

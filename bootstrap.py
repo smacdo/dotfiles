@@ -152,7 +152,10 @@ def main() -> int:
 
     initialize_vim_plugin_manager(dry_run=args.dry_run)
     configure_vcs_author(
-        gitconfig_path=MY_GITCONFIG_PATH, name=args.git_name, email=args.git_email
+        gitconfig_path=MY_GITCONFIG_PATH,
+        name=args.git_name,
+        email=args.git_email,
+        dry_run=args.dry_run,
     )
     configure_claude_code(
         settings_path=home_dir / ".claude" / "settings.json",
