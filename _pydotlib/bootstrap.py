@@ -2,8 +2,9 @@
 Utility functions for the bootstrap.py program.
 """
 
+import json
 import logging
-import os.path
+import os
 import shutil
 import ssl
 import subprocess
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock, patch
 
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from _pydotlib.cli import confirm, input_field
 from _pydotlib.colors import Colors
 from _pydotlib.git import (
@@ -77,6 +79,54 @@ def configure_vcs_author(
     )
 
     update_git_config_file(gitconfig_path, git_keys)
+
+
+def _detect_real_editor() -> str:
+    if shutil.which("nvim"):
+        return "nvim"
+    if shutil.which("vim"):
+        return "vim"
+    env_editor = os.environ.get("EDITOR")
+    if env_editor:
+        return env_editor
+    return "vi"
+
+
+def configure_claude_code(
+    settings_path: Path, dry_run: bool
+) -> None:
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    settings_dir = settings_path.parent
+    if not settings_dir.exists():
+        if not dry_run:
+            settings_dir.mkdir(parents=True, exist_ok=True)
+        logging.info(f"{dry_text}Created dir {settings_dir}")
+
+    settings: dict[str, Any] = {}
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text())
+        except json.JSONDecodeError:
+            logging.warning(f"Could not parse {settings_path}, skipping Claude Code configuration")
+            return
+
+    env = settings.get("env", {})
+    desired_editor = "claude-editor"
+    desired_real_editor = _detect_real_editor()
+
+    if env.get("EDITOR") == desired_editor and env.get("REAL_EDITOR") == desired_real_editor:
+        logging.info(f"{dry_text}Claude Code editor already configured")
+        return
+
+    env["EDITOR"] = desired_editor
+    env["REAL_EDITOR"] = desired_real_editor
+    settings["env"] = env
+
+    logging.info(f"{dry_text}Setting Claude Code EDITOR={desired_editor}, REAL_EDITOR={desired_real_editor}")
+
+    if not dry_run:
+        settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
 def initialize_vim_plugin_manager() -> None:
@@ -468,3 +518,85 @@ class TestGitClone(unittest.TestCase):
             )
 
             mock_run.assert_called_once()
+
+
+class TestConfigureClaudeCode(unittest.TestCase):
+    def test_creates_settings_from_scratch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / ".claude" / "settings.json"
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
+            self.assertIn(settings["env"]["REAL_EDITOR"], ("nvim", "vim", "vi"))
+
+    def test_preserves_existing_keys(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text(json.dumps({"hooks": {"some": "hook"}}))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["hooks"], {"some": "hook"})
+            self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
+
+    def test_preserves_existing_env_keys(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text(json.dumps({"env": {"FOO": "bar"}}))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["env"]["FOO"], "bar")
+            self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
+
+    def test_noop_when_already_configured(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            real_editor = _detect_real_editor()
+            existing = {"env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor}}
+            settings_path.write_text(json.dumps(existing))
+            mtime_before = settings_path.stat().st_mtime
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            mtime_after = settings_path.stat().st_mtime
+            self.assertEqual(mtime_before, mtime_after)
+
+    def test_skips_malformed_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text("{invalid json")
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            self.assertEqual(settings_path.read_text(), "{invalid json")
+
+    def test_dry_run_does_not_write(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / ".claude" / "settings.json"
+            configure_claude_code(settings_path, dry_run=True)
+
+            self.assertFalse(settings_path.exists())
+
+
+class TestDetectRealEditor(unittest.TestCase):
+    @patch("shutil.which", side_effect=lambda cmd: "/usr/bin/nvim" if cmd == "nvim" else None)
+    def test_prefers_nvim(self, _):
+        self.assertEqual(_detect_real_editor(), "nvim")
+
+    @patch("shutil.which", side_effect=lambda cmd: "/usr/bin/vim" if cmd == "vim" else None)
+    def test_falls_back_to_vim(self, _):
+        self.assertEqual(_detect_real_editor(), "vim")
+
+    @patch("shutil.which", return_value=None)
+    @patch.dict(os.environ, {"EDITOR": "nano"})
+    def test_falls_back_to_env_editor(self, _):
+        self.assertEqual(_detect_real_editor(), "nano")
+
+    @patch("shutil.which", return_value=None)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_falls_back_to_vi(self, _):
+        self.assertEqual(_detect_real_editor(), "vi")

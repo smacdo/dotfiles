@@ -15,6 +15,7 @@ import argparse
 import logging
 
 from _pydotlib.bootstrap import (
+    configure_claude_code,
     configure_vcs_author,
     create_dirs,
     download_files,
@@ -152,6 +153,10 @@ def main() -> int:
     initialize_vim_plugin_manager()
     configure_vcs_author(
         gitconfig_path=MY_GITCONFIG_PATH, name=args.git_name, email=args.git_email
+    )
+    configure_claude_code(
+        settings_path=home_dir / ".claude" / "settings.json",
+        dry_run=args.dry_run,
     )
 
     return 0
