@@ -196,6 +196,12 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
         logging.info(f"{dry_text}{target} is already symlinked to {source}")
         return
 
+    # Remove broken symlinks so we can replace them.
+    if target.is_symlink() and not target.exists():
+        if not dry_run:
+            target.unlink()
+        logging.info(f"{dry_text}Removed broken symlink {target}")
+
     # Does the target file name already exist on the disk?
     if target.exists():
         # Ask user if they would like to "back up" the file by renaming before replacing it with a
@@ -429,6 +435,24 @@ class TestCreateBackupFilename(unittest.TestCase):
 
             filename = backup.name
             self.assertRegex(filename, r"\.bashrc_\d+\.ORIGINAL")
+
+
+class TestSafeSymlink(unittest.TestCase):
+    def test_replaces_broken_symlink(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            source = tmp_path / "source"
+            source.touch()
+            target = tmp_path / "target"
+
+            target.symlink_to(tmp_path / "nonexistent")
+            self.assertTrue(target.is_symlink())
+            self.assertFalse(target.exists())
+
+            safe_symlink(source, target, dry_run=False)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), source.resolve())
 
 
 class TestGitClone(unittest.TestCase):
