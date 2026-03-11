@@ -250,7 +250,7 @@ def make_local_config(source: Path, target: Path) -> bool:
         target: Path to the target file.
     """
     if target.exists():
-        logging.info(f"{source} already exists")
+        logging.info(f"{target} already exists")
         return False
 
     if not source.exists():
