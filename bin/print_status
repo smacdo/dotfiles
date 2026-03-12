@@ -66,6 +66,7 @@ status_os() {
       darwin)  printf '󰀵' ;;
       ubuntu)  printf '' ;;
       debian)  printf '󰣚' ;;
+      centos)  printf '' ;;
       fedora)  printf '󰣛' ;;
       redhat)  printf '󱄛' ;;
       arch)    printf '󰣇' ;;
