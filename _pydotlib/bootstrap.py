@@ -2,6 +2,7 @@
 Utility functions for the bootstrap.py program.
 """
 
+import functools
 import json
 import logging
 import os
@@ -333,9 +334,10 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
         return False
 
 
-def _has_internet(timeout: float = 5) -> bool:
+@functools.cache
+def _has_internet() -> bool:
     try:
-        socket.create_connection(("github.com", 443), timeout=timeout).close()
+        socket.create_connection(("github.com", 443), timeout=5).close()
         return True
     except OSError:
         return False
