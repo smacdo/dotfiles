@@ -535,8 +535,9 @@ class TestGitClone(unittest.TestCase):
 
             self.assertFalse(result)
 
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
     @patch("subprocess.run")
-    def test_git_clone_repos_skips_existing_dest(self, mock_run):
+    def test_git_clone_repos_skips_existing_dest(self, mock_run, _):
         with tempfile.TemporaryDirectory() as tmpdir:
             dest = Path(tmpdir) / "existing"
             dest.mkdir()
