@@ -16,6 +16,8 @@ from _pydotlib.cli import ColoredLogFormatter
 
 logger = logging.getLogger(__name__)
 
+DOCKER_FLAVORS = ["debian", "ubuntu", "fedora", "alpine"]
+
 
 def check_docker() -> bool:
     """Check that Docker is installed on the system. Logs warnings if a check fails."""
@@ -140,16 +142,13 @@ def run_docker_test(target: str, flavor: str) -> bool:
             [
                 "docker",
                 "exec",
-                "-it",
                 container_name,
                 "bash",
                 "-c",
                 "cd /home/testuser/.dotfiles && python3 bootstrap.py -v --git-name 'Testy McTestFace' --git-email 'testy@test.com' < /dev/null",
             ],
-            timeout=10,
+            timeout=30,
         )
-
-        return True
     except subprocess.CalledProcessError as e:
         logging.exception(
             f"failed to run test: {e.stdout}",
@@ -164,6 +163,90 @@ def run_docker_test(target: str, flavor: str) -> bool:
     finally:
         # Stop the container after tests have completed.
         subprocess.check_output(["docker", "stop", container_name])
+
+    # Run post-bootstrap verification:
+    try:
+        subprocess.check_output(
+            [
+                "docker",
+                "start",
+                container_name,
+            ]
+        )
+        subprocess.check_output(
+            [
+                "docker",
+                "exec",
+                container_name,
+                "sh",
+                "/home/testuser/.dotfiles/tests/docker/bootstrap/verify_bootstrap.sh",
+            ],
+            timeout=10,
+        )
+    except subprocess.CalledProcessError as e:
+        logging.exception(
+            f"post-bootstrap verification failed: {e.stdout}",
+            exc_info=e,
+        )
+        return False
+    finally:
+        subprocess.check_output(["docker", "stop", container_name])
+
+    return True
+
+
+def run_shell_syntax_tests() -> bool:
+    repo_root = Path(__file__).parent
+    all_passed = True
+
+    def check_syntax(shell: str, filepath: Path) -> bool:
+        result = subprocess.run(
+            [shell, "-n", str(filepath)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            logging.error(f"{shell} -n {filepath} failed:\n{result.stderr}")
+            return False
+        logging.debug(f"{shell} -n {filepath}: OK")
+        return True
+
+    # POSIX syntax check on shell_profile/*.sh
+    shell_profile_dir = repo_root / "shell_profile"
+    if shell_profile_dir.is_dir():
+        for sh_file in sorted(shell_profile_dir.glob("*.sh")):
+            if not check_syntax("sh", sh_file):
+                all_passed = False
+
+    # bash -n on .bash_profile and .bashrc
+    for name in [".bash_profile", ".bashrc"]:
+        filepath = repo_root / name
+        if filepath.exists() and not check_syntax("bash", filepath):
+            all_passed = False
+
+    # zsh -n on .zshrc and .zshenv (skip if zsh not installed)
+    if shutil.which("zsh"):
+        for name in [".zshrc", ".zshenv"]:
+            filepath = repo_root / name
+            if filepath.exists() and not check_syntax("zsh", filepath):
+                all_passed = False
+    else:
+        logging.info("zsh not found, skipping zsh syntax checks")
+
+    # sh -n on bin/ scripts with #!/bin/sh shebang
+    bin_dir = repo_root / "bin"
+    if bin_dir.is_dir():
+        for entry in sorted(bin_dir.iterdir()):
+            if not entry.is_file():
+                continue
+            try:
+                first_line = entry.read_text().split("\n", 1)[0].strip()
+            except (UnicodeDecodeError, PermissionError):
+                continue
+            if first_line == "#!/bin/sh" and not check_syntax("sh", entry):
+                all_passed = False
+
+    return all_passed
 
 
 def run_pydotlib_tests() -> bool:
@@ -220,6 +303,16 @@ def main() -> int:
         action="store_true",
         help="Enable verbose output (DEBUG level logging)",
     )
+    args_parser.add_argument(
+        "--no-docker",
+        action="store_true",
+        help="Skip Docker integration tests",
+    )
+    args_parser.add_argument(
+        "--docker-only",
+        action="store_true",
+        help="Run only Docker integration tests",
+    )
 
     args = args_parser.parse_args()
 
@@ -230,16 +323,28 @@ def main() -> int:
     logging.getLogger().addHandler(log_handler)
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    # Run unit tests.
-    if not run_pydotlib_tests():
-        logging.fatal("pydotlib unit tests failed - aborting")
-        return 1
+    if not args.docker_only:
+        # Run shell syntax tests.
+        if not run_shell_syntax_tests():
+            logging.fatal("shell syntax tests failed - aborting")
+            return 1
+
+        # Run unit tests.
+        if not run_pydotlib_tests():
+            logging.fatal("pydotlib unit tests failed - aborting")
+            return 1
 
     # Run integration tests using Docker.
-    if not check_docker():
-        return 1
+    if not args.no_docker:
+        if not check_docker():
+            return 1
 
-    run_docker_test("bootstrap", "debian")
+        all_passed = True
+        for flavor in DOCKER_FLAVORS:
+            if not run_docker_test("bootstrap", flavor):
+                all_passed = False
+        if not all_passed:
+            return 1
 
     logging.info("All tests passed!")
 
