@@ -1,0 +1,13 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache \
+    bash \
+    git \
+    python3
+
+RUN adduser -D -s /bin/bash testuser
+
+USER testuser
+WORKDIR /home/testuser
+
+CMD ["/bin/bash"]
