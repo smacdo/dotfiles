@@ -12,3 +12,4 @@ private
 .vim/pack
 .vim/autoload/plug.vim
 bin/lock-mac
+.claude/settings.local.json
