@@ -24,7 +24,7 @@ DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
 # Lint a list of shell scripts, and return a list of files that failed a linter
 # check.
 ################################################################################
-def lint_sh_files(file_paths: list[str]) -> list[str]:
+def lint_sh_files(file_paths: list[str], shell: str | None = None) -> list[str]:
     # Make sure linter tool is available.
     if shutil.which("shellcheck") is None:
         raise Exception("cannot lint shell scripts - shellcheck not found")
@@ -35,9 +35,10 @@ def lint_sh_files(file_paths: list[str]) -> list[str]:
     for file_path in file_paths:
         # SC1090 - ignore warning for can't follow non-constant source.
         # SC1091 - ignore warning for included files that cannot be found.
-        result = subprocess.run(
-            ["shellcheck", file_path, "-e", "SC1090", "-e", "SC1091"]
-        )
+        cmd = ["shellcheck", file_path, "-e", "SC1090", "-e", "SC1091"]
+        if shell is not None:
+            cmd.extend(["--shell", shell])
+        result = subprocess.run(cmd)
 
         if result.returncode != 0:
             files_failed.append(file_path)
@@ -181,9 +182,12 @@ def main() -> int:
     logging.info("linting shell scripts...")
 
     failed_sh_files = lint_sh_files(
+        find_shell_scripts("shell_profile", SH_EXTS, SH_SHEBANGS),
+        shell="sh",
+    )
+    failed_sh_files += lint_sh_files(
         BASH_CONFIG_FILES
         + DOTFILES_SH_SCRIPTS
-        + find_shell_scripts("shell_profile", SH_EXTS, SH_SHEBANGS)
         + find_shell_scripts("bin", SH_EXTS, SH_SHEBANGS)
     )
 
