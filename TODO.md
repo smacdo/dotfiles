@@ -4,6 +4,13 @@
 - Add option to cancel (skip) the backup/delete interactive prompt.
 - Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo for safe_symlink.
 - download_file: Download to temporary location, and compare to dest. Prompt user if there is mismatch.
+- Initialize ~/.config/dotfiles/... (the path to the my shell env file)
+  - Interactive prompt for weather location
+  - other vars that need to be set? can't remember...
+- Add a doctor mode that checks for common problems and (sometimes) auto-fixes them
+  - check if common programs are installed (especially ones used by the dotfiles)
+  - check if expected env vars are set
+  - etc
 
 ## Linting
 - [x] Lint shell scripts with shellcheck
