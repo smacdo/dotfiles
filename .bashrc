@@ -185,5 +185,3 @@ source_first \
   "${HOME}/.my_bashrc.sh"
 
 ### end of config - there should be no lines below this one! ###
-
-. "$HOME/.local/share/../bin/env"
