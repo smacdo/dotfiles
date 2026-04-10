@@ -123,7 +123,7 @@ def perform_convert(
     if isinstance(output_file, Path):
         with open(output_file, "wb") as file:
             file.write(file_contents)
-    if isinstance(output_file, io.BufferedWriter):
+    elif isinstance(output_file, io.BufferedWriter):
         output_file.write(file_contents)
     else:
         output_file.write(str(file_contents))

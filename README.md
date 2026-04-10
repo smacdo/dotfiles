@@ -92,5 +92,37 @@ configuration yet. Maybe I'll do that someday.
     * Terminal -> Flash visual bell [x]
     * Keys -> Left Option Key = Esc+a
 
+## Meeting Reminders (next-meeting)
+The `next-meeting` script shows upcoming Google Calendar meetings in the tmux
+status bar and optionally in the Claude Code status line. It supports two
+calendar backends: `gcal` (google_mux, preferred on devservers) and `gcalcli`
+(for personal machines). The script auto-detects which is available.
+
+### Setup
+On devservers (`gcal` / google_mux): already installed. Restart tmux.
+
+On personal machines, this feature is optional. If you want meeting reminders,
+install and authenticate `gcalcli`:
+
+1. Install: `pip install gcalcli` or `brew install gcalcli`
+2. Authenticate: `gcalcli init`
+3. Restart tmux or run `tmux source ~/.tmux.conf`
+
+`bootstrap.py` does not install calendar tooling.
+
+Run `next-meeting` with no arguments for a quick list of today's meetings.
+
+### Configuration
+All settings are optional environment variables, set in
+`~/.config/dotfiles/my_shell_profile.sh`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NEXT_MEETING_SHOW` | 30 | Show in tmux when within N minutes |
+| `NEXT_MEETING_WARN` | 5 | Yellow warning threshold (minutes) |
+| `NEXT_MEETING_CRITICAL` | 2 | Red critical threshold (minutes) |
+| `NEXT_MEETING_CACHE_TTL` | 120 | Seconds between calendar refreshes |
+| `NEXT_MEETING_ALERT_AT` | 5,0 | Fire tmux alerts at these minute marks |
+
 ## Packages
 * lesspipe

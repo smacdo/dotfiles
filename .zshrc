@@ -209,3 +209,5 @@ else
 fi
 
 ### end of config - there should be no lines below this one! ###
+
+. "$HOME/.local/share/../bin/env"

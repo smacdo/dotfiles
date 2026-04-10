@@ -1,0 +1,35 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: tmux status-right content: upcoming meeting or weather fallback.
+# Usage: Called by tmux via #(~/.dotfiles/bin/tmux-right-status)
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# shellcheck disable=SC3040
+(set -o pipefail 2> /dev/null) && set -o pipefail
+
+ROOT="${S_DOTFILE_ROOT:-$HOME/.dotfiles}"
+MEETING_CMD="$ROOT/bin/next-meeting"
+WEATHER_CMD="$ROOT/bin/weather_status.sh"
+
+# Try next-meeting first. If it outputs something, use that.
+if [ -x "$MEETING_CMD" ]; then
+    weather_fallback=""
+    if [ -x "$WEATHER_CMD" ]; then
+        weather_fallback=$("$WEATHER_CMD" 2>/dev/null || true)
+    fi
+
+    output=$("$MEETING_CMD" --mode tmux --fallback-text "$weather_fallback" 2>/dev/null || true)
+    if [ -n "$output" ]; then
+        printf '%s ' "$output"
+        exit 0
+    fi
+fi
+
+# Fallback: just show weather directly
+if [ -x "$WEATHER_CMD" ]; then
+    "$WEATHER_CMD" 2>/dev/null || true
+fi

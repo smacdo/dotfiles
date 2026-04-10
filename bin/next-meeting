@@ -1,0 +1,641 @@
+#!/usr/bin/env python3
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: Show upcoming Google Calendar meetings for status bars and CLI use.
+# Usage: next-meeting [--mode tmux|claude|list|json] [--fallback-text TEXT]
+#==============================================================================#
+from __future__ import annotations
+
+import argparse
+import datetime
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+from typing import NamedTuple
+
+
+class Config(NamedTuple):
+    show_threshold: int
+    warn_threshold: int
+    critical_threshold: int
+    hide_after_start: int
+    cache_ttl: int
+    tmux_subject_len: int
+    claude_subject_len: int
+    claude_show_threshold: int
+    alert_at: list[int]
+    alert_duration_ms: int
+
+
+class FetchResult(NamedTuple):
+    meetings: list[dict] | None
+    error: str | None
+
+
+def env_int(name, default):
+    val = os.environ.get(name)
+    if not val:
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        print(
+            f"Warning: {name}={val!r} is not a valid integer, using default {default}",
+            file=sys.stderr,
+        )
+        return default
+
+
+def env_str(name, default):
+    return os.environ.get(name, default)
+
+
+def load_config():
+    try:
+        alert_at = [
+            int(x.strip()) for x in env_str("NEXT_MEETING_ALERT_AT", "5,0").split(",")
+        ]
+    except ValueError:
+        print(
+            "Warning: NEXT_MEETING_ALERT_AT is not valid, using default 5,0",
+            file=sys.stderr,
+        )
+        alert_at = [5, 0]
+
+    return Config(
+        show_threshold=env_int("NEXT_MEETING_SHOW", 30),
+        warn_threshold=env_int("NEXT_MEETING_WARN", 5),
+        critical_threshold=env_int("NEXT_MEETING_CRITICAL", 2),
+        hide_after_start=env_int("NEXT_MEETING_HIDE_AFTER", 5),
+        cache_ttl=env_int("NEXT_MEETING_CACHE_TTL", 120),
+        tmux_subject_len=env_int("NEXT_MEETING_TMUX_LEN", 20),
+        claude_subject_len=env_int("NEXT_MEETING_CLAUDE_LEN", 10),
+        claude_show_threshold=env_int("NEXT_MEETING_CLAUDE_SHOW", 15),
+        alert_at=alert_at,
+        alert_duration_ms=env_int("NEXT_MEETING_ALERT_MS", 5000),
+    )
+
+
+def state_home():
+    return os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
+
+
+def cache_path():
+    return os.path.join(state_home(), "next-meeting-cache.json")
+
+
+def alerts_path():
+    return os.path.join(state_home(), "next-meeting-alerts.json")
+
+
+def format_command_error(name, result):
+    details = result.stderr.strip() or result.stdout.strip()
+    if details:
+        return f"{name} failed: {details}"
+    return f"{name} exited with status {result.returncode}"
+
+
+def fetch_meetings_gcal():
+    try:
+        result = subprocess.run(
+            ["gcal", "list", "--json", "--days", "1", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except FileNotFoundError:
+        return FetchResult(None, "gcal not found")
+    except subprocess.TimeoutExpired:
+        return FetchResult(None, "gcal timed out")
+
+    if result.returncode != 0:
+        return FetchResult(None, format_command_error("gcal", result))
+
+    try:
+        data = json.loads(result.stdout)
+        items = data.get("data", {}).get("data", {}).get("items", [])
+    except (json.JSONDecodeError, AttributeError):
+        return FetchResult(None, "gcal returned invalid JSON")
+
+    now = datetime.datetime.now().astimezone()
+    meetings = []
+    for item in items:
+        subject = item.get("summary", "").strip()
+        start_raw = item.get("start", {})
+        end_raw = item.get("end", {})
+
+        if "date" in start_raw and "dateTime" not in start_raw:
+            continue
+
+        start_str = start_raw.get("dateTime")
+        end_str = end_raw.get("dateTime")
+        if not start_str or not end_str:
+            continue
+
+        try:
+            start = datetime.datetime.fromisoformat(start_str)
+            end = datetime.datetime.fromisoformat(end_str)
+        except ValueError:
+            continue
+
+        if (end - start).total_seconds() > 4 * 3600:
+            continue
+
+        if end < now:
+            continue
+
+        response_status = "accepted"
+        for attendee in item.get("attendees", []):
+            if attendee.get("self"):
+                response_status = attendee.get("responseStatus", "accepted")
+                break
+
+        meetings.append(
+            {
+                "subject": subject,
+                "start": start.astimezone().replace(tzinfo=None).strftime(
+                    "%Y-%m-%d %H:%M"
+                ),
+                "end": end.astimezone().replace(tzinfo=None).strftime(
+                    "%Y-%m-%d %H:%M"
+                ),
+                "response_status": response_status,
+            }
+        )
+
+    return FetchResult(meetings, None)
+
+
+def fetch_meetings_gcalcli():
+    try:
+        result = subprocess.run(
+            [
+                "gcalcli",
+                "agenda",
+                "--tsv",
+                "--nocolor",
+                "--nodeclined",
+                "now",
+                "11:59pm today",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except FileNotFoundError:
+        return FetchResult(None, "gcalcli not found")
+    except subprocess.TimeoutExpired:
+        return FetchResult(None, "gcalcli timed out")
+
+    if result.returncode != 0:
+        return FetchResult(None, format_command_error("gcalcli", result))
+
+    meetings = []
+    for line in result.stdout.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 5:
+            continue
+
+        start_date, start_time, end_date, end_time = (
+            parts[0],
+            parts[1],
+            parts[2],
+            parts[3],
+        )
+        subject = parts[4]
+
+        if not start_time.strip() or not end_time.strip():
+            continue
+
+        start = None
+        end = None
+        for fmt in ("%Y-%m-%d %I:%M%p", "%Y-%m-%d %I:%M %p", "%Y-%m-%d %H:%M"):
+            try:
+                start = datetime.datetime.strptime(f"{start_date} {start_time}", fmt)
+                end = datetime.datetime.strptime(f"{end_date} {end_time}", fmt)
+                break
+            except ValueError:
+                continue
+
+        if start is None or end is None:
+            continue
+
+        if (end - start).total_seconds() > 4 * 3600:
+            continue
+
+        meetings.append(
+            {
+                "subject": subject.strip(),
+                "start": start.strftime("%Y-%m-%d %H:%M"),
+                "end": end.strftime("%Y-%m-%d %H:%M"),
+                "response_status": "accepted",
+            }
+        )
+
+    return FetchResult(meetings, None)
+
+
+def fetch_meetings():
+    fetchers = []
+    if shutil.which("gcal"):
+        fetchers.append(fetch_meetings_gcal)
+    if shutil.which("gcalcli"):
+        fetchers.append(fetch_meetings_gcalcli)
+
+    if not fetchers:
+        return FetchResult(None, "no calendar CLI found")
+
+    errors = []
+    for fetcher in fetchers:
+        result = fetcher()
+        if result.error is None:
+            return result
+        errors.append(result.error)
+
+    return FetchResult(None, "; ".join(errors))
+
+
+def read_cache():
+    path = cache_path()
+    if not os.path.exists(path):
+        return None, 0
+
+    try:
+        age = time.time() - os.path.getmtime(path)
+        with open(path) as f:
+            return json.load(f), age
+    except (OSError, json.JSONDecodeError):
+        return None, float("inf")
+
+
+def write_cache(meetings):
+    path = cache_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
+        with os.fdopen(fd, "w") as f:
+            json.dump(meetings, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def get_meetings(config):
+    cached, age = read_cache()
+
+    if cached is not None and age <= config.cache_ttl:
+        return FetchResult(cached, None)
+
+    fresh = fetch_meetings()
+    if fresh.meetings is not None:
+        write_cache(fresh.meetings)
+        return fresh
+
+    if cached is not None:
+        return FetchResult(cached, fresh.error)
+
+    return fresh
+
+
+def parse_time(s):
+    return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M")
+
+
+def clean_subject(subject):
+    subject = re.sub(r"^\[.*?\]\s*", "", subject)
+    subject = re.sub(r"^[A-Z]{2,5}\s*\|\s*", "", subject)
+    return subject.strip()
+
+
+def truncate(s, maxlen):
+    if len(s) <= maxlen:
+        return s
+    return s[: maxlen - 1] + "\u2026"
+
+
+def compute_urgency(minutes_until, config):
+    if minutes_until > config.show_threshold:
+        return "hidden"
+    if minutes_until > config.warn_threshold:
+        return "normal"
+    if minutes_until > config.critical_threshold:
+        return "warning"
+    if minutes_until > 0:
+        return "critical"
+    return "started"
+
+
+def select_next_meeting(meetings, config, accepted_only=True):
+    now = datetime.datetime.now()
+    candidates = []
+
+    for meeting in meetings:
+        try:
+            start = parse_time(meeting["start"])
+            end = parse_time(meeting["end"])
+        except (ValueError, KeyError):
+            continue
+
+        if end < now:
+            continue
+
+        minutes_since_start = (now - start).total_seconds() / 60
+        if minutes_since_start > config.hide_after_start:
+            continue
+
+        if accepted_only:
+            status = meeting.get("response_status", "accepted").lower()
+            if status in ("declined", "tentative", "needsaction", "needs-action"):
+                continue
+
+        minutes_until = (start - now).total_seconds() / 60
+        candidates.append(
+            {
+                **meeting,
+                "start_dt": start,
+                "end_dt": end,
+                "minutes_until": minutes_until,
+                "urgency": compute_urgency(minutes_until, config),
+                "subject_clean": clean_subject(meeting["subject"]),
+                "start_time": start.strftime("%H:%M"),
+            }
+        )
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda candidate: candidate["start_dt"])
+    return candidates[0]
+
+
+def load_alerts() -> dict:
+    path = alerts_path()
+    try:
+        with open(path) as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+            return {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_alerts(alerts):
+    path = alerts_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
+        with os.fdopen(fd, "w") as f:
+            json.dump(alerts, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def next_alert_threshold(minutes_until, alert_at, fired):
+    unfired = sorted({threshold for threshold in alert_at if threshold not in fired})
+
+    if minutes_until <= 0:
+        eligible = [
+            threshold
+            for threshold in unfired
+            if threshold <= 0 and minutes_until <= threshold
+        ]
+        if eligible:
+            return max(eligible)
+        return None
+
+    eligible = [
+        threshold
+        for threshold in unfired
+        if threshold > 0 and minutes_until <= threshold
+    ]
+    if eligible:
+        return min(eligible)
+    return None
+
+
+def check_and_fire_alerts(meeting, config):
+    if not shutil.which("tmux"):
+        return
+
+    key = f"{meeting['subject']}|{meeting['start']}"
+    alerts = load_alerts()
+    today = datetime.date.today().isoformat()
+
+    if alerts.get("_last_cleanup") != today:
+        cleaned: dict = {"_last_cleanup": today}
+        for alert_key, values in alerts.items():
+            if alert_key == "_last_cleanup":
+                continue
+            date_part = alert_key.rsplit("|", 1)[-1].split(" ")[0] if "|" in alert_key else ""
+            if date_part >= today:
+                cleaned[alert_key] = values
+        alerts = cleaned
+
+    fired: list = alerts.get(key, [])
+    threshold = next_alert_threshold(
+        meeting["minutes_until"],
+        config.alert_at,
+        fired,
+    )
+
+    if threshold is not None:
+        subject = meeting["subject_clean"]
+        if threshold <= 0:
+            msg = f"\uf073  Meeting starting NOW: {subject}"
+        else:
+            msg = f"\uf073  Meeting in {threshold} minutes: {subject}"
+        subprocess.run(
+            ["tmux", "display-message", "-d", str(config.alert_duration_ms), msg],
+            capture_output=True,
+        )
+        fired.append(threshold)
+
+    alerts[key] = fired
+    save_alerts(alerts)
+
+
+def format_tmux(meeting, fallback_text, config):
+    if meeting is None or meeting["urgency"] == "hidden":
+        return fallback_text or ""
+
+    check_and_fire_alerts(meeting, config)
+
+    subject = truncate(meeting["subject_clean"], config.tmux_subject_len)
+    if meeting["urgency"] == "started":
+        time_part = "NOW"
+    else:
+        time_part = f"{meeting['start_time']} ({int(max(1, meeting['minutes_until']))}m)"
+
+    color_map = {
+        "normal": "#[fg=white]",
+        "warning": "#[fg=brightyellow,bold]",
+        "critical": "#[fg=brightred,bold]",
+        "started": "#[fg=brightred,bold]",
+    }
+    color = color_map.get(meeting["urgency"], "")
+
+    return f"{color}\uf073 {subject} {time_part} #[default]"
+
+
+def format_claude(meeting, config):
+    if meeting is None or meeting["minutes_until"] > config.claude_show_threshold:
+        return ""
+
+    subject = truncate(meeting["subject_clean"], config.claude_subject_len)
+    if meeting["urgency"] == "started":
+        return f"{subject} NOW"
+    if meeting["urgency"] == "critical":
+        return f"{subject} {int(max(1, meeting['minutes_until']))}m!!"
+    if meeting["urgency"] == "warning":
+        return f"{subject} {int(max(1, meeting['minutes_until']))}m!"
+    return f"{subject} {int(meeting['minutes_until'])}m"
+
+
+def format_list(meetings, config):
+    now = datetime.datetime.now()
+    day_meetings = []
+
+    for meeting in meetings:
+        try:
+            start = parse_time(meeting["start"])
+            end = parse_time(meeting["end"])
+        except (ValueError, KeyError):
+            continue
+
+        if end < now:
+            continue
+
+        if (end - start).total_seconds() > 4 * 3600:
+            continue
+
+        day_meetings.append(
+            {
+                **meeting,
+                "start_dt": start,
+                "end_dt": end,
+                "minutes_until": (start - now).total_seconds() / 60,
+                "subject_clean": clean_subject(meeting["subject"]),
+            }
+        )
+
+    day_meetings.sort(key=lambda meeting: meeting["start_dt"])
+    if not day_meetings:
+        print("No upcoming meetings today.")
+        return
+
+    next_accepted = None
+    for meeting in day_meetings:
+        status = meeting.get("response_status", "accepted").lower()
+        if status in ("declined", "tentative", "needsaction", "needs-action"):
+            continue
+        if meeting["minutes_until"] > -config.hide_after_start:
+            next_accepted = meeting
+            break
+
+    print("Today's meetings:")
+    for meeting in day_meetings:
+        marker = "\u25b8" if next_accepted and meeting is next_accepted else " "
+        time_hint = ""
+        mins = int(meeting["minutes_until"])
+        if meeting["minutes_until"] > 1:
+            if mins < 60:
+                time_hint = f"  (in {mins}m)"
+            else:
+                time_hint = f"  (in {mins // 60}h {mins % 60}m)"
+        elif meeting["minutes_until"] > -config.hide_after_start:
+            time_hint = "  (now)"
+
+        print(
+            f"  {marker} {meeting['start_dt']:%H:%M} - {meeting['end_dt']:%H:%M}  "
+            f"{(meeting['subject_clean'] or meeting['subject']):<30s} "
+            f"{meeting.get('response_status', 'accepted').lower()}{time_hint}"
+        )
+
+
+def format_json(meeting, error=None):
+    if meeting is None:
+        output = {"next_meeting": None}
+    else:
+        output = {
+            "subject": meeting["subject"],
+            "subject_clean": meeting["subject_clean"],
+            "start": meeting["start"],
+            "end": meeting["end"],
+            "start_time": meeting["start_time"],
+            "minutes_until": round(meeting["minutes_until"], 1),
+            "urgency": meeting["urgency"],
+            "response_status": meeting.get("response_status", "unknown"),
+        }
+
+    if error:
+        output["error"] = error
+
+    print(json.dumps(output, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Show upcoming Google Calendar meetings.")
+    parser.add_argument(
+        "--mode",
+        choices=["tmux", "claude", "list", "json"],
+        default="list",
+        help="Output mode (default: list)",
+    )
+    parser.add_argument(
+        "--fallback-text",
+        default="",
+        help="Text to show when no meeting is upcoming (tmux mode only)",
+    )
+    args = parser.parse_args()
+
+    config = load_config()
+    result = get_meetings(config)
+    meetings = result.meetings or []
+
+    if args.mode == "tmux":
+        output = format_tmux(
+            select_next_meeting(meetings, config, accepted_only=True),
+            args.fallback_text,
+            config,
+        )
+        if output:
+            print(output)
+        return 0
+
+    if args.mode == "claude":
+        output = format_claude(
+            select_next_meeting(meetings, config, accepted_only=True),
+            config,
+        )
+        if output:
+            print(output)
+        return 0
+
+    if args.mode == "json":
+        meeting = select_next_meeting(meetings, config, accepted_only=True)
+        format_json(meeting, result.error)
+        return 1 if result.error and not meetings else 0
+
+    if result.error and not meetings:
+        print(f"Error: {result.error}", file=sys.stderr)
+        if result.error == "no calendar CLI found":
+            print(
+                "Install gcal (google_mux) or gcalcli (pip install gcalcli)",
+                file=sys.stderr,
+            )
+        return 1
+
+    format_list(meetings, config)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
