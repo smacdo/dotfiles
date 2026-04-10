@@ -94,7 +94,18 @@ is_file_newer_than() {
 ################################################################################
 get_latest_weather_data() {
   LOCATION=${1:-${WEATHER_LOCATION}}
-  curl -s wttr.in/"${LOCATION}"?format="%l;%c;%C;%t;%p;%P;%m;%s;%S;%h"\
+
+  CURL_ARGS="-s --max-time 10"
+
+  # Use DOTFILES_PROXY if set (e.g. for devservers behind a forward proxy).
+  # Set this in ~/.config/dotfiles/my_shell_profile.sh to keep proxy details
+  # out of the public dotfiles repo.
+  if [ -n "${DOTFILES_PROXY:-}" ]; then
+    CURL_ARGS="${CURL_ARGS} --proxy ${DOTFILES_PROXY}"
+  fi
+
+  # shellcheck disable=SC2086
+  curl ${CURL_ARGS} "wttr.in/${LOCATION}?format=%l%3B%c%3B%C%3B%t%3B%p%3B%P%3B%m%3B%s%3B%S%3B%h" \
     || return 1
 
 }
