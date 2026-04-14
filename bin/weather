@@ -139,7 +139,7 @@ def read_unit_percent(json: dict) -> Optional[float]:
         return float(json["value"])
 
 
-# TODO: Refactor into ForecastPeriod = Forecast + Start/End
+# TODO: Refactor into ForecastPeriod = Condition + Start/End
 class ForecastPeriod:
     """Weather forecast data for a period of time."""
 
@@ -162,10 +162,24 @@ class ForecastPeriod:
         self.end_time = datetime.fromisoformat(json["endTime"])
         self.is_daytime = bool(json["isDaytime"]) if "isDaytime" in json else None
         self.temperature = Temperature(json["temperature"], json["temperatureUnit"])
-        self.precip_chance = read_unit_percent(json["probabilityOfPrecipitation"]) if "probabilityOfPrecipitation" in json else None
-        self.dewpoint = Temperature.from_json(json["dewpoint"]) if "dewpoint" in json else None
-        self.relative_humidity = read_unit_percent(json["relativeHumidity"]) if "relativeHumidity" in json else None
-        self.wind = WindSpeed.from_str(json["windSpeed"], json["windDirection"]) if "windSpeed" in json else None
+        self.precip_chance = (
+            read_unit_percent(json["probabilityOfPrecipitation"])
+            if "probabilityOfPrecipitation" in json
+            else None
+        )
+        self.dewpoint = (
+            Temperature.from_json(json["dewpoint"]) if "dewpoint" in json else None
+        )
+        self.relative_humidity = (
+            read_unit_percent(json["relativeHumidity"])
+            if "relativeHumidity" in json
+            else None
+        )
+        self.wind = (
+            WindSpeed.from_str(json["windSpeed"], json["windDirection"])
+            if "windSpeed" in json
+            else None
+        )
         self.icon_url = str(json["icon"])
         self.short_summary = str(json["shortForecast"])
         self.detailed_summary = str(json["detailedForecast"])
@@ -231,6 +245,7 @@ class Forecast:
 
 class WeatherClient:
     """Looks up weather related information using the weather.gov API."""
+
     debug_print: bool
 
     def __init__(self, debug_print=False) -> None:
@@ -274,11 +289,11 @@ class WeatherClient:
             print(repr(response))
 
         # TODO: capture remainder of fields and encapsulate into class:
-        #props = response["properties"]
-        #generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
-        #update_time = props["updateTime"]  # ^^^^
-        #valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
-        #elevation = props["elevation"]["value"]  # 456.8951999
+        # props = response["properties"]
+        # generated_at = props["generatedAt"]  # "2023-09-19T17:52:33+00:00",
+        # update_time = props["updateTime"]  # ^^^^
+        # valid_time = props["validTimes"]  # "2023-09-19T11:00:00+00:00/P7DT14H"
+        # elevation = props["elevation"]["value"]  # 456.8951999
         # also unitCode = "wmoUnit:m" along with value
 
         forecasts: List[ForecastPeriod] = []
@@ -306,7 +321,9 @@ def main() -> None:
     # Get weather forecast for region.
     # TODO: Support location lookup by name.
     weather_client = WeatherClient()
-    forecasts = weather_client.lookup_forecast(weather_client.lookup_grid_point(47.675, -122.1215))
+    forecasts = weather_client.lookup_forecast(
+        weather_client.lookup_grid_point(47.675, -122.1215)
+    )
 
     # Print forecast information depending on what user asked for.
     if args.time_period_or_action == "now":

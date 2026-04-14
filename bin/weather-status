@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""
+Author: Scott MacDonald
+Purpose: Prints weather information suitable for display in a status bar.
+
+Information about wttr.in, including the formatting options used below can be at
+https://github.com/chubin/wttr.in
+
+The format used below has the following data arranged in order:
+  Location;Condition;Temp;Precip;Moon;Sunset;Sunrise
+"""
+
+# TODO: Support weather extended caching if network not available.
+
+import argparse
+import json
+import os
+import ssl
+import sys
+import tempfile
+import time
+import urllib.request
+
+from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+
+@dataclass
+class Unit(Generic[T]):
+    value: T
+    unit: str
+
+    def __str__(self):
+        return f"{str(self.value)}{self.unit}"
+
+
+@dataclass
+class Condition:
+    location: str
+    cond: str
+    cond_full: str
+    temp: Unit[int]
+    precip: Unit[float]
+    pressure: Unit[int]
+    moon: str
+    sunset: str
+    sunrise: str
+    humidity: Unit[float]
+
+    @property
+    def short_location(self) -> str:
+        return self.location.split(",")[0]
+
+    @staticmethod
+    def Parse(s: str) -> "Condition":
+        parts = s.split(";")
+        return Condition(
+            location=parts[0],  # "kent, washington, us"
+            cond=parts[1],  # "☀️" (spaces already stripped)
+            cond_full=parts[2],  # "Sunny"
+            # Remove '+' and '°F', then convert to int
+            temp=Unit(int(parts[3].replace("+", "").replace("°F", "")), "F"),
+            # Remove 'in' and convert to float
+            precip=Unit(float(parts[4].replace("in", "")), "in"),
+            # Remove 'hPa' and convert to int
+            pressure=Unit(int(parts[5].replace("hPa", "")), "hPa"),
+            moon=parts[6],
+            sunset=parts[7],
+            sunrise=parts[8],
+            # Remove '%' and convert to int
+            humidity=Unit(int(parts[9].replace("%", "")), "%"),
+        )
+
+
+def fetch_wttr(location: str | None) -> str:
+    location = location if location else ""
+
+    return (
+        urllib.request.urlopen(
+            f"https://wttr.in/{location}?format=%l%3B%c%3B%C%3B%t%3B%p%3B%P%3B%m%3B%s%3B%S%3B%h",
+            context=ssl._create_unverified_context(),
+            timeout=10,
+        )
+        .read()
+        .decode("utf-8")
+    )
+
+
+def cache_path() -> str:
+    return os.path.join(
+        os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+        "dotfiles/weather-status-cache.json",
+    )
+
+
+def read_cache(location: str, timeout_secs: int) -> str | None:
+    path = cache_path()
+
+    if not os.path.exists(cache_path()):
+        return None
+
+    try:
+        age_secs = time.time() - os.path.getmtime(path)
+        with open(path) as f:
+            cached_conditions = json.load(f)
+
+            if location.lower() in cached_conditions:
+                return cached_conditions[location.lower()]
+    except json.JSONDecodeError:
+        pass
+
+    return None
+
+
+def write_cache(location: str, data: str) -> None:
+    assert data is not None
+
+    path = cache_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # Read current cache entries and add this location to the entries.
+    cached_conditions: dict[str, str] = {}
+
+    if os.path.exists(path):
+        with open(path) as f:
+            cached_conditions = json.load(f)
+
+    cached_conditions[location.lower()] = data
+
+    # Write cache back to disk.
+    # TODO: locking?
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
+
+    with os.fdopen(fd, "w") as f:
+        json.dump(cached_conditions, f)
+
+    os.replace(tmp, path)
+
+
+def parse_wttr_str(s: str) -> Condition:
+    return Condition.Parse(s)
+
+
+def current_conditions(location: str) -> Condition:
+    wttr_response = read_cache(location, timeout_secs=5 * 60)
+
+    if wttr_response is None:
+        wttr_response = fetch_wttr(location)
+
+    write_cache(location, wttr_response)
+
+    return Condition.Parse(wttr_response)
+
+
+def report_summary(c: Condition) -> str:
+    return f"{c.short_location.title()} {c.temp} {c.cond}"
+
+
+def report_all(c: Condition) -> str:
+    return (
+        f"Location: {c.location.title()}\n"
+        f"Conditions: {c.cond} {c.cond_full}\n"
+        f"Temperature: {c.temp}\n"
+        f"Precip: {c.precip}\n"
+        f"Humidity: {c.humidity}\n"
+        f"Pressure: {c.pressure}\n"
+        f"Moon: {c.moon}\n"
+        f"Sunset: {c.sunset}\n"
+        f"Sunrise: {c.sunrise}"
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Show upcoming Google Calendar meetings."
+    )
+    parser.add_argument(
+        "--print-location",
+        action="store_true",
+        help="Print the location that will be looked up",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all condition fields, not just the summary",
+    )
+    parser.add_argument(
+        "--location",
+        help="Location to look up weather conditions for",
+    )
+    args = parser.parse_args()
+
+    # Get the weather location from the arguments, or the environment variable "WEATHER_LOCATION" if
+    # not provided.
+    if args.location:
+        location = args.location
+    else:
+        location = os.environ.get("WEATHER_LOCATION")
+
+    # Print the weather location and exit early if requested.
+    if args.print_location:
+        print(location)
+        return 0
+
+    # Print the current conditions
+    c = current_conditions(location)
+
+    if args.all:
+        print(report_all(c))
+    else:
+        print(report_summary(c))
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

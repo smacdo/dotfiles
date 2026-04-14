@@ -11,6 +11,13 @@
   - check if common programs are installed (especially ones used by the dotfiles)
   - check if expected env vars are set
   - etc
+  - Check for MacOS Python SSL misconfiguration
+
+### MacOS Python SSL Misconfiguration
+error: ` urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer 
+ certificate (_ssl.c:1020)>` when running `urllib.request.urlopen(...)`
+
+problem is the python installed via homebrew or standalone doesn't use the system's certificates.
 
 ## Linting
 - [x] Lint shell scripts with shellcheck
