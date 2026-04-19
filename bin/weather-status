@@ -7,22 +7,34 @@ Information about wttr.in, including the formatting options used below can be at
 https://github.com/chubin/wttr.in
 
 The format used below has the following data arranged in order:
-  Location;Condition;Temp;Precip;Moon;Sunset;Sunrise
+  Location;ConditionEmoji;ConditionText;Temp;Precip;Pressure;Moon;
+  Sunset;Sunrise;Humidity;FeelsLike;Wind;UVIndex;MoonDay;Dawn;Dusk
 """
 
 # TODO: Support weather extended caching if network not available.
+# TODO: Add cache busting (delete cache entry for location).
+# TODO: Extract caching to _pydotlib module
+# TODO: Share logging with _pydotlib module.
 
 import argparse
 import json
 import os
-import ssl
+import logging
 import sys
 import tempfile
-import time
+import urllib.error
+import urllib.parse
 import urllib.request
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Generic, TypeVar
+
+# from _pydotlib.cli import ColoredLogFormatter # TODO: import pydotlib
+
+ENV_WEATHER_LOCATION = "WEATHER_LOCATION"
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -45,20 +57,31 @@ class Condition:
     precip: Unit[float]
     pressure: Unit[int]
     moon: str
+    moon_day: int
     sunset: str
     sunrise: str
+    dawn: str
+    dusk: str
     humidity: Unit[float]
+    feels_like: Unit[int]
+    wind: str
+    uv_index: int
 
     @property
     def short_location(self) -> str:
         return self.location.split(",")[0]
 
     @staticmethod
-    def Parse(s: str) -> "Condition":
+    def parse(s: str) -> "Condition":
         parts = s.split(";")
+        expected = 16
+        if len(parts) < expected:
+            raise ValueError(
+                f"Unexpected wttr.in response ({len(parts)} fields, expected {expected}): {s!r}"
+            )
         return Condition(
-            location=parts[0],  # "kent, washington, us"
-            cond=parts[1],  # "☀️" (spaces already stripped)
+            location=parts[0],   # "kent, washington, us"
+            cond=parts[1].strip(),  # "☀️" (spaces already stripped)
             cond_full=parts[2],  # "Sunny"
             # Remove '+' and '°F', then convert to int
             temp=Unit(int(parts[3].replace("+", "").replace("°F", "")), "F"),
@@ -71,21 +94,28 @@ class Condition:
             sunrise=parts[8],
             # Remove '%' and convert to int
             humidity=Unit(int(parts[9].replace("%", "")), "%"),
+            # Remove '+' and '°F', then convert to int
+            feels_like=Unit(int(parts[10].replace("+", "").replace("°F", "")), "F"),
+            wind=parts[11],      # e.g. "↙7mph" — kept as-is, includes direction arrow
+            uv_index=int(parts[12]),
+            moon_day=int(parts[13]),
+            dawn=parts[14],
+            dusk=parts[15],
         )
 
 
 def fetch_wttr(location: str | None) -> str:
-    location = location if location else ""
+    location = urllib.parse.quote(location, safe="") if location else ""
+    url = f"https://wttr.in/{location}?format=%l%3B%c%3B%C%3B%t%3B%p%3B%P%3B%m%3B%s%3B%S%3B%h%3B%f%3B%w%3B%u%3B%M%3B%D%3B%d"
 
-    return (
-        urllib.request.urlopen(
-            f"https://wttr.in/{location}?format=%l%3B%c%3B%C%3B%t%3B%p%3B%P%3B%m%3B%s%3B%S%3B%h",
-            context=ssl._create_unverified_context(),
-            timeout=10,
-        )
-        .read()
-        .decode("utf-8")
-    )
+    logger.debug(f"Fetching {url}")
+
+    try:
+        response = urllib.request.urlopen(url)
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Failed to fetch weather data: {e.reason}") from e
+
+    return response.read().decode("utf-8")
 
 
 def cache_path() -> str:
@@ -98,36 +128,56 @@ def cache_path() -> str:
 def read_cache(location: str, timeout_secs: int) -> str | None:
     path = cache_path()
 
-    if not os.path.exists(cache_path()):
+    if not os.path.exists(path):
+        logging.debug(f"Cache file {path} does not exist")
         return None
 
     try:
-        age_secs = time.time() - os.path.getmtime(path)
         with open(path) as f:
+            logger.debug(f"Using cache file at {path}")
             cached_conditions = json.load(f)
 
             if location.lower() in cached_conditions:
-                return cached_conditions[location.lower()]
+                created_at_str, data = cached_conditions[location.lower()]
+                created_at = datetime.fromisoformat(created_at_str)
+                age_secs = (datetime.now(timezone.utc) - created_at).total_seconds()
+
+                if age_secs < timeout_secs:
+                    logger.debug(
+                        f"Loaded cache key `{location}` with age {age_secs:.1f}s"
+                    )
+                    return data
+                else:
+                    logger.debug(
+                        f"Rejected expired cache key `{location}` with age = {age_secs:.1f}s (max {timeout_secs}s)"
+                    )
+            else:
+                logger.debug(f"Cache key `{location}` does not exist")
     except json.JSONDecodeError:
-        pass
+        logger.warning(f"Cache file {path} contains invalid JSON, ignoring")
+    except (ValueError, TypeError):
+        logger.warning(f"Cache file {path} has unrecognized format, ignoring")
 
     return None
 
 
 def write_cache(location: str, data: str) -> None:
-    assert data is not None
-
     path = cache_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     # Read current cache entries and add this location to the entries.
-    cached_conditions: dict[str, str] = {}
+    cached_conditions: dict[str, tuple[str, str]] = {}
 
     if os.path.exists(path):
-        with open(path) as f:
-            cached_conditions = json.load(f)
+        logger.debug(f"Using cache file at {path}")
+        try:
+            with open(path) as f:
+                cached_conditions = json.load(f)
+        except json.JSONDecodeError:
+            logger.warning(f"Cache file {path} contains invalid JSON, discarding")
 
-    cached_conditions[location.lower()] = data
+    created_at = datetime.now(timezone.utc).isoformat()
+    cached_conditions[location.lower()] = (created_at, data)
 
     # Write cache back to disk.
     # TODO: locking?
@@ -138,20 +188,23 @@ def write_cache(location: str, data: str) -> None:
 
     os.replace(tmp, path)
 
+    logger.debug(
+        f"Wrote to cache key = `{location}`, created_at = `{created_at}`, data = `{data}`"
+    )
 
-def parse_wttr_str(s: str) -> Condition:
-    return Condition.Parse(s)
 
-
-def current_conditions(location: str) -> Condition:
-    wttr_response = read_cache(location, timeout_secs=5 * 60)
+def current_conditions(location: str | None) -> Condition:
+    cache_key = location if location else "__AUTO_LOCATION__"
+    wttr_response = read_cache(cache_key, timeout_secs=5 * 60)
 
     if wttr_response is None:
+        logger.debug(
+            f"Fetch current conditions for `{location}` because it was not cached"
+        )
         wttr_response = fetch_wttr(location)
+        write_cache(cache_key, wttr_response)
 
-    write_cache(location, wttr_response)
-
-    return Condition.Parse(wttr_response)
+    return Condition.parse(wttr_response)
 
 
 def report_summary(c: Condition) -> str:
@@ -162,13 +215,17 @@ def report_all(c: Condition) -> str:
     return (
         f"Location: {c.location.title()}\n"
         f"Conditions: {c.cond} {c.cond_full}\n"
-        f"Temperature: {c.temp}\n"
+        f"Temperature: {c.temp} (feels like {c.feels_like})\n"
+        f"Wind: {c.wind}\n"
         f"Precip: {c.precip}\n"
         f"Humidity: {c.humidity}\n"
         f"Pressure: {c.pressure}\n"
-        f"Moon: {c.moon}\n"
+        f"UV Index: {c.uv_index}\n"
+        f"Moon: {c.moon} (day {c.moon_day})\n"
+        f"Dawn: {c.dawn}\n"
+        f"Sunrise: {c.sunrise}\n"
         f"Sunset: {c.sunset}\n"
-        f"Sunrise: {c.sunrise}"
+        f"Dusk: {c.dusk}"
     )
 
 
@@ -187,17 +244,48 @@ def main() -> int:
         help="Show all condition fields, not just the summary",
     )
     parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output (DEBUG level logging)",
+    )
+    parser.add_argument(
+        "-s",
+        "--silent",
+        action="store_true",
+        help="Silence output except for errors",
+    )
+    parser.add_argument(
         "--location",
         help="Location to look up weather conditions for",
     )
     args = parser.parse_args()
 
+    # Set up more verbose logging if the user requested it.
+    log_handler = logging.StreamHandler(sys.stdout)
+    # TODO: re-enable colored log format when pydotlib imported.
+    # log_handler.setFormatter(ColoredLogFormatter())
+
+    logging.getLogger().addHandler(log_handler)
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    elif args.silent:
+        logging.getLogger().setLevel(logging.ERROR)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
+
     # Get the weather location from the arguments, or the environment variable "WEATHER_LOCATION" if
     # not provided.
     if args.location:
         location = args.location
+    elif ENV_WEATHER_LOCATION in os.environ:
+        logging.debug(f"Reading location from env var `{ENV_WEATHER_LOCATION}`")
+        location = os.environ.get(ENV_WEATHER_LOCATION)
     else:
-        location = os.environ.get("WEATHER_LOCATION")
+        location = None
+
+    logging.debug(f"Location is {location}")
 
     # Print the weather location and exit early if requested.
     if args.print_location:
@@ -205,7 +293,11 @@ def main() -> int:
         return 0
 
     # Print the current conditions
-    c = current_conditions(location)
+    try:
+        c = current_conditions(location)
+    except (RuntimeError, ValueError) as e:
+        logger.error(str(e))
+        return 1
 
     if args.all:
         print(report_all(c))

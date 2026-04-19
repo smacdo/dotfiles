@@ -126,3 +126,15 @@ All settings are optional environment variables, set in
 
 ## Packages
 * lesspipe
+
+## Troubleshooting
+### Exception urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1020)>
+MacOS Python installations (especially from brew, python.org) ship without bundling the system's certificate store. You will need to run the following once to initialize the certifacte store:
+
+   open /Applications/Python\ 3.X/Install\ Certificates.command
+
+so for Python 3.13, you'd run:
+
+   open /Applications/Python\ 3.13/Install\ Certificates.command
+
+Try re-running the script, and it should work.
