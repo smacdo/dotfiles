@@ -13,7 +13,7 @@ set -u
 
 ROOT="${S_DOTFILE_ROOT:-$HOME/.dotfiles}"
 MEETING_CMD="$ROOT/bin/next-meeting"
-WEATHER_CMD="$ROOT/bin/weather_status.sh"
+WEATHER_CMD="$ROOT/bin/weather-status"
 
 # Try next-meeting first. If it outputs something, use that.
 if [ -x "$MEETING_CMD" ]; then
