@@ -19,6 +19,9 @@ BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
 DOTFILES_SH_SCRIPTS = ["_setup.sh"]
 DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
 
+END_OF_CONFIG_SENTINEL = "### end of config - there should be no lines below this one! ###"
+END_OF_CONFIG_FILES = [".bashrc", ".zshrc"]
+
 
 ################################################################################
 # Lint a list of shell scripts, and return a list of files that failed a linter
@@ -161,6 +164,30 @@ def find_shell_scripts(
 
 
 ################################################################################
+# Check that no non-empty lines appear after the end-of-config sentinel in the
+# given file. Returns a list of (line_number, line_text) violations.
+################################################################################
+def check_sentinel_is_last(file_path: str, sentinel: str) -> list[tuple[int, str]]:
+    with open(file_path) as f:
+        lines = f.readlines()
+
+    sentinel_index = None
+    for i, line in enumerate(lines):
+        if line.strip() == sentinel:
+            sentinel_index = i
+
+    if sentinel_index is None:
+        return [(0, f"sentinel not found: {sentinel!r}")]
+
+    violations = []
+    for i, line in enumerate(lines[sentinel_index + 1 :], start=sentinel_index + 2):
+        if line.strip():
+            violations.append((i, line.rstrip()))
+
+    return violations
+
+
+################################################################################
 # Script main
 ################################################################################
 def main() -> int:
@@ -177,6 +204,21 @@ def main() -> int:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.getLogger().setLevel(logging.INFO)
+
+    # Check that nothing was appended after the end-of-config sentinel.
+    logging.info("checking end-of-config sentinels...")
+
+    for config_file in END_OF_CONFIG_FILES:
+        violations = check_sentinel_is_last(config_file, END_OF_CONFIG_SENTINEL)
+        if violations:
+            has_fatal_lints = True
+            for lineno, text in violations:
+                if lineno == 0:
+                    logging.error(f"{config_file}: {text}")
+                else:
+                    logging.error(f"{config_file}:{lineno}: line after end-of-config sentinel: {text!r}")
+        else:
+            logging.debug(f"{config_file}: end-of-config sentinel OK")
 
     # Lint shell scripts.
     logging.info("linting shell scripts...")
