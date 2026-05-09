@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+# Author: Scott MacDonald <scott@smacdo.com>
+# Purpose: Claude Code status line
+# Usage: echo '{}' | claude_status [--debug]
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+RESET = "\033[0m"
+DIM = "\033[2m"
+YELLOW = "\033[33m"
+BOLD_RED = "\033[1;31m"
+ORANGE = "\033[38;5;208m"
+DIM_GREEN = "\033[2;32m"
+SEP = " · "
+
+
+def dim(s: str) -> str:
+    return f"{DIM}{s}{RESET}"
+
+
+def yellow(s: str) -> str:
+    return f"{YELLOW}{s}{RESET}"
+
+
+def bold_red(s: str) -> str:
+    return f"{BOLD_RED}{s}{RESET}"
+
+
+def orange(s: str) -> str:
+    return f"{ORANGE}{s}{RESET}"
+
+
+def dim_green(s: str) -> str:
+    return f"{DIM_GREEN}{s}{RESET}"
+
+
+def parse_model_name(model_id: str) -> str:
+    s = model_id[len("claude-"):] if model_id.startswith("claude-") else model_id
+    parts = s.split("-")
+    if not parts:
+        return model_id
+    family = parts[0].capitalize()
+    for i in range(1, len(parts) - 1):
+        if parts[i].isdigit() and parts[i + 1].isdigit():
+            return f"{family} {parts[i]}.{parts[i + 1]}"
+    return f"{family} {parts[1]}" if len(parts) >= 2 else family
+
+
+def format_effort_annotation(effort_level: str, thinking_enabled: bool) -> str:
+    level = effort_level.lower()
+    if level in ("", "normal", "medium"):
+        return "(thinking)" if thinking_enabled else ""
+    elif level == "low":
+        base = "low thinking" if thinking_enabled else "low"
+        return dim(f"({base})")
+    elif level == "high":
+        base = "hi thinking" if thinking_enabled else "hi"
+        return yellow(f"({base})")
+    elif level == "xhigh":
+        base = "xhigh thinking" if thinking_enabled else "xhigh"
+        return orange(f"({base})")
+    elif level == "max":
+        base = "max thinking" if thinking_enabled else "max"
+        return bold_red(f"({base})")
+    return "(thinking)" if thinking_enabled else ""
+
+
+def build_model_section(data: dict) -> str:
+    model = data.get("model") or {}
+    model_id = model.get("id", "")
+    display_name = model.get("display_name", "")
+
+    if display_name:
+        name = display_name
+        if name.startswith("Claude "):
+            name = name[len("Claude "):]
+        # Old naming was "Claude X.Y Name"; after stripping, first char is a digit
+        if name and name[0].isdigit() and model_id:
+            name = parse_model_name(model_id)
+    elif model_id:
+        name = parse_model_name(model_id)
+    else:
+        name = "Claude"
+
+    effort_data = data.get("effort") or {}
+    effort_level = effort_data.get("level", "") if effort_data else ""
+    thinking_data = data.get("thinking") or {}
+    thinking_enabled = bool(thinking_data.get("enabled", False)) if thinking_data else False
+
+    annotation = format_effort_annotation(effort_level, thinking_enabled)
+    return f"{name} {annotation}" if annotation else name
+
+
+def fmt_tokens(n: int) -> str:
+    return f"{round(n / 1000)}k" if n >= 1000 else str(n)
+
+
+# Per-million token prices (input, output) — rough approximations for cost display
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "claude-opus": (15.0, 75.0),
+    "claude-sonnet": (3.0, 15.0),
+    "claude-haiku": (0.25, 1.25),
+}
+
+
+def estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float:
+    model_id_lower = model_id.lower()
+    price_in, price_out = 3.0, 15.0  # sonnet fallback
+    for key, (p_in, p_out) in MODEL_PRICING.items():
+        if key in model_id_lower:
+            price_in, price_out = p_in, p_out
+            break
+    return (input_tokens / 1_000_000) * price_in + (output_tokens / 1_000_000) * price_out
+
+
+def color_rate_pct(pct: float, raw: str) -> str:
+    if pct >= 80:
+        return bold_red(raw)
+    elif pct >= 65:
+        return yellow(raw)
+    return dim(raw)
+
+
+def build_usage_section(data: dict, short: bool) -> str:
+    rate_limits = data.get("rate_limits")
+    ctx = data.get("context_window") or {}
+    model = data.get("model") or {}
+    model_id = model.get("id", "")
+
+    if rate_limits:
+        parts: list[str] = []
+        for key in ("five_hour", "seven_day"):
+            entry = rate_limits.get(key)
+            if entry is not None:
+                pct = entry.get("used_percentage", 0)
+                parts.append(color_rate_pct(pct, f"{pct:.0f}%"))
+        return "⏱ " + "/".join(parts) if parts else ""
+
+    total_in = ctx.get("total_input_tokens", 0) or 0
+    total_out = ctx.get("total_output_tokens", 0) or 0
+    in_str = f"↓{fmt_tokens(total_in)}"
+    out_str = f"↑{fmt_tokens(total_out)}"
+    if short:
+        return f"{in_str} {out_str}"
+    cost = estimate_cost(model_id, total_in, total_out)
+    return f"{in_str} {out_str} (${cost:.2f})" if cost > 0.0 else f"{in_str} {out_str}"
+
+
+def color_context_pct(pct: float, raw: str) -> str:
+    if pct > 90:
+        return bold_red(raw)
+    elif pct > 75:
+        return yellow(raw)
+    elif pct < 50:
+        return dim_green(raw)
+    return raw
+
+
+def build_context_section(data: dict, short: bool) -> str:
+    ctx = data.get("context_window") or {}
+    used_pct = ctx.get("used_percentage")
+    ctx_size = ctx.get("context_window_size", 0) or 0
+    current = ctx.get("current_usage")
+
+    if used_pct is None:
+        return ""
+
+    colored_pct = color_context_pct(float(used_pct), f"{used_pct:.0f}%")
+    if short or not current:
+        return f"◑ {colored_pct}"
+
+    input_toks = current.get("input_tokens", 0) or 0
+    cache_read = current.get("cache_read_input_tokens", 0) or 0
+    bracket = dim(f"[{fmt_tokens(input_toks + cache_read)}/{fmt_tokens(ctx_size)}]")
+    return f"◑ {colored_pct} {bracket}"
+
+
+def _run_git(args: list[str], cwd: str) -> str | None:
+    try:
+        r = subprocess.run(
+            ["git", "-c", "core.hooksPath=/dev/null"] + args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        return r.stdout.strip() if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def _get_git_stat(cwd: str) -> str:
+    output = _run_git(["diff", "--no-color", "--shortstat", "HEAD"], cwd)
+    if not output:
+        return ""
+    added = removed = 0
+    for part in output.split(","):
+        part = part.strip()
+        if "insertion" in part:
+            added = int(part.split()[0])
+        elif "deletion" in part:
+            removed = int(part.split()[0])
+    parts: list[str] = []
+    if added:
+        parts.append(f"+{added}")
+    if removed:
+        parts.append(f"-{removed}")
+    return " ".join(parts)
+
+
+def build_dir_branch_section(data: dict) -> str:
+    workspace = data.get("workspace") or {}
+    cwd = workspace.get("current_dir") or data.get("cwd") or ""
+    if not cwd:
+        return ""
+
+    home = os.path.expanduser("~")
+    display_dir = "~" + cwd[len(home):] if cwd.startswith(home) else cwd
+    result = f"⌂ {display_dir}"
+
+    branch = _run_git(["branch", "--show-current"], cwd)
+    if branch and branch not in ("main", "master"):
+        result += f" ⎇ {branch}"
+        stat = _get_git_stat(cwd)
+        if stat:
+            result += f" {stat}"
+
+    return result
+
+
+def _get_birth_ts(path: str) -> int | None:
+    # macOS stat: birth time as epoch seconds (-f %SB -t %s)
+    try:
+        r = subprocess.run(
+            ["stat", "-f", "%SB", "-t", "%s", path],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        return int(r.stdout.strip()) if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def build_duration_section(data: dict) -> str:
+    # No session start time in the spec; use transcript file birth time as proxy
+    transcript_path = data.get("transcript_path")
+    if not transcript_path:
+        return ""
+    try:
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        birth_ts = _get_birth_ts(transcript_path) or int(os.path.getmtime(transcript_path))
+        elapsed = max(0, now_ts - birth_ts)
+        if elapsed < 60:
+            return "◷ <1min"
+        if elapsed < 3600:
+            return f"◷ {elapsed // 60}min"
+        h, m = elapsed // 3600, (elapsed % 3600) // 60
+        return f"◷ {h}h {m}m" if m else f"◷ {h}h"
+    except Exception:
+        return ""
+
+
+def main() -> None:
+    debug = "--debug" in sys.argv
+
+    try:
+        raw = sys.stdin.read()
+        data: dict = json.loads(raw) if raw.strip() else {}
+    except Exception:
+        data = {}
+
+    if debug:
+        print("=== claude_status debug ===", file=sys.stderr)
+        print(f"top-level keys: {sorted(data.keys())}", file=sys.stderr)
+        print(f"context_window keys: {sorted((data.get('context_window') or {}).keys())}", file=sys.stderr)
+        print(f"rate_limits keys: {sorted((data.get('rate_limits') or {}).keys())}", file=sys.stderr)
+        print(json.dumps(data, indent=2), file=sys.stderr)
+
+    term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+    short = term_width <= 72
+
+    sections = [
+        build_model_section(data),
+        build_usage_section(data, short),
+        build_context_section(data, short),
+    ]
+
+    if not short:
+        dir_str = build_dir_branch_section(data)
+        dur_str = build_duration_section(data)
+        if dir_str:
+            sections.append(dir_str)
+        if dur_str:
+            sections.append(dur_str)
+
+    print(SEP.join(s for s in sections if s))
+
+
+if __name__ == "__main__":
+    main()

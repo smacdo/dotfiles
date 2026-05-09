@@ -120,21 +120,29 @@ def configure_claude_code(
             logging.warning(f"Could not parse {settings_path}, skipping Claude Code configuration")
             return
 
+    changed = False
+
     env = settings.get("env", {})
     desired_editor = "claude-editor"
     desired_real_editor = _detect_real_editor()
 
-    if env.get("EDITOR") == desired_editor and env.get("REAL_EDITOR") == desired_real_editor:
+    if env.get("EDITOR") != desired_editor or env.get("REAL_EDITOR") != desired_real_editor:
+        env["EDITOR"] = desired_editor
+        env["REAL_EDITOR"] = desired_real_editor
+        settings["env"] = env
+        logging.info(f"{dry_text}Setting Claude Code EDITOR={desired_editor}, REAL_EDITOR={desired_real_editor}")
+        changed = True
+    else:
         logging.info(f"{dry_text}Claude Code editor already configured")
-        return
 
-    env["EDITOR"] = desired_editor
-    env["REAL_EDITOR"] = desired_real_editor
-    settings["env"] = env
+    if "statusLine" not in settings:
+        settings["statusLine"] = {"type": "command", "command": "claude_status"}
+        logging.info(f"{dry_text}Setting Claude Code statusLine to claude_status")
+        changed = True
+    else:
+        logging.info(f"{dry_text}Claude Code statusLine already configured")
 
-    logging.info(f"{dry_text}Setting Claude Code EDITOR={desired_editor}, REAL_EDITOR={desired_real_editor}")
-
-    if not dry_run:
+    if changed and not dry_run:
         settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
@@ -574,6 +582,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             settings = json.loads(settings_path.read_text())
             self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
             self.assertIn(settings["env"]["REAL_EDITOR"], ("nvim", "vim", "vi"))
+            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude_status"})
 
     def test_preserves_existing_keys(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -601,7 +610,10 @@ class TestConfigureClaudeCode(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
             real_editor = _detect_real_editor()
-            existing = {"env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor}}
+            existing = {
+                "env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor},
+                "statusLine": {"type": "command", "command": "claude_status"},
+            }
             settings_path.write_text(json.dumps(existing))
             mtime_before = settings_path.stat().st_mtime
 
@@ -609,6 +621,29 @@ class TestConfigureClaudeCode(unittest.TestCase):
 
             mtime_after = settings_path.stat().st_mtime
             self.assertEqual(mtime_before, mtime_after)
+
+    def test_sets_statusline_when_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            real_editor = _detect_real_editor()
+            existing = {"env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor}}
+            settings_path.write_text(json.dumps(existing))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude_status"})
+
+    def test_does_not_overwrite_existing_statusline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            existing = {"statusLine": {"type": "command", "command": "my_custom_status"}}
+            settings_path.write_text(json.dumps(existing))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["statusLine"]["command"], "my_custom_status")
 
     def test_skips_malformed_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -625,6 +660,19 @@ class TestConfigureClaudeCode(unittest.TestCase):
             configure_claude_code(settings_path, dry_run=True)
 
             self.assertFalse(settings_path.exists())
+
+    def test_dry_run_does_not_write_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            real_editor = _detect_real_editor()
+            existing = {"env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor}}
+            settings_path.write_text(json.dumps(existing))
+            mtime_before = settings_path.stat().st_mtime
+
+            configure_claude_code(settings_path, dry_run=True)
+
+            mtime_after = settings_path.stat().st_mtime
+            self.assertEqual(mtime_before, mtime_after)
 
 
 class TestDetectRealEditor(unittest.TestCase):
