@@ -64,7 +64,6 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 - **`settings/`** — Editor/tool configs (nvim, VSCode, Ghostty, Wezterm, clang-format)
 - **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). See *`bin/` script policy* below for when `bin/` scripts may use it.
 - **`.vim/`** — Vim configs (colorschemes, ftplugins, spell files, native packages)
-- **`sh/`** — Deprecated shell library (`cli.sh`, `git.sh`); new scripts should use Python
 - **`tools/`** — Post-bootstrap install scripts for external dependencies (Nerd Fonts, uv, p10k, VS Code)
 - **`tests/docker/`** — Docker-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora/alpine
 - **`vendor/`** — Vendored third-party shell integrations (iterm2, bash, zsh completions); do not edit
@@ -95,7 +94,7 @@ Not checked in. Loaded automatically at shell startup:
 
 Scripts in `bin/` should be **portable** — written so someone could copy a single file out of this repo into their own setup and have it work. That means:
 
-- Default to standalone: no imports from `_pydotlib/`, `sh/`, or other repo-local modules.
+- Default to standalone: no imports from `_pydotlib/` or other repo-local modules.
 - Short commands and one-liners may be POSIX sh; reach for Python once logic is non-trivial. Python scripts use only the standard library (no `pip` deps).
 - Only reach for `_pydotlib/` when 2+ `bin/` scripts share genuinely non-trivial logic (e.g., weather data fetching, shared logging setup). One-off helpers belong inline in the script.
 - When in doubt, duplicate a few lines rather than introducing a shared dependency — readability and portability beat DRY here.

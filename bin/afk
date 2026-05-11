@@ -6,7 +6,13 @@
 # vim: set filetype=python
 
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
-. "$S_DOTFILE_ROOT"/sh/cli.sh
+
+error()             { printf '[ERROR]: %s\n' "$*" >&2; }
+exit_with_message() { code="$1"; shift; error "$@"; exit "${code:-1}"; }
+set_verbose()       { export VERBOSE="${1:-1}"; }
+is_verbose()        { [ "${VERBOSE:-0}" = "1" ]; }
+verbose()           { [ "${VERBOSE:-0}" = "1" ] && echo "$@"; return 0; }
+print_action()      { echo "$@"; }
 
 print_help() {
   echo "Cross platform tool to lock the current desktop session."
