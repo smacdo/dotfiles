@@ -351,16 +351,15 @@ claude() {
   fi
 
   # Strip -f/--force before forwarding
-  args=""
+  filtered=()
   for arg in "$@"; do
     case "$arg" in
       -f|--force) ;;
-      *) args="$args $arg" ;;
+      *) filtered+=("$arg") ;;
     esac
   done
 
-  # shellcheck disable=SC2086
-  command claude $args
+  command claude "${filtered[@]}"
 }
 
 #------------------------------------------------------------------------------#
