@@ -61,6 +61,8 @@ check_root() {
     success "Running as root (on behalf of $SUDO_USER)."
 }
 
+DISTRO_FAMILY=""
+
 check_platform() {
     # Check for Linux
     if [[ "$(uname -s)" != "Linux" ]]; then
@@ -68,7 +70,6 @@ check_platform() {
     fi
     success "Platform is Linux."
 
-    # Check for Debian
     if [[ ! -f /etc/os-release ]]; then
         bail "Cannot determine Linux distribution (/etc/os-release not found)."
     fi
@@ -78,28 +79,21 @@ check_platform() {
 
     case "${ID:-}" in
         debian|ubuntu|linuxmint|pop)
+            DISTRO_FAMILY="debian"
             success "Detected Debian-based distribution: ${PRETTY_NAME:-$ID}"
             ;;
-        # TODO: Add support for RPM-based distros (Fedora, RHEL, CentOS)
-        # fedora|rhel|centos)
-        #     install_vscode_rpm
-        #     ;;
-        # TODO: Add support for Arch Linux
-        # arch|manjaro)
-        #     install_vscode_arch
-        #     ;;
-        # TODO: Add support for openSUSE
-        # opensuse*|sles)
-        #     install_vscode_zypper
-        #     ;;
+        fedora|rhel|centos)
+            DISTRO_FAMILY="rpm"
+            success "Detected RPM-based distribution: ${PRETTY_NAME:-$ID}"
+            ;;
         *)
-            bail "Unsupported distribution: ${PRETTY_NAME:-$ID}. Only Debian-based distros are currently supported."
+            bail "Unsupported distribution: ${PRETTY_NAME:-$ID}. Supported: Debian/Ubuntu and Fedora/RHEL/CentOS."
             ;;
     esac
 }
 
 # ==============================================================================
-# VSCODE INSTALLATION (Microsoft apt repo)
+# VSCODE INSTALLATION
 # ==============================================================================
 
 install_vscode() {
@@ -108,6 +102,14 @@ install_vscode() {
         return
     fi
 
+    case "$DISTRO_FAMILY" in
+        debian) install_vscode_apt ;;
+        rpm)    install_vscode_dnf ;;
+        *)      bail "install_vscode: unsupported DISTRO_FAMILY=$DISTRO_FAMILY" ;;
+    esac
+}
+
+install_vscode_apt() {
     info "Installing VSCode dependencies..."
     apt-get install -y wget gpg apt-transport-https
 
@@ -138,6 +140,36 @@ install_vscode() {
 
     info "Installing code..."
     apt-get install -y code
+    success "VSCode installed successfully."
+}
+
+install_vscode_dnf() {
+    info "Importing Microsoft GPG key..."
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    success "GPG key imported."
+
+    local repo_file="/etc/yum.repos.d/vscode.repo"
+
+    if [[ ! -f "$repo_file" ]]; then
+        info "Adding Microsoft VSCode dnf repository..."
+        cat > "$repo_file" <<'EOF'
+[code]
+name=Visual Studio Code
+baseurl=https://packages.microsoft.com/yumrepos/vscode
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+EOF
+        success "Repository added."
+    else
+        success "VSCode repository already configured. Skipping."
+    fi
+
+    info "Refreshing dnf metadata..."
+    dnf check-update || true  # check-update returns 100 when updates are available
+
+    info "Installing code..."
+    dnf install -y code
     success "VSCode installed successfully."
 }
 
@@ -205,7 +237,7 @@ EOF
 
 main() {
     echo "=============================================="
-    echo " VSCode Installer for Debian-based systems"
+    echo " VSCode Installer (Debian / RPM-based Linux)"
     echo "=============================================="
     echo ""
 

@@ -24,6 +24,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - Suppress the "All checks passed!" output from mypy. 
 - Print out a summary of the files with failing lints at the end.
 - Lint `run_tests.py`
+- Expand lint scope to include `tools/` shell scripts (currently only `shell_profile/`, root configs, and `bin/` are linted).
 
 ## Testing
 - [x] Add script to automate dotfile updating, syncing
@@ -138,6 +139,11 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 # Misc
 - Github action to run linter
 - Github action to run tests
+
+# Tools (`tools/`)
+
+## VS Code installer
+- Add macOS support (`brew install --cask visual-studio-code`). Currently Linux-only (Debian/Ubuntu, Fedora/RHEL/CentOS). On WSL, VS Code is installed on the Windows side and accessed via Remote — no Linux install needed.
 
 # Bin Scripts
 - Script that line breaks excessively long command lines

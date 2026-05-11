@@ -18,11 +18,10 @@ If you are starting from scratch (you don't have your own dotfiles repository
 yet), then I recommend you do the following:
 
   1. Create a new dotfiles repository for yourself
-  2. Copy the `./bootstrap.sh` and `./setup.sh` scripts that automate new machine
-  setup.
-  3. Create new files for each of the matching configs (`.bashrc`, `.vimrc`, 
+  2. Copy the `./bootstrap.py` script that automates new machine setup.
+  3. Create new files for each of the matching configs (`.bashrc`, `.vimrc`,
   etc) that you want, and copy over any interesting configuration settings.
-  4. Modify `./bootstrap.sh` and `./setup.sh` to match your new setup.
+  4. Modify `./bootstrap.py` to match your new setup.
   5. Continue copying what you need from my (and other peoples!) dotfile
   repositories.
   5. Profit!!
@@ -40,9 +39,14 @@ curl https://raw.githubusercontent.com/smacdo/dotfiles/master/bin/generate-ssh-k
 ```
 
 ## Setup
-First you need to clone the dotfiles repository to your machine, and symbolically
-link standard shell config files (.vimrc, .bashrc, .zshrc etc) to files found in
-this repository.
+
+### Prerequisites
+
+- **macOS**: install [Homebrew](https://brew.sh/) first. These dotfiles assume `brew` is already on your `PATH` and do not install it for you.
+
+### Bootstrap
+
+Clone the dotfiles repository to your machine, then symbolically link standard shell config files (`.vimrc`, `.bashrc`, `.zshrc`, etc.) to files found in this repository.
 
 ```
 git clone git@github.com:smacdo/dotfiles.git ~/.dotfiles
@@ -53,21 +57,21 @@ Restart or reload your shell. This step varies depending on the shell you are
 using, for example on bash you should run `source ~/.bashrc` and on zsh you want
 to run `source ~/.zshrc`.
 
-The next shell script will install "core" programs (bash, zsh, neovim, fzf,
-ripgrep, etc). It will also detect your current desktop environment (MacOS or
-Gnome) and update the default settings to match what I like.
+`bootstrap.py` only handles symlinks, vim plugin manager, p10k, and a few other
+configs — it does not install system packages. Install the tools you want with
+your platform's package manager (Homebrew, apt, dnf). The optional helpers in
+`tools/` install a few extras:
 
 ```
-cd ~/.dotfiles
-./setup.sh -p core
+./tools/install_uv.sh             # uv (used by lint_all.py)
+./tools/install_rust.sh           # rustup
+./tools/install_nerd_fonts.sh     # JetBrainsMono Nerd Font
+./tools/install_powerlevel10k.sh  # zsh powerlevel10k theme
+sudo ./tools/install_vscode.sh    # VS Code (Debian/Ubuntu, Fedora/RHEL/CentOS)
 ```
 
-**Important note**: For MacOS machines where you want homebrew to install packages
-to your home directory (rather than system wide), you want to add the `-H` flag
-to setup: `./setup.sh -H -p core`.
-
-With that done you should be good to go! Don't forget to tell (neo)vim to install
-plugins the first time you start it up by running `:PlugInstall`.
+Don't forget to tell (neo)vim to install plugins the first time you start it up
+by running `:PlugInstall`.
 
 # Manual Configuration Notes
 These notes are here because I haven't fully automated all my machine

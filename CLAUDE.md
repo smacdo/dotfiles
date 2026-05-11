@@ -38,9 +38,6 @@ python3 lint_all.py         # requires: shellcheck, uv (for ruff + ty)
 
 # Run unit tests + Docker integration tests
 python3 run_tests.py
-
-# Fresh-machine package install (legacy; to be folded into bootstrap.py)
-./_setup.sh -p core         # -H flag for user-local Homebrew on macOS
 ```
 
 ## Workflow
@@ -89,6 +86,8 @@ Not checked in. Loaded automatically at shell startup:
 ### Platform Detection
 
 `shell_profile/functions.sh`:`detect_os()` sets `DOT_OS` (macos/linux/unknown), `DOT_DIST` (ubuntu/debian/redhat/fedora/darwin), and `DOT_ARCH`. Predicate helpers: `is_osx`, `is_linux`, `is_wsl`, etc.
+
+**Supported platforms.** This repo targets recent versions of macOS, Windows (via WSL), and the Linux distros Red Hat / Fedora / Debian / Ubuntu. Don't add branches for distros outside that list (Arch, openSUSE, Alpine for runtime use, etc.) — file a TODO instead. Also skip platforms where a feature doesn't make sense (e.g., installing VS Code under WSL — users install it on the Windows side and connect via Remote).
 
 ## Policies
 
