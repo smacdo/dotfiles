@@ -351,15 +351,18 @@ claude() {
   fi
 
   # Strip -f/--force before forwarding
-  filtered=()
-  for arg in "$@"; do
+  n=$#
+  while [ "$n" -gt 0 ]; do
+    arg="$1"
+    shift
+    n=$((n - 1))
     case "$arg" in
       -f|--force) ;;
-      *) filtered+=("$arg") ;;
+      *) set -- "$@" "$arg" ;;
     esac
   done
 
-  command claude "${filtered[@]}"
+  command claude "$@"
 }
 
 #------------------------------------------------------------------------------#
