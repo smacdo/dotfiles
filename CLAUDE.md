@@ -47,6 +47,7 @@ python3 run_tests.py
 
 - **Always run `python3 lint_all.py` after finishing a change and before every commit.** Do not commit if lint fails. (`lint_all.py` discovers files itself — no need to track which paths it covers.)
 - Run `python3 run_tests.py` after changes to `bootstrap.py` or `_pydotlib/`.
+- If your environment routes external HTTP through a forward proxy, set `HTTP_PROXY` and `HTTPS_PROXY` in a per-machine override (e.g., `~/.config/dotfiles/my_shell_profile.sh`) before running `lint_all.py` or `bootstrap.py`. `uv` and `pip` honor those env vars; without them, package fetches will fail with DNS errors.
 
 ## Architecture
 

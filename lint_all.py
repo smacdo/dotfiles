@@ -85,6 +85,21 @@ def ruff_lint_py_file(file_path: str, auto_fix=False) -> tuple[bool, str]:
 
 
 ################################################################################
+# Verify that `uvx` can run the named tool (either cached locally or fetchable
+# from pypi). Returns (ok, combined_output). Used as a preflight so we don't
+# burn minutes retrying network calls for every file.
+################################################################################
+def preflight_uvx_tool(tool: str) -> tuple[bool, str]:
+    result = subprocess.run(
+        ["uvx", tool, "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    return (result.returncode == 0, result.stdout)
+
+
+################################################################################
 # Lint a list of python files, and return a list of the files that failed a
 # linter check.
 #
@@ -240,20 +255,39 @@ def main() -> int:
     # TODO: Apply auto fixes if --fix is passed.
     logging.info("linting python scripts...")
 
-    failed_py_files = lint_py_files(DOTFILES_PY_SCRIPTS)
+    # Preflight: confirm uvx can launch ty and ruff (cached or fetchable from
+    # pypi). If not, skip Python linting and flag it as fatal — don't burn
+    # minutes retrying network calls for every file.
+    failed_py_files: list[str] = []
+    py_lint_skipped = False
 
-    if len(failed_py_files) > 0:
-        has_fatal_lints = True
-        logging.error(
-            f"{len(failed_py_files)} core python scripts failed required linter checks"
-        )
+    for tool in ("ty", "ruff"):
+        ok, output = preflight_uvx_tool(tool)
+        if not ok:
+            py_lint_skipped = True
+            has_fatal_lints = True
+            logging.error(
+                f"uvx cannot run `{tool}` (no cache and pypi unreachable). "
+                f"Skipping Python linting — this must be addressed. "
+                f"Last output: {output.strip().splitlines()[-1] if output.strip() else '(empty)'}"
+            )
+            break
 
-    failed_py_files += lint_py_files(find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS))
+    if not py_lint_skipped:
+        failed_py_files = lint_py_files(DOTFILES_PY_SCRIPTS)
 
-    if len(failed_py_files) > 0:
-        logging.warning(
-            f"{len(failed_py_files)} python bin scripts failed linter checks"
-        )
+        if len(failed_py_files) > 0:
+            has_fatal_lints = True
+            logging.error(
+                f"{len(failed_py_files)} core python scripts failed required linter checks"
+            )
+
+        failed_py_files += lint_py_files(find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS))
+
+        if len(failed_py_files) > 0:
+            logging.warning(
+                f"{len(failed_py_files)} python bin scripts failed linter checks"
+            )
 
     # TODO: Auto-format files if --format is passed. Apply formatting to any file for which there
     #       are no linting errors, even if other files failed.
