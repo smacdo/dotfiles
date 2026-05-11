@@ -33,28 +33,20 @@ This check applies to every write, not just commits — content can leak through
 # Install/bootstrap (symlinks configs, sets up vim plugins, configures git author)
 ./bootstrap.py              # --dry-run and --verbose supported
 
-# Install system packages (Homebrew on macOS, dnf on Redhat/Fedora)
-# DEPRECATED — should be moved into bootstrap.py
-./_setup.sh -p core         # -H flag for user-local Homebrew on macOS
-
 # Lint all shell and Python files
 python3 lint_all.py         # requires: shellcheck, uv (for ruff + ty)
 
 # Run unit tests + Docker integration tests
 python3 run_tests.py
+
+# Fresh-machine package install (legacy; to be folded into bootstrap.py)
+./_setup.sh -p core         # -H flag for user-local Homebrew on macOS
 ```
 
 ## Workflow
 
-- **Run `python3 lint_all.py` after any change** to a shell script, Python script, or config file (`shell_profile/`, `zsh_files/`, `bin/`, `.bashrc`, `.zshrc`, `.bash_profile`, `_setup.sh`, `bootstrap.py`, `lint_all.py`).
-- **Run `python3 lint_all.py` before every commit.** Do not commit if lint fails.
+- **Always run `python3 lint_all.py` after finishing a change and before every commit.** Do not commit if lint fails. (`lint_all.py` discovers files itself — no need to track which paths it covers.)
 - Run `python3 run_tests.py` after changes to `bootstrap.py` or `_pydotlib/`.
-
-### What lint_all.py checks
-
-- Shell scripts: `shellcheck` (SC1090, SC1091 suppressed globally)
-- Python files: `ty` (type checking) + `ruff` (linting), both via `uvx`
-- `.bashrc` and `.zshrc`: no content after the end-of-config sentinel line
 
 ## Architecture
 
@@ -72,9 +64,13 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 - **`zsh_files/`** — Zsh-only config (symlinked to `~/.zsh/`): keybindings, zsh functions
 - **`bin/`** — Custom scripts on `$PATH` via `shell_profile/paths.sh`
 - **`settings/`** — Editor/tool configs (nvim, VSCode, Ghostty, Wezterm, clang-format)
-- **`_pydotlib/`** — Python utility library used by `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `bin/`
+- **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). See *`bin/` script policy* below for when `bin/` scripts may use it.
 - **`.vim/`** — Vim configs (colorschemes, ftplugins, spell files, native packages)
 - **`sh/`** — Deprecated shell library (`cli.sh`, `git.sh`); new scripts should use Python
+- **`tools/`** — Post-bootstrap install scripts for external dependencies (Nerd Fonts, uv, p10k, VS Code)
+- **`tests/docker/`** — Docker-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora/alpine
+- **`vendor/`** — Vendored third-party shell integrations (iterm2, bash, zsh completions); do not edit
+- **`fonts/`** — Local font files installed by `tools/install_nerd_fonts.sh`
 
 ### Bootstrap System
 
@@ -85,31 +81,39 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 Not checked in. Loaded automatically at shell startup:
 - `~/.config/dotfiles/my_shell_profile.sh` or `~/.my_shell_profile.sh` — post-load, both shells
 - `~/.config/dotfiles/0_my_shell_profile.sh` or `~/.0_my_shell_profile.sh` — pre-load, both shells
-- `~/.my_bashrc.sh`, `~/.my_zshrc.sh` — shell-specific post-load
+- `~/.config/dotfiles/my_bashrc.sh` or `~/.my_bashrc.sh` — bash-specific post-load
+- `~/.config/dotfiles/my_zshrc.sh` or `~/.my_zshrc.sh` — zsh-specific post-load
 - `~/.my_gitconfig` — machine-specific git author name/email
 
 ### Platform Detection
 
 `shell_profile/functions.sh`:`detect_os()` sets `DOT_OS` (macos/linux/unknown), `DOT_DIST` (ubuntu/debian/redhat/fedora/darwin), and `DOT_ARCH`. Predicate helpers: `is_osx`, `is_linux`, `is_wsl`, etc.
 
+## Policies
+
+### `bin/` script policy
+
+Scripts in `bin/` should be **portable** — written so someone could copy a single file out of this repo into their own setup and have it work. That means:
+
+- Default to standalone: no imports from `_pydotlib/`, `sh/`, or other repo-local modules.
+- Short commands and one-liners may be POSIX sh; reach for Python once logic is non-trivial. Python scripts use only the standard library (no `pip` deps).
+- Only reach for `_pydotlib/` when 2+ `bin/` scripts share genuinely non-trivial logic (e.g., weather data fetching, shared logging setup). One-off helpers belong inline in the script.
+- When in doubt, duplicate a few lines rather than introducing a shared dependency — readability and portability beat DRY here.
+
+Naming and form:
+
+- **No file suffixes** (`.py`, `.sh`) — invoke as `weather`, not `weather.py`. Use a shebang to declare the interpreter.
+- **Kebab-case** filenames (`next-meeting`, not `next_meeting` or `nextMeeting`).
+- **Always `chmod +x`** — scripts must be directly executable from `$PATH`.
+
+### Top-level docs
+
+- `README.md` — public-facing setup/forking guide; don't duplicate setup steps from CLAUDE.md here.
+- `NOTES.md` — personal scratch notes; don't reorganize without asking.
+- `TODO.md` — personal backlog; confirm before checking off items unless the user explicitly tasked you with addressing a TODO.
+
 ## Conventions
 
-- New shell scripts must use the skeleton from `bin/mksh`:
-  ```sh
-  #!/bin/sh
-  #==============================================================================#
-  # Author: Scott MacDonald
-  # Purpose: <description>
-  # Usage: ./<script_name>
-  #==============================================================================#
-  # vim: set filetype=sh :
-  set -e
-  set -u
-
-  # shellcheck disable=SC3040
-  (set -o pipefail 2> /dev/null) && set -o pipefail
-  ```
-- Shell scripts use POSIX sh, not bash
-- Non-trivial scripts should be Python; Python scripts use only builtin modules
-- Do not source `sh/cli.sh` (deprecated) — define helpers inline
-- Vim/Neovim share `settings/nvim/init.vim`, symlinked to both `~/.vimrc` and `~/.config/nvim/init.vim`
+- New shell scripts: generate from `bin/mksh <name>` (POSIX sh skeleton with `set -eu` and pipefail).
+- `.bashrc` and `.zshrc` have an end-of-config sentinel line; never add content below it (lint enforces this).
+- Vim/Neovim share `settings/nvim/init.vim`, symlinked to both `~/.vimrc` and `~/.config/nvim/init.vim`.

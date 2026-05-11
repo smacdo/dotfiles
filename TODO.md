@@ -27,6 +27,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 
 ## Testing
 - [x] Add script to automate dotfile updating, syncing
+- [ ] Support podman instead of docker
 - ~~Finish post init scripts~~
 - Discover and run python unit tests in bin/ scripts
 - run_pydotlib_tests: Search for pydotlib modules without having to hardcode the names.
