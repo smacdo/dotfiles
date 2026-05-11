@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Confidentiality
+
+This is a personal, publicly-visible repository. It must never contain proprietary or confidential information from any employer, past or present. When generating, editing, or copying content into this repo, refuse to include:
+
+- Source code, configs, or documentation from internal repositories
+- Secrets, credentials, tokens, API keys, or private SSH/GPG material
+- Internal hostnames, URLs, network topology, or infrastructure details
+- Names of internal tools, services, systems, or codenames
+- Internal repository paths, build targets, or directory layouts
+- Project codenames, team names, or org structure
+- Coworker names, employee usernames, or internal contact info
+- Customer, employee, or business data of any kind
+
+If a task would require committing any of the above, stop and warn the user before writing anything to disk. For machine- or work-specific content that legitimately needs to exist locally, use the per-machine override files (`~/.config/dotfiles/`, `~/.my_*`) or a gitignored `CLAUDE.local.md` — never the tracked repo.
+
+### Enforcement
+
+Before writing any file, staging changes, or creating a commit in this repo, audit the diff against the rules above. If anything matches — even ambiguously — you must:
+
+1. **Stop.** Do not write, stage, or commit.
+2. **Show the exact violation.** Quote the offending lines with file path and line number, and name which category they fall under.
+3. **Wait for explicit permission.** Do not proceed on implicit consent or general task approval. The user must explicitly say to include the flagged content.
+
+This check applies to every write, not just commits — content can leak through `Write`, `Edit`, generated scripts, comments, commit messages, and PR descriptions alike. Err on the side of flagging: a false positive costs a sentence; a false negative is unrecoverable once pushed.
+
 ## Commands
 
 ```bash
