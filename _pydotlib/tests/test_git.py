@@ -95,6 +95,28 @@ ignored = hello world
         )
 
 
+    def test_appends_missing_key_to_existing_section(self):
+        config = "[user]\nname = Alice\n"
+        result = update_git_config(config, {"user:email": "alice@example.com"})
+
+        self.assertIn("name = Alice", result)
+        self.assertIn("[user]", result)
+        self.assertIn("email = alice@example.com", result)
+
+    def test_appends_missing_section_with_key(self):
+        result = update_git_config("", {"user:name": "Alice"})
+
+        self.assertIn("[user]", result)
+        self.assertIn("name = Alice", result)
+        self.assertLess(result.index("[user]"), result.index("name = Alice"))
+
+    def test_appends_top_level_key_when_missing(self):
+        result = update_git_config("", {"foo": "bar"})
+
+        self.assertIn("foo = bar", result)
+        self.assertNotIn("[", result)
+
+
 class TestGetRepoRoot(unittest.TestCase):
     @patch("subprocess.run")
     def test_returns_repo_root_path(self, mock_run):

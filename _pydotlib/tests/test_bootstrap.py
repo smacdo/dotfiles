@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from _pydotlib.bootstrap import (
     _detect_real_editor,
     configure_claude_code,
+    configure_vcs_author,
     configure_weather_location,
     create_backup_filename,
     git_clone,
@@ -31,6 +32,47 @@ class TestIsDotfilesRoot(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             self.assertFalse(is_dotfiles_root(tmp_path))
+
+
+class TestConfigureVcsAuthor(unittest.TestCase):
+    def test_adds_missing_email_when_arg_provided(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / ".my_gitconfig"
+            path.write_text("[user]\n\tname = Alice\n")
+
+            configure_vcs_author(path, email="alice@example.com")
+
+            content = path.read_text()
+            self.assertIn("name = Alice", content)
+            self.assertIn("email = alice@example.com", content)
+
+    def test_creates_file_with_provided_args(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / ".my_gitconfig"
+
+            configure_vcs_author(path, name="Bob", email="bob@example.com")
+
+            content = path.read_text()
+            self.assertIn("name = Bob", content)
+            self.assertIn("email = bob@example.com", content)
+
+    def test_dry_run_does_not_create_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / ".my_gitconfig"
+
+            configure_vcs_author(path, name="Bob", email="bob@example.com", dry_run=True)
+
+            self.assertFalse(path.exists())
+
+    def test_dry_run_does_not_modify_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / ".my_gitconfig"
+            original = "[user]\n\tname = Alice\n"
+            path.write_text(original)
+
+            configure_vcs_author(path, email="alice@example.com", dry_run=True)
+
+            self.assertEqual(path.read_text(), original)
 
 
 class TestCreateBackupFilename(unittest.TestCase):

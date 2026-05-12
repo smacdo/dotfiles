@@ -57,9 +57,10 @@ def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
     return matched_keys
 
 
-def update_git_config(config_text: str, keys: dict[str, str]) -> str:
+def update_git_config(config_text: str, keys: dict[str, str | None]) -> str:
     new_lines: list[str] = []
     section: str | None = None
+    matched: set[str] = set()
 
     for line in config_text.splitlines():
         replaced = False
@@ -72,15 +73,31 @@ def update_git_config(config_text: str, keys: dict[str, str]) -> str:
             raw_key = match[2].strip()
             git_key = f"{section}:{raw_key}" if section else raw_key
 
-            for key in keys:
-                if key == git_key:
-                    new_lines.append(
-                        f"{key_padding}{raw_key} = {keys[key] if keys[key] is not None else ''}"
-                    )
-                    replaced = True
+            if git_key in keys:
+                new_lines.append(
+                    f"{key_padding}{raw_key} = {keys[git_key] if keys[git_key] is not None else ''}"
+                )
+                matched.add(git_key)
+                replaced = True
 
         if not replaced:
             new_lines.append(line)
+
+    # Append requested-but-missing keys, grouped by section. Git tolerates
+    # duplicate section headers (it merges them), so we don't need to splice
+    # into existing sections.
+    unmatched: dict[str | None, list[tuple[str, str | None]]] = {}
+    for git_key, value in keys.items():
+        if git_key in matched:
+            continue
+        sec, sep, raw_key = git_key.rpartition(":")
+        unmatched.setdefault(sec if sep else None, []).append((raw_key, value))
+
+    for sec, kvs in unmatched.items():
+        if sec is not None:
+            new_lines.append(f"[{sec}]")
+        for raw_key, value in kvs:
+            new_lines.append(f"\t{raw_key} = {value if value is not None else ''}")
 
     return os.linesep.join(new_lines)
 

@@ -58,24 +58,22 @@ def configure_vcs_author(
         default: str | None,
         prompt: str,
     ) -> None:
-        if key in keys:
-            if default is None:
-                new_value = input_field(
-                    prompt,
-                    default_message=(
-                        git_keys[key]
-                        if git_keys[key] != placeholder
-                        else "leave blank to skip"
-                    ),
-                    default=(git_keys[key] if git_keys[key] != placeholder else None),
-                )
+        # CLI arg always wins.
+        if default is not None:
+            keys[key] = default
+            return
 
-                if new_value:
-                    git_keys[key] = new_value
-                else:
-                    del keys[key]
-            else:
-                git_keys[key] = default
+        # If the key is already set to a real value, leave it alone.
+        current = keys.get(key)
+        if current is not None and current != placeholder:
+            return
+
+        # Prompt the user; treat "missing" and "placeholder" the same way.
+        new_value = input_field(prompt, default_message="leave blank to skip")
+        if new_value:
+            keys[key] = new_value
+        elif key in keys:
+            del keys[key]
 
     git_keys = read_git_config_file(gitconfig_path, ["user:name", "user:email"])
 
