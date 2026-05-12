@@ -14,7 +14,6 @@ The format used below has the following data arranged in order:
 # TODO: Support weather extended caching if network not available.
 # TODO: Add cache busting (delete cache entry for location).
 # TODO: Extract caching to _pydotlib module
-# TODO: Share logging with _pydotlib module.
 
 import argparse
 import json
@@ -29,8 +28,6 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Generic, TypeVar
-
-# from _pydotlib.cli import ColoredLogFormatter # TODO: import pydotlib
 
 ENV_WEATHER_LOCATION = "WEATHER_LOCATION"
 
@@ -261,19 +258,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # Set up more verbose logging if the user requested it.
-    log_handler = logging.StreamHandler(sys.stdout)
-    # TODO: re-enable colored log format when pydotlib imported.
-    # log_handler.setFormatter(ColoredLogFormatter())
-
-    logging.getLogger().addHandler(log_handler)
-
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+        level = logging.DEBUG
     elif args.silent:
-        logging.getLogger().setLevel(logging.ERROR)
+        level = logging.ERROR
     else:
-        logging.getLogger().setLevel(logging.INFO)
+        level = logging.INFO
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     # Get the weather location from the arguments, or the environment variable "WEATHER_LOCATION" if
     # not provided.
