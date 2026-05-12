@@ -251,23 +251,12 @@ def run_shell_syntax_tests() -> bool:
 
 def run_pydotlib_tests() -> bool:
     loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-
-    test_modules = [
-        "_pydotlib.bootstrap",
-        "_pydotlib.cli",
-        "_pydotlib.colors",
-        "_pydotlib.git",
-        "_pydotlib.xdg",
-    ]
-
-    for module_name in test_modules:
-        try:
-            module = __import__(module_name, fromlist=[""])
-            suite.addTests(loader.loadTestsFromModule(module))
-            print(f"✓ Loaded tests from {module_name}")
-        except Exception as e:
-            print(f"✗ Failed to load {module_name}: {e}")
+    repo_root = Path(__file__).parent
+    suite = loader.discover(
+        start_dir=str(repo_root / "_pydotlib" / "tests"),
+        pattern="test_*.py",
+        top_level_dir=str(repo_root),
+    )
 
     print()
     print("=" * 70)
