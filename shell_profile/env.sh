@@ -46,3 +46,16 @@ if [ -x /opt/homebrew/bin/lesspipe.sh ]; then
 elif [ -x /usr/bin/lesspipe.sh ]; then
   export LESSOPEN="|/usr/bin/lesspipe.sh %s"
 fi
+
+# Weather location for `weather-status` (managed by bootstrap.py).
+# Inline XDG fallback because env.sh is loaded from .zshenv before xdg.sh.
+_dot_weather_file="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/weather_location"
+if [ -f "$_dot_weather_file" ]; then
+  _dot_weather_value="$(cat "$_dot_weather_file")"
+  if [ -n "$_dot_weather_value" ]; then
+    WEATHER_LOCATION="$_dot_weather_value"
+    export WEATHER_LOCATION
+  fi
+  unset _dot_weather_value
+fi
+unset _dot_weather_file

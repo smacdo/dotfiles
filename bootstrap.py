@@ -17,6 +17,7 @@ import logging
 from _pydotlib.bootstrap import (
     configure_claude_code,
     configure_vcs_author,
+    configure_weather_location,
     create_dirs,
     download_files,
     git_clone_repos,
@@ -31,6 +32,7 @@ from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 logger = logging.getLogger(__name__)
 
 MY_GITCONFIG_PATH = Path.joinpath(Path.home(), ".my_gitconfig")
+WEATHER_LOCATION_PATH = xdg_config_dir() / "dotfiles" / "weather_location"
 
 
 def apply_dotfile_symlinks(
@@ -63,6 +65,11 @@ def main() -> int:
     )
     args_parser.add_argument(
         "--git-email", type=str, help="Email to use when initializing .my_gitconfig"
+    )
+    args_parser.add_argument(
+        "--weather-location",
+        type=str,
+        help="Location to use for weather-status (e.g. 'Seattle')",
     )
 
     args = args_parser.parse_args()
@@ -155,6 +162,11 @@ def main() -> int:
         gitconfig_path=MY_GITCONFIG_PATH,
         name=args.git_name,
         email=args.git_email,
+        dry_run=args.dry_run,
+    )
+    configure_weather_location(
+        location_path=WEATHER_LOCATION_PATH,
+        location=args.weather_location,
         dry_run=args.dry_run,
     )
     configure_claude_code(

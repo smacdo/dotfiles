@@ -146,6 +146,51 @@ def configure_claude_code(
         settings_path.write_text(json.dumps(settings, indent=2) + "\n")
 
 
+def configure_weather_location(
+    location_path: Path | str,
+    location: str | None = None,
+    dry_run: bool = False,
+) -> None:
+    """Prompt for and persist the WEATHER_LOCATION value to `location_path`.
+
+    If `location` is provided, it's used directly without prompting (mirrors
+    `configure_vcs_author`'s `name`/`email` args).  Otherwise the user is
+    shown the current value (from the file if it exists, falling back to
+    $WEATHER_LOCATION) and prompted; an empty answer keeps the current value.
+    Writes the file only if the resulting value is non-empty and differs from
+    what's on disk.
+    """
+    location_path = Path(location_path)
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    on_disk: str | None = None
+    if location_path.exists():
+        on_disk = location_path.read_text().strip() or None
+
+    current = on_disk or os.environ.get("WEATHER_LOCATION") or None
+
+    if location is not None:
+        new_value: str | None = location.strip() or None
+    else:
+        new_value = input_field("Enter your weather location", default=current)
+
+    if not new_value:
+        logging.info(f"{dry_text}No weather location set, skipping")
+        return
+
+    if new_value == on_disk:
+        logging.info(f"{dry_text}Weather location already set to {new_value!r}")
+        return
+
+    if dry_run:
+        logging.info(f"{dry_text}Would write weather location {new_value!r} to {location_path}")
+        return
+
+    location_path.parent.mkdir(parents=True, exist_ok=True)
+    location_path.write_text(new_value + "\n")
+    logging.info(f"Wrote weather location {new_value!r} to {location_path}")
+
+
 def initialize_vim_plugin_manager(dry_run: bool) -> None:
     """
     Initializes the vim-plug plugin manager for vim and neovim, if they are installed on the system.
@@ -673,6 +718,96 @@ class TestConfigureClaudeCode(unittest.TestCase):
 
             mtime_after = settings_path.stat().st_mtime
             self.assertEqual(mtime_before, mtime_after)
+
+
+class TestConfigureWeatherLocation(unittest.TestCase):
+    def test_writes_file_when_location_arg_provided(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "dotfiles" / "weather_location"
+            configure_weather_location(path, location="Seattle", dry_run=False)
+            self.assertEqual(path.read_text(), "Seattle\n")
+
+    @patch("_pydotlib.bootstrap.input_field", return_value="Portland")
+    def test_writes_file_when_user_enters_value(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            configure_weather_location(path, dry_run=False)
+            self.assertEqual(path.read_text(), "Portland\n")
+
+    @patch("_pydotlib.bootstrap.input_field")
+    def test_preserves_existing_value_when_input_blank(self, mock_input):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            path.write_text("Redmond\n")
+            mtime_before = path.stat().st_mtime
+
+            # input_field returns the default when input is blank — simulate that
+            # by returning whatever default was passed.
+            mock_input.side_effect = lambda message, default=None: default
+
+            configure_weather_location(path, dry_run=False)
+
+            self.assertEqual(path.read_text(), "Redmond\n")
+            self.assertEqual(path.stat().st_mtime, mtime_before)
+
+    @patch("_pydotlib.bootstrap.input_field", return_value=None)
+    def test_skips_write_when_no_value_and_no_existing(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            configure_weather_location(path, dry_run=False)
+            self.assertFalse(path.exists())
+
+    def test_dry_run_does_not_write(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "dotfiles" / "weather_location"
+            configure_weather_location(path, location="Seattle", dry_run=True)
+            self.assertFalse(path.exists())
+
+    @patch("_pydotlib.bootstrap.input_field")
+    @patch.dict(os.environ, {"WEATHER_LOCATION": "FromEnv"}, clear=False)
+    def test_falls_back_to_env_var_when_no_file(self, mock_input):
+        captured = {}
+
+        def capture_default(message, default=None):
+            captured["default"] = default
+            return default
+
+        mock_input.side_effect = capture_default
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            configure_weather_location(path, dry_run=False)
+
+            self.assertEqual(captured["default"], "FromEnv")
+            self.assertEqual(path.read_text(), "FromEnv\n")
+
+    def test_no_rewrite_when_arg_matches_existing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            path.write_text("Seattle\n")
+            mtime_before = path.stat().st_mtime
+
+            configure_weather_location(path, location="Seattle", dry_run=False)
+
+            self.assertEqual(path.read_text(), "Seattle\n")
+            self.assertEqual(path.stat().st_mtime, mtime_before)
+
+    def test_empty_location_arg_skips_write(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            configure_weather_location(path, location="", dry_run=False)
+            self.assertFalse(path.exists())
+
+    def test_dry_run_does_not_modify_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "weather_location"
+            path.write_text("Redmond\n")
+            mtime_before = path.stat().st_mtime
+
+            configure_weather_location(path, location="Seattle", dry_run=True)
+
+            self.assertEqual(path.read_text(), "Redmond\n")
+            self.assertEqual(path.stat().st_mtime, mtime_before)
 
 
 class TestDetectRealEditor(unittest.TestCase):
