@@ -63,13 +63,17 @@ def configure_vcs_author(
             keys[key] = default
             return
 
-        # If the key is already set to a real value, leave it alone.
+        # Always prompt, showing the current value as the default (if any).
+        # Treat "missing" and "placeholder" the same way: no useful default.
         current = keys.get(key)
-        if current is not None and current != placeholder:
-            return
+        real_default = current if current and current != placeholder else None
 
-        # Prompt the user; treat "missing" and "placeholder" the same way.
-        new_value = input_field(prompt, default_message="leave blank to skip")
+        new_value = input_field(
+            prompt,
+            default_message=(real_default if real_default else "leave blank to skip"),
+            default=real_default,
+        )
+
         if new_value:
             keys[key] = new_value
         elif key in keys:
