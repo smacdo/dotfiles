@@ -373,10 +373,11 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
             logging.info(f"Downloaded {url} to {dest} with curl")
             return True
         except subprocess.CalledProcessError as curl_error:
-            logging.exception(f"Failed to download {url} with curl", exc_info=e)
+            stderr = curl_error.stderr.decode().strip() if curl_error.stderr else ""
+            logging.exception(f"Failed to download {url} with curl: {stderr}")
             return False
         except FileNotFoundError:
-            logging.exception(f"`curl` was not found. Please install it", exc_info=e)
+            logging.exception("`curl` was not found. Please install it")
             return False
 
     except Exception as e:
