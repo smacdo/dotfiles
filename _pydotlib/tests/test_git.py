@@ -98,9 +98,7 @@ ignored = hello world
 class TestGetRepoRoot(unittest.TestCase):
     @patch("subprocess.run")
     def test_returns_repo_root_path(self, mock_run):
-        mock_result = MagicMock()
-        mock_result.stdout = "/home/user/repo\n"
-        mock_run.return_value = mock_result
+        mock_run.return_value = MagicMock(returncode=0, stdout="/home/user/repo\n")
 
         result = get_repo_root(Path("/home/user/repo/subdir"))
 
@@ -109,13 +107,31 @@ class TestGetRepoRoot(unittest.TestCase):
 
     @patch("subprocess.run")
     def test_returns_none_for_non_git_directory(self, mock_run):
-        mock_run.side_effect = subprocess.CalledProcessError(
+        mock_run.return_value = MagicMock(
             returncode=128,
-            cmd=["git", "rev-parse", "--show-toplevel"],
-            stderr="fatal: not a git repository",
+            stderr="fatal: not a git repository (or any of the parent directories): .git\n",
         )
 
         result = get_repo_root(Path("/home/user/notrepo"))
+
+        self.assertIsNone(result)
+
+    @patch("subprocess.run", side_effect=FileNotFoundError("git"))
+    def test_raises_when_git_not_installed(self, mock_run):
+        with self.assertRaises(RuntimeError) as cm:
+            get_repo_root(Path("/home/user/anywhere"))
+        self.assertIn("git", str(cm.exception).lower())
+
+    @patch("subprocess.run")
+    def test_raises_for_other_git_failures(self, mock_run):
+        mock_run.return_value = MagicMock(
+            returncode=2,
+            stderr="fatal: bad revision 'HEAD'\n",
+        )
+
+        with self.assertRaises(RuntimeError) as cm:
+            get_repo_root(Path("/home/user/repo"))
+        self.assertIn("exit 2", str(cm.exception))
 
 
 class TestReadGitConfigFile(unittest.TestCase):

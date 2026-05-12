@@ -4,7 +4,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from subprocess import CalledProcessError
 
 
 def get_repo_root(path: Path) -> Path | None:
@@ -12,9 +11,11 @@ def get_repo_root(path: Path) -> Path | None:
     Get the root directory of a git checkout for the provided path.
 
     :param path: A path inside a git checkout.
-    :return: The root directory for the git checkout.
+    :return: The root directory for the git checkout, or None if `path` is not
+        inside one.
+    :raises RuntimeError: if `git` is not installed, or if `git rev-parse`
+        fails for a reason other than "not a git repository".
     """
-    # Use the git command to find the top level directory for the repo.
     try:
         git_result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
@@ -22,16 +23,18 @@ def get_repo_root(path: Path) -> Path | None:
             capture_output=True,
             text=True,
         )
-    except CalledProcessError as e:
-        if e.stderr.startswith("fatal: not a git repository"):
+    except FileNotFoundError as e:
+        raise RuntimeError("`git` is not installed or not on PATH") from e
+
+    if git_result.returncode != 0:
+        if "not a git repository" in git_result.stderr:
             return None
+        raise RuntimeError(
+            f"git rev-parse failed (exit {git_result.returncode}): "
+            f"{git_result.stderr.strip()}"
+        )
 
-        raise
-
-    # Read the directory from stdout, and verify that it's a valid directory before returning.
-    root_dir = Path(git_result.stdout.strip()).resolve()
-
-    return root_dir
+    return Path(git_result.stdout.strip()).resolve()
 
 
 def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
