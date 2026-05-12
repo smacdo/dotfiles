@@ -69,18 +69,26 @@ def input_field(
         return input_result
 
 
-def confirm(message: str, default: bool | None = None) -> bool | None:
+def confirm(message: str, default: bool | None = None) -> bool:
     """Prompt user for yes/no confirmation.
 
     Args:
-        message: Question to ask user
-        default: Default answer if user enters nothing (None for required input)
+        message: Question to ask the user.
+        default: Answer to return if the user enters nothing.  None means the
+            user must give a yes/no response — empty input re-prompts.
 
     Returns:
-        True for yes, False for no, default value for empty input
+        True for yes, False for no.
+
+    Raises:
+        RuntimeError: if called in a non-interactive session with no default.
     """
 
-    if not sys.stdin.isatty() and default is not None:
+    if not sys.stdin.isatty():
+        if default is None:
+            raise RuntimeError(
+                "confirm() called without a default in a non-interactive session"
+            )
         return default
 
     while True:
@@ -91,9 +99,15 @@ def confirm(message: str, default: bool | None = None) -> bool | None:
         )
         reply = input().strip().lower()
 
-        if reply is None or len(reply) == 0:
-            return default
-        elif "yes".startswith(reply):
+        if not reply:
+            if default is not None:
+                return default
+            print("Please answer yes or no.", file=sys.stderr)
+            continue
+
+        if "yes".startswith(reply):
             return True
-        elif "no".startswith(reply):
+        if "no".startswith(reply):
             return False
+
+        print("Please answer yes or no.", file=sys.stderr)

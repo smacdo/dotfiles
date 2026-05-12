@@ -32,13 +32,22 @@ class InputFieldTests(unittest.TestCase):
 
 
 class ConfirmTests(unittest.TestCase):
+    def setUp(self):
+        # Most tests assume an interactive terminal; the explicit "non-tty"
+        # tests patch isatty back to False locally.
+        patcher = mock.patch("sys.stdin")
+        self.mock_stdin = patcher.start()
+        self.mock_stdin.isatty.return_value = True
+        self.addCleanup(patcher.stop)
+
     @patch("builtins.input", return_value="")
     def test_prints_message_with_yes_no(self, mocked_input):
+        # default=True so empty input resolves on the first prompt instead of looping.
         with redirect_stderr(StringIO()) as stderr_buffer:
-            confirm(message="do something?", default=None)
+            confirm(message="do something?", default=True)
             captured_stderr = stderr_buffer.getvalue()
 
-            self.assertEqual("do something? [y/n] ", captured_stderr)
+            self.assertEqual("do something? [Y/n] ", captured_stderr)
 
     @patch("builtins.input")
     def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
@@ -125,16 +134,32 @@ class ConfirmTests(unittest.TestCase):
     @patch("builtins.input", return_value="")
     def test_returns_default_if_no_input(self, mocked_input):
         with redirect_stderr(StringIO()):
-            self.assertIsNone(confirm(message="do something?", default=None))
             self.assertTrue(confirm(message="do something?", default=True))
             self.assertFalse(confirm(message="do something?", default=False))
 
     @patch("builtins.input", return_value="     ")
     def test_returns_default_if_blank_input(self, mocked_input):
         with redirect_stderr(StringIO()):
-            self.assertIsNone(confirm(message="do something?", default=None))
             self.assertTrue(confirm(message="do something?", default=True))
             self.assertFalse(confirm(message="do something?", default=False))
+
+    @patch("builtins.input", side_effect=["", "y"])
+    def test_reprompts_on_empty_input_when_no_default(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer:
+            self.assertTrue(confirm(message="do something?", default=None))
+            self.assertIn("Please answer yes or no.", stderr_buffer.getvalue())
+
+    @patch("builtins.input", side_effect=["maybe", "n"])
+    def test_reprompts_on_invalid_input(self, mocked_input):
+        with redirect_stderr(StringIO()) as stderr_buffer:
+            self.assertFalse(confirm(message="do something?", default=None))
+            self.assertIn("Please answer yes or no.", stderr_buffer.getvalue())
+
+    def test_raises_when_non_tty_and_no_default(self):
+        with mock.patch("sys.stdin") as stdin:
+            stdin.isatty.return_value = False
+            with self.assertRaises(RuntimeError):
+                confirm(message="do something?", default=None)
 
     @patch("builtins.input", return_value="")
     def test_returns_default_value_when_input_empty(self, mock_input):
