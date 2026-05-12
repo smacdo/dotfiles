@@ -58,18 +58,18 @@ ignored = hello world
             },
         )
 
-        self.assertEqual(
-            updated_config,
-            """
-# my_key = incorrect_value
-foo = bar
-foobar = barfoo
-blank =    
-[hello]
-my_key = updated_value
-ignored = hello world
-    indented_key = hello!""",
-        )
+        expected = "\n".join([
+            "",
+            "# my_key = incorrect_value",
+            "foo = bar",
+            "foobar = barfoo",
+            "blank =    ",
+            "[hello]",
+            "my_key = updated_value",
+            "ignored = hello world",
+            "    indented_key = hello!",
+        ]) + "\n"
+        self.assertEqual(updated_config, expected)
 
     def test_update_drops_none_values(self):
         updated_config = update_git_config(
@@ -81,18 +81,18 @@ ignored = hello world
             },
         )
 
-        self.assertEqual(
-            updated_config,
-            """
-# my_key = incorrect_value
-foo = bar
-foobar = 
-blank =    
-[hello]
-my_key = 
-ignored = hello world
-    indented_key = hello!""",
-        )
+        expected = "\n".join([
+            "",
+            "# my_key = incorrect_value",
+            "foo = bar",
+            "foobar = ",
+            "blank =    ",
+            "[hello]",
+            "my_key = ",
+            "ignored = hello world",
+            "    indented_key = hello!",
+        ]) + "\n"
+        self.assertEqual(updated_config, expected)
 
 
     def test_appends_missing_key_to_existing_section(self):
@@ -115,6 +115,18 @@ ignored = hello world
 
         self.assertIn("foo = bar", result)
         self.assertNotIn("[", result)
+
+    def test_output_always_ends_with_newline(self):
+        # Input with no trailing newline, output should still end with one.
+        self.assertTrue(update_git_config("[user]\n\tname = X", {}).endswith("\n"))
+        # Input with trailing newline, output also ends with exactly one.
+        result = update_git_config("[user]\n\tname = X\n", {})
+        self.assertTrue(result.endswith("\n"))
+        self.assertFalse(result.endswith("\n\n"))
+
+    def test_output_uses_lf_only(self):
+        result = update_git_config("[user]\n\tname = X\n", {"user:email": "x@y"})
+        self.assertNotIn("\r", result)
 
 
 class TestGetRepoRoot(unittest.TestCase):

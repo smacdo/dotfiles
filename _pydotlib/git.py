@@ -99,7 +99,8 @@ def update_git_config(config_text: str, keys: dict[str, str | None]) -> str:
         for raw_key, value in kvs:
             new_lines.append(f"\t{raw_key} = {value if value is not None else ''}")
 
-    return os.linesep.join(new_lines)
+    # Git config files are LF-only and POSIX text files end with a newline.
+    return "\n".join(new_lines) + "\n"
 
 
 def read_git_config_file(path: Path, keys: list[str]) -> dict[str, str]:
@@ -107,19 +108,23 @@ def read_git_config_file(path: Path, keys: list[str]) -> dict[str, str]:
         return read_git_config(f.read(), keys)
 
 
-def update_git_config_file(path: Path, keys: dict[str, str]) -> None:
+def update_git_config_file(path: Path, keys: dict[str, str | None]) -> None:
     # Generate an updated configuration and write it to a temporary file.
     with open(path, encoding="utf-8") as f:
         updated_config = update_git_config(f.read(), keys)
 
-    temp_dir = os.path.dirname(path)
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=temp_dir) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", delete=False, dir=os.path.dirname(path), encoding="utf-8"
+    ) as temp_file:
         temp_filepath = temp_file.name
         temp_file.write(updated_config)
 
-    # Replace the old config file with the new one.
     try:
         os.replace(temp_filepath, path)
-    except Exception as e:
-        os.remove(temp_filepath)
-        raise e
+    except BaseException:
+        # Best-effort cleanup; suppress so the original exception isn't masked.
+        try:
+            os.remove(temp_filepath)
+        except OSError:
+            pass
+        raise
