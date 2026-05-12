@@ -380,10 +380,6 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
             logging.exception("`curl` was not found. Please install it")
             return False
 
-    except Exception as e:
-        logging.exception(f"Unexpected error downloading {url}", exc_info=e)
-        return False
-
 
 @functools.cache
 def _has_internet() -> bool:
