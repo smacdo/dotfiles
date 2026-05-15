@@ -27,12 +27,11 @@ def should_use_colors() -> bool:
 
 @dataclass(frozen=True)
 class ColorCodes:
-    """
-    ANSI color codes.
+    """ANSI control codes for terminal formatting.
 
-    All attributes in this class are ANSI control codes that change terminal formatting when printed
-    as output. The attributes are only set when `should_use_colors()` is True, otherwise all the
-    attributes are initialized to empty strings.
+    Instances are constructed via `_get_colors()`, which fills every field
+    with either the real escape sequence (when colors are enabled) or an
+    empty string (when they're not).
     """
 
     RESET: str

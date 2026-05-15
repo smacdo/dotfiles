@@ -107,9 +107,11 @@ def configure_claude_code(
 
     settings_dir = settings_path.parent
     if not settings_dir.exists():
-        if not dry_run:
+        if dry_run:
+            logging.info(f"{dry_text}Would create dir {settings_dir}")
+        else:
             settings_dir.mkdir(parents=True, exist_ok=True)
-        logging.info(f"{dry_text}Created dir {settings_dir}")
+            logging.info(f"Created dir {settings_dir}")
 
     settings: dict[str, Any] = {}
     if settings_path.exists():

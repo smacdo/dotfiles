@@ -31,7 +31,7 @@ class ColoredLogFormatter(logging.Formatter):
                 f"{color}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Colors.RESET}"
             )
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         return self.format_strs[record.levelno].format(record)
 
 

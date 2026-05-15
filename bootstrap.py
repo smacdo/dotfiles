@@ -29,7 +29,7 @@ from _pydotlib.cli import ColoredLogFormatter
 from _pydotlib.git import get_repo_root
 from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
-MY_GITCONFIG_PATH = Path.joinpath(Path.home(), ".my_gitconfig")
+MY_GITCONFIG_PATH = Path.home() / ".my_gitconfig"
 WEATHER_LOCATION_PATH = xdg_config_dir() / "dotfiles" / "weather_location"
 
 
