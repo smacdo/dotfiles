@@ -3,7 +3,7 @@
 - [x] Replace occurrences of .dotfiles with a environment variable
 - [x] Add option to cancel (skip) the backup/delete interactive prompt.
 - Add a `choose()` helper in `_pydotlib/cli.py` for multi-option prompts (e.g. backup / skip / overwrite-without-backup). Then revisit `safe_symlink`'s prompt UX. Want to iterate on copy and option set.
-- Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo for safe_symlink.
+- [x] Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo for safe_symlink.
 - download_file: Download to temporary location, and compare to dest. Prompt user if there is mismatch.
 - Initialize ~/.config/dotfiles/... (the path to the my shell env file)
   - Interactive prompt for weather location

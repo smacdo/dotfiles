@@ -231,7 +231,20 @@ def create_backup_filename(target: Path) -> Path:
     return backup_path
 
 
-def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
+def _under(child: Path, parent: Path) -> bool:
+    """True if `child` (resolved) lives inside `parent` (resolved)."""
+    try:
+        return child.resolve().is_relative_to(parent.resolve())
+    except (OSError, ValueError):
+        return False
+
+
+def safe_symlink(
+    source: Path,
+    target: Path,
+    dry_run: bool,
+    dotfiles_root: Path | None = None,
+) -> None:
     """
     Create a symlink at `target` pointing to `source`, taking precautions against
     overwriting the user's existing files.
@@ -240,6 +253,8 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
       - already symlinked to `source` → no-op
       - missing → create the symlink (and its parent dir if needed)
       - broken symlink → unlink and replace
+      - symlink to another file inside `dotfiles_root` (when provided) → silently
+        re-point to `source` (handles repo-internal moves without prompting)
       - regular file or directory → prompt to back up to `.ORIGINAL`; if the
         user declines, skip this file entirely (we never overwrite without a
         backup)
@@ -248,6 +263,8 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
         source: A dotfiles file to symlink to.
         target: Path in the user's home directory that will be symlinked to `source`.
         dry_run: Print the action but don't actually do it.
+        dotfiles_root: If provided, enables the auto-update behavior for stale
+            dotfiles-managed symlinks. Pass the repo root.
 
     Raises:
         FileNotFoundError: if `source` doesn't exist.
@@ -270,8 +287,23 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
         logging.info(f"{dry_text}{target} is already symlinked to {source}")
         return
 
+    # Auto-update a symlink that points elsewhere inside the dotfiles repo
+    # (e.g., the file moved within the repo since the user last bootstrapped).
+    # Both the existing target and the new source must be inside dotfiles_root —
+    # the paranoia guard ensures we only do this for managed-by-us links.
+    if (
+        dotfiles_root is not None
+        and target.is_symlink()
+        and _under(target, dotfiles_root)
+        and _under(source, dotfiles_root)
+    ):
+        if not dry_run:
+            target.unlink()
+        logging.info(f"{dry_text}Updating stale dotfiles symlink at {target}")
+        # Fall through to symlink creation.
+
     # Remove broken symlinks so we can replace them.
-    if target.is_symlink() and not target.exists():
+    elif target.is_symlink() and not target.exists():
         if not dry_run:
             target.unlink()
         logging.info(f"{dry_text}Removed broken symlink {target}")

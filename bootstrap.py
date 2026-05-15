@@ -38,7 +38,10 @@ def apply_dotfile_symlinks(
 ) -> None:
     for source, target in files:
         safe_symlink(
-            source=dotfiles_dir.joinpath(source), target=target, dry_run=dry_run
+            source=dotfiles_dir.joinpath(source),
+            target=target,
+            dry_run=dry_run,
+            dotfiles_root=dotfiles_dir,
         )
 
 

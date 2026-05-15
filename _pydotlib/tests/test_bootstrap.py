@@ -214,6 +214,67 @@ class TestSafeSymlink(unittest.TestCase):
             self.assertTrue(backup.is_dir())
             self.assertEqual((backup / "old_file").read_text(), "from_target")
 
+    @patch("_pydotlib.bootstrap.confirm")
+    def test_auto_updates_stale_dotfiles_symlink(self, mock_confirm):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            dotfiles = tmp / "dotfiles"
+            dotfiles.mkdir()
+            old_source = dotfiles / "old_path"
+            old_source.touch()
+            new_source = dotfiles / "new_path"
+            new_source.touch()
+            target = tmp / "target"
+            target.symlink_to(old_source)
+
+            safe_symlink(new_source, target, dry_run=False, dotfiles_root=dotfiles)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), new_source.resolve())
+            self.assertFalse((tmp / "target.ORIGINAL").exists())
+            mock_confirm.assert_not_called()
+
+    @patch("_pydotlib.bootstrap.confirm", return_value=True)
+    def test_does_not_auto_update_when_symlink_points_outside_dotfiles(self, mock_confirm):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            dotfiles = tmp / "dotfiles"
+            dotfiles.mkdir()
+            source = dotfiles / "source"
+            source.touch()
+
+            external = tmp / "external"
+            external.touch()
+            target = tmp / "target"
+            target.symlink_to(external)
+
+            safe_symlink(source, target, dry_run=False, dotfiles_root=dotfiles)
+
+            # Falls through to backup-prompt path (confirm called, .ORIGINAL created).
+            mock_confirm.assert_called_once()
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), source.resolve())
+            self.assertTrue((tmp / "target.ORIGINAL").is_symlink())
+
+    @patch("_pydotlib.bootstrap.confirm", return_value=True)
+    def test_does_not_auto_update_when_dotfiles_root_not_provided(self, mock_confirm):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            dotfiles = tmp / "dotfiles"
+            dotfiles.mkdir()
+            old_source = dotfiles / "old_path"
+            old_source.touch()
+            new_source = dotfiles / "new_path"
+            new_source.touch()
+            target = tmp / "target"
+            target.symlink_to(old_source)
+
+            # No dotfiles_root passed — falls back to backup prompt.
+            safe_symlink(new_source, target, dry_run=False)
+
+            mock_confirm.assert_called_once()
+            self.assertTrue((tmp / "target.ORIGINAL").exists())
+
 
 class TestGitClone(unittest.TestCase):
     @patch("subprocess.run")
