@@ -34,6 +34,14 @@ def configure_vcs_author(
     email: str | None = None,
     dry_run: bool = False,
 ) -> None:
+    """Ensure `gitconfig_path` has user.name and user.email set.
+
+    If the file doesn't exist, it's created with `TODO_SET_*` placeholder
+    values that subsequent prompts will overwrite.  For each of name and
+    email, if the corresponding `name`/`email` argument is provided, it's
+    written directly; otherwise the user is prompted (current value shown
+    as the default — Enter to keep, type to change).
+    """
     gitconfig_path = Path(gitconfig_path)
     dry_text = "[DRY RUN] " if dry_run else ""
 
@@ -103,6 +111,13 @@ def _detect_real_editor() -> str:
 def configure_claude_code(
     settings_path: Path, dry_run: bool
 ) -> None:
+    """Ensure Claude Code's `settings.json` is wired up to the dotfiles helpers.
+
+    Sets `env.EDITOR` to `claude-editor` and `env.REAL_EDITOR` to whatever
+    `_detect_real_editor()` resolves to, and adds a `statusLine` pointing at
+    the `claude_status` script.  Existing keys (including a custom
+    `statusLine`) are preserved.  Malformed JSON files are left untouched.
+    """
     dry_text = "[DRY RUN] " if dry_run else ""
 
     settings_dir = settings_path.parent
@@ -335,6 +350,11 @@ def safe_symlink(
 
 
 def create_dirs(dry_run: bool, dirs: list[str | Path]) -> None:
+    """Create each directory in `dirs` if it doesn't already exist.
+
+    No-op if the path already exists as a directory; logs an error if it
+    exists as a file.  Parent directories are created as needed.
+    """
     dry_text = "[DRY RUN] " if dry_run else ""
 
     for d in dirs:
@@ -359,10 +379,10 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
     Args:
         url: URL to download from.
         dest: Destination path for the downloaded file.
-        dry_run:
+        dry_run: Print the action but don't actually download anything.
 
     Returns:
-        True if download succeeded, False otherwise.
+        True if download succeeded (or was skipped under dry-run), False otherwise.
     """
     if dry_run:
         logging.info(f"[DRY RUN] Would download {url} to {dest}")
@@ -414,6 +434,12 @@ def download_files(
     dry_run: bool,
     skip_if_dest_exists: bool = True,
 ) -> None:
+    """Download a batch of (url, dest) pairs via `download_file`.
+
+    Short-circuits the whole batch when `_has_internet()` is False (logs a
+    warning and returns).  Targets that already exist on disk are skipped
+    when `skip_if_dest_exists` is True (the default).
+    """
     dry_text = "[DRY RUN] " if dry_run else ""
 
     if not dry_run and not _has_internet():
@@ -468,6 +494,12 @@ def git_clone_repos(
     skip_if_dest_exists: bool = True,
     depth: int | None = None,
 ) -> None:
+    """Clone a batch of (url, dest) repos via `git_clone`.
+
+    Short-circuits the whole batch when `_has_internet()` is False (logs a
+    warning and returns).  Destinations that already exist are skipped when
+    `skip_if_dest_exists` is True (the default).
+    """
     dry_text = "[DRY RUN] " if dry_run else ""
 
     if not dry_run and not _has_internet():

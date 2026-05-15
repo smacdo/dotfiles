@@ -38,6 +38,12 @@ def get_repo_root(path: Path) -> Path | None:
 
 
 def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
+    """Extract specific keys from a gitconfig-format string.
+
+    `keys` are written as `section:name` for sectioned values (e.g.
+    `user:email`) or just `name` for top-level values.  Returns a dict
+    mapping each *found* key to its value; missing keys are simply omitted.
+    """
     matched_keys: dict[str, str] = {}
     section: str | None = None
 
@@ -58,6 +64,17 @@ def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
 
 
 def update_git_config(config_text: str, keys: dict[str, str | None]) -> str:
+    """Apply key→value updates to a gitconfig-format string and return the result.
+
+    Keys present in the input are replaced in place, preserving their original
+    indentation.  Keys *not* present are appended at the end, grouped by
+    section — git tolerates duplicate section headers (merges them) so we
+    don't splice into existing sections.  A `None` value writes an empty
+    value (i.e. `key = `), which git treats as "unset for boolean keys" /
+    empty string elsewhere.
+
+    Output is LF-only and ends with exactly one newline.
+    """
     new_lines: list[str] = []
     section: str | None = None
     matched: set[str] = set()
@@ -104,11 +121,18 @@ def update_git_config(config_text: str, keys: dict[str, str | None]) -> str:
 
 
 def read_git_config_file(path: Path, keys: list[str]) -> dict[str, str]:
+    """File-backed wrapper around `read_git_config`."""
     with open(path, encoding="utf-8") as f:
         return read_git_config(f.read(), keys)
 
 
 def update_git_config_file(path: Path, keys: dict[str, str | None]) -> None:
+    """Apply `update_git_config` to the file at `path`, atomically.
+
+    Writes the result to a temporary file in the same directory, then
+    `os.replace`s it over the original.  On failure the temporary file is
+    best-effort cleaned up without masking the original exception.
+    """
     # Generate an updated configuration and write it to a temporary file.
     with open(path, encoding="utf-8") as f:
         updated_config = update_git_config(f.read(), keys)

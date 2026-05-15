@@ -7,6 +7,13 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def should_use_colors() -> bool:
+    """Decide whether the current terminal should receive ANSI color codes.
+
+    Honors the standard environment knobs in priority order: NO_COLOR and
+    CLICOLOR=0 force off; CLICOLOR=1, CLICOLOR_FORCE, and FORCE_COLOR force
+    on; otherwise, color is enabled only if stdout is a tty AND `tput colors`
+    reports >= 8.  Result is cached for the lifetime of the process.
+    """
     if os.getenv("NO_COLOR") or os.getenv("CLICOLOR") == "0":
         return False
     elif (
