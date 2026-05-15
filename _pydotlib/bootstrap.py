@@ -233,29 +233,37 @@ def create_backup_filename(target: Path) -> Path:
 
 def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
     """
-    Create a shared config file that is symlinked to its source dotfile config. Any changes to the
-    target config file will be reflected in the dotfiles checkout.
+    Create a symlink at `target` pointing to `source`, taking precautions against
+    overwriting the user's existing files.
 
-    This function tries to take precautions when creating the symlink. Targets that are already
-    symlinked to `source` are skipped. If the target already exists, it will be renamed to
-    `.ORIGINAL`
+    Behavior by target state:
+      - already symlinked to `source` → no-op
+      - missing → create the symlink (and its parent dir if needed)
+      - broken symlink → unlink and replace
+      - regular file or directory → prompt to back up to `.ORIGINAL`; if the
+        user declines, skip this file entirely (we never overwrite without a
+        backup)
 
     Args:
         source: A dotfiles file to symlink to.
         target: Path in the user's home directory that will be symlinked to `source`.
         dry_run: Print the action but don't actually do it.
+
+    Raises:
+        FileNotFoundError: if `source` doesn't exist.
     """
     if not source.exists():
-        raise ValueError(f"{source} does not exist")
+        raise FileNotFoundError(f"{source} does not exist")
 
     dry_text = "[DRY RUN] " if dry_run else ""
 
     # Create the directory leading up to the target if it doesn't exist.
-    if not target.exists():
-        if not dry_run:
+    if not target.parent.exists():
+        if dry_run:
+            logging.info(f"{dry_text}Would create dir {target.parent}")
+        else:
             target.parent.mkdir(parents=True, exist_ok=True)
-
-        logging.info(f"{dry_text}Created dir {target.parent}")
+            logging.info(f"Created dir {target.parent}")
 
     # Skip if the target is already symlinked to source.
     if target.is_symlink() and target.resolve() == source.resolve():
@@ -270,23 +278,22 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
 
     # Does the target file name already exist on the disk?
     if target.exists():
-        # Ask user if they would like to "back up" the file by renaming before replacing it with a
-        # symlink.
+        # Ask the user if we should back the file up (renaming to .ORIGINAL)
+        # before replacing it with a symlink.  Declining skips this file
+        # entirely — we never overwrite without a backup.
         backup_path = create_backup_filename(target)
 
-        if confirm(
+        if not confirm(
             message=f"{Colors.BOLD}Rename {target} to {backup_path.name} before replacing with symlink?{Colors.RESET}",
             default=True,
         ):
-            if not dry_run:
-                target.rename(backup_path)
+            logging.info(f"{dry_text}Skipping {target} (declined backup)")
+            return
 
-            logging.info(f"{dry_text}Renamed {target} to {backup_path}")
-        else:
-            if not dry_run:
-                target.unlink()
+        if not dry_run:
+            target.rename(backup_path)
 
-            logging.warning(f"{dry_text}Deleted {target}")
+        logging.info(f"{dry_text}Renamed {target} to {backup_path}")
 
     # Create the symlink.
     if not dry_run:

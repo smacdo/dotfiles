@@ -116,6 +116,104 @@ class TestSafeSymlink(unittest.TestCase):
             self.assertTrue(target.is_symlink())
             self.assertEqual(target.resolve(), source.resolve())
 
+    def test_creates_new_symlink(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source"
+            source.touch()
+            target = tmp / "target"
+
+            safe_symlink(source, target, dry_run=False)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), source.resolve())
+
+    def test_noop_when_target_already_symlinked_to_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source"
+            source.touch()
+            target = tmp / "target"
+            target.symlink_to(source)
+            mtime_before = target.lstat().st_mtime
+
+            safe_symlink(source, target, dry_run=False)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.lstat().st_mtime, mtime_before)
+
+    @patch("_pydotlib.bootstrap.confirm", return_value=True)
+    def test_backs_up_existing_file_when_confirmed(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source"
+            source.write_text("new")
+            target = tmp / "target"
+            target.write_text("old")
+
+            safe_symlink(source, target, dry_run=False)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), source.resolve())
+            backup = tmp / "target.ORIGINAL"
+            self.assertTrue(backup.exists())
+            self.assertEqual(backup.read_text(), "old")
+
+    @patch("_pydotlib.bootstrap.confirm", return_value=False)
+    def test_skips_when_backup_declined(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source"
+            source.write_text("new")
+            target = tmp / "target"
+            target.write_text("old")
+
+            safe_symlink(source, target, dry_run=False)
+
+            # Target untouched, no symlink, no backup.
+            self.assertFalse(target.is_symlink())
+            self.assertEqual(target.read_text(), "old")
+            self.assertFalse((tmp / "target.ORIGINAL").exists())
+
+    def test_raises_when_source_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            with self.assertRaises(FileNotFoundError):
+                safe_symlink(tmp / "nope", tmp / "target", dry_run=False)
+
+    def test_dry_run_does_not_modify_filesystem(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source"
+            source.touch()
+            target = tmp / "subdir" / "target"
+
+            safe_symlink(source, target, dry_run=True)
+
+            # Neither the target nor its parent dir should have been created.
+            self.assertFalse(target.exists())
+            self.assertFalse(target.parent.exists())
+
+    @patch("_pydotlib.bootstrap.confirm", return_value=True)
+    def test_backs_up_existing_directory(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source = tmp / "source_dir"
+            source.mkdir()
+            (source / "marker").write_text("from_source")
+
+            target = tmp / "target_dir"
+            target.mkdir()
+            (target / "old_file").write_text("from_target")
+
+            safe_symlink(source, target, dry_run=False)
+
+            self.assertTrue(target.is_symlink())
+            self.assertEqual(target.resolve(), source.resolve())
+            backup = tmp / "target_dir.ORIGINAL"
+            self.assertTrue(backup.is_dir())
+            self.assertEqual((backup / "old_file").read_text(), "from_target")
+
 
 class TestGitClone(unittest.TestCase):
     @patch("subprocess.run")
