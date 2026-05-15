@@ -14,8 +14,6 @@ from pathlib import Path
 
 from _pydotlib.cli import ColoredLogFormatter
 
-logger = logging.getLogger(__name__)
-
 DOCKER_FLAVORS = ["debian", "ubuntu", "fedora", "alpine"]
 
 

@@ -293,30 +293,6 @@ def safe_symlink(source: Path, target: Path, dry_run: bool) -> None:
     logging.info(f"{dry_text}Symlinked {target} to {source}")
 
 
-def make_local_config(source: Path, target: Path) -> bool:
-    """
-    Create a local config file copy from the dotfiles repo rather than a symlink. This allows the
-    user to modify the file without having the changes reflected in the dotfiles checkout.
-
-    Args:
-        source: Path to the source dotfiles file.
-        target: Path to the target file.
-    """
-    if target.exists():
-        logging.info(f"{target} already exists")
-        return False
-
-    if not source.exists():
-        raise ValueError(f"{source} does not exist")
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
-
-    logging.info(f"Cloned config {source} to {target}")
-
-    return True
-
-
 def create_dirs(dry_run: bool, dirs: list[str | Path]) -> None:
     dry_text = "[DRY RUN] " if dry_run else ""
 
