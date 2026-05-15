@@ -5,6 +5,7 @@
 - Add a `choose()` helper in `_pydotlib/cli.py` for multi-option prompts (e.g. backup / skip / overwrite-without-backup). Then revisit `safe_symlink`'s prompt UX. Want to iterate on copy and option set.
 - [x] Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo for safe_symlink.
 - download_file: Download to temporary location, and compare to dest. Prompt user if there is mismatch.
+- `initialize_vim_plugin_manager`: appears to be misbehaving — investigate. Also add test coverage; either unit tests (mock `subprocess.check_call` and the `shutil.which` lookups) or a docker integration test that runs bootstrap end-to-end and verifies plugins were installed (e.g. check `~/.vim/plugged/` contents).
 - Initialize ~/.config/dotfiles/... (the path to the my shell env file)
   - Interactive prompt for weather location
   - other vars that need to be set? can't remember...
@@ -33,6 +34,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - ~~Finish post init scripts~~
 - Discover and run python unit tests in bin/ scripts
 - run_pydotlib_tests: Search for pydotlib modules without having to hardcode the names.
+- ColoredLogFormatter: figure out how to test the actual ANSI escape codes are emitted (or not). Today's test only checks that level/message round-trip — color output is coupled to the import-time `Colors` singleton, which depends on the `should_use_colors()` cache.
 - Print docker output when a docker test run fails
 - Refactor docker script code into pydotlib module.
 - Docker test: Run bootstrap.py to validate functionality for debian, fedora and ubuntu

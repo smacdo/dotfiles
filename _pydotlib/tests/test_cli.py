@@ -1,10 +1,11 @@
+import logging
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 from unittest import mock
 from unittest.mock import patch
 
-from _pydotlib.cli import confirm, input_field
+from _pydotlib.cli import ColoredLogFormatter, confirm, input_field
 
 
 class InputFieldTests(unittest.TestCase):
@@ -170,3 +171,43 @@ class ConfirmTests(unittest.TestCase):
     def test_returns_none_when_input_empty_and_no_default(self, mock_input):
         result = input_field("Enter value")
         self.assertIsNone(result)
+
+
+class ColoredLogFormatterTests(unittest.TestCase):
+    def _make_record(self, level: int, msg: str = "hello") -> logging.LogRecord:
+        return logging.LogRecord(
+            name="test",
+            level=level,
+            pathname=__file__,
+            lineno=0,
+            msg=msg,
+            args=None,
+            exc_info=None,
+        )
+
+    def test_formats_includes_message_and_level(self):
+        formatter = ColoredLogFormatter()
+        for level_name in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            level = logging.getLevelName(level_name)
+            output = formatter.format(self._make_record(level, "msg-text"))
+            self.assertIn("msg-text", output)
+            self.assertIn(level_name, output)
+
+    def test_formats_each_known_level_without_error(self):
+        formatter = ColoredLogFormatter()
+        for level in (
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.CRITICAL,
+        ):
+            formatter.format(self._make_record(level))
+
+    def test_unknown_level_raises_keyerror(self):
+        # Locks in current behavior: levels not in LOG_LEVEL_COLORS crash with
+        # KeyError. If we ever want to be more forgiving, change this test
+        # along with the production code.
+        formatter = ColoredLogFormatter()
+        with self.assertRaises(KeyError):
+            formatter.format(self._make_record(logging.NOTSET))

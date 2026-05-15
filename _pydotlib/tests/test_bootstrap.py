@@ -1,8 +1,10 @@
 import json
 import os
+import ssl
 import subprocess
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +14,9 @@ from _pydotlib.bootstrap import (
     configure_vcs_author,
     configure_weather_location,
     create_backup_filename,
+    create_dirs,
+    download_file,
+    download_files,
     git_clone,
     git_clone_repos,
     is_dotfiles_root,
@@ -97,6 +102,36 @@ class TestCreateBackupFilename(unittest.TestCase):
 
             filename = backup.name
             self.assertRegex(filename, r"\.bashrc_\d+\.ORIGINAL")
+
+
+class TestCreateDirs(unittest.TestCase):
+    def test_creates_missing_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "nested" / "dir"
+            create_dirs(dry_run=False, dirs=[target])
+            self.assertTrue(target.is_dir())
+
+    def test_noop_when_directory_already_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir)
+            mtime_before = target.stat().st_mtime
+            create_dirs(dry_run=False, dirs=[target])
+            self.assertEqual(target.stat().st_mtime, mtime_before)
+
+    def test_logs_error_when_path_is_a_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "afile"
+            target.touch()
+            with self.assertLogs(level="ERROR") as logs:
+                create_dirs(dry_run=False, dirs=[target])
+            self.assertTrue(any("expected" in m for m in logs.output))
+            self.assertTrue(target.is_file())
+
+    def test_dry_run_does_not_create(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "nested" / "dir"
+            create_dirs(dry_run=True, dirs=[target])
+            self.assertFalse(target.exists())
 
 
 class TestSafeSymlink(unittest.TestCase):
@@ -274,6 +309,100 @@ class TestSafeSymlink(unittest.TestCase):
 
             mock_confirm.assert_called_once()
             self.assertTrue((tmp / "target.ORIGINAL").exists())
+
+
+class TestDownloadFile(unittest.TestCase):
+    def test_dry_run_returns_true_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "out" / "file"
+            self.assertTrue(download_file("https://example.com/x", dest, dry_run=True))
+            self.assertFalse(dest.exists())
+            self.assertFalse(dest.parent.exists())
+
+    @patch("urllib.request.urlopen")
+    def test_urllib_happy_path(self, mock_urlopen):
+        mock_urlopen.return_value.__enter__.return_value.read.return_value = b"payload"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "nested" / "out"
+            self.assertTrue(download_file("https://example.com/x", dest, dry_run=False))
+            self.assertEqual(dest.read_bytes(), b"payload")
+
+    @patch("subprocess.run")
+    @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
+    def test_falls_back_to_curl_on_urllib_error(self, _, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "out"
+            self.assertTrue(download_file("https://example.com/x", dest, dry_run=False))
+            mock_run.assert_called_once()
+            args = mock_run.call_args[0][0]
+            self.assertEqual(args[0], "curl")
+            self.assertIn("https://example.com/x", args)
+            self.assertIn(str(dest), args)
+
+    @patch("subprocess.run")
+    @patch("urllib.request.urlopen", side_effect=ssl.SSLError("bad cert"))
+    def test_falls_back_to_curl_on_ssl_error(self, _, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "out"
+            self.assertTrue(download_file("https://example.com/x", dest, dry_run=False))
+            mock_run.assert_called_once()
+
+    @patch("subprocess.run")
+    @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
+    def test_returns_false_when_curl_fails(self, _, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            22, ["curl"], stderr=b"server returned 404"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "out"
+            self.assertFalse(download_file("https://example.com/x", dest, dry_run=False))
+
+    @patch("subprocess.run", side_effect=FileNotFoundError("curl"))
+    @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
+    def test_returns_false_when_curl_missing(self, _urlopen, _run):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = Path(tmpdir) / "out"
+            self.assertFalse(download_file("https://example.com/x", dest, dry_run=False))
+
+
+class TestDownloadFiles(unittest.TestCase):
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("_pydotlib.bootstrap.download_file")
+    def test_skips_when_target_exists(self, mock_download, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "out"
+            target.touch()
+            download_files([("https://x", target)], dry_run=False)
+            mock_download.assert_not_called()
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("_pydotlib.bootstrap.download_file")
+    def test_downloads_when_target_missing(self, mock_download, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "out"
+            download_files([("https://x", target)], dry_run=False)
+            mock_download.assert_called_once_with(url="https://x", dest=target, dry_run=False)
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("_pydotlib.bootstrap.download_file")
+    def test_redownloads_when_skip_disabled(self, mock_download, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "out"
+            target.touch()
+            download_files(
+                [("https://x", target)], dry_run=False, skip_if_dest_exists=False
+            )
+            mock_download.assert_called_once()
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=False)
+    @patch("_pydotlib.bootstrap.download_file")
+    def test_skips_all_when_offline(self, mock_download, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            download_files([("https://x", Path(tmpdir) / "out")], dry_run=False)
+            mock_download.assert_not_called()
 
 
 class TestGitClone(unittest.TestCase):
@@ -467,6 +596,16 @@ class TestConfigureClaudeCode(unittest.TestCase):
 
             mtime_after = settings_path.stat().st_mtime
             self.assertEqual(mtime_before, mtime_after)
+
+    @patch("shutil.which", return_value=None)
+    @patch.dict(os.environ, {"EDITOR": "nano"})
+    def test_writes_real_editor_from_env_when_no_vim(self, _):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / ".claude" / "settings.json"
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["env"]["REAL_EDITOR"], "nano")
 
 
 class TestConfigureWeatherLocation(unittest.TestCase):
