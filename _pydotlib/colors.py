@@ -19,7 +19,7 @@ def should_use_colors() -> bool:
         try:
             colors_supported = subprocess.check_output(["tput", "colors"]).decode()
             return int(colors_supported) >= 8
-        except ValueError:
+        except (ValueError, FileNotFoundError, subprocess.CalledProcessError):
             return False
     else:
         return False

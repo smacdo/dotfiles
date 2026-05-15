@@ -71,6 +71,23 @@ class TestShouldUseColors(unittest.TestCase):
         # NO_COLOR should override CLICOLOR
         self.assertFalse(should_use_colors())
 
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.stdout.isatty", return_value=True)
+    @patch("subprocess.check_output", side_effect=FileNotFoundError("tput"))
+    def test_returns_false_when_tput_not_installed(
+        self, mock_subprocess, mock_isatty
+    ):
+        self.assertFalse(should_use_colors())
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("sys.stdout.isatty", return_value=True)
+    @patch(
+        "subprocess.check_output",
+        side_effect=subprocess.CalledProcessError(1, ["tput", "colors"]),
+    )
+    def test_returns_false_when_tput_fails(self, mock_subprocess, mock_isatty):
+        self.assertFalse(should_use_colors())
+
 
 class TestColorsClass(unittest.TestCase):
     def setUp(self):
