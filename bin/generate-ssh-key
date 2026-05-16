@@ -42,7 +42,16 @@ if ! grep -qF "IdentityFile ~/.ssh/$keyname" "$configPath"; then
 fi
 
 echo "Adding $keyname to ssh-agent"
-ssh-add -K "$privateFilePath"
+case "$(uname -s)" in
+  Darwin)
+    # macOS 13+ uses --apple-use-keychain; older releases used -K.
+    ssh-add --apple-use-keychain "$privateFilePath" 2>/dev/null \
+      || ssh-add -K "$privateFilePath"
+    ;;
+  *)
+    ssh-add "$privateFilePath"
+    ;;
+esac
 
 # Show the public key and put it in the clipboard.
 # For MacOS, you can use copy contents of the public key to the clipboard with
