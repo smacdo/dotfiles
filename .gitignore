@@ -6,6 +6,7 @@
 private
 .zsh_local
 *.pyc
+__pycache__/
 *.DS_Store
 .vim/.netrwhist
 .repos
