@@ -1,0 +1,17 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald <root@smacdo.com>
+# Purpose: Execute commands in a Windows PowerShell environment from WSL.
+#==============================================================================#
+# vim: set filetype=sh :
+
+if command -v pwsh.exe >/dev/null 2>&1; then
+  pwsh_shell=pwsh.exe
+elif command -v powershell.exe >/dev/null 2>&1; then
+  pwsh_shell=powershell.exe
+else
+  printf 'wsl-pwsh ERROR: could not locate pwsh.exe or powershell.exe on PATH\n' >&2
+  exit 2
+fi
+
+"${pwsh_shell}" -NoProfile -NoLogo -NonInteractive -command "$*"
