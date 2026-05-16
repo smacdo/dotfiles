@@ -14,6 +14,16 @@ class InputFieldTests(unittest.TestCase):
         result = input_field("Enter value")
         self.assertEqual(result, "user input")
 
+    @patch("builtins.input", return_value="x")
+    def test_prompt_goes_to_stderr(self, mocked_input):
+        with (
+            redirect_stderr(StringIO()) as stderr_buffer,
+            mock.patch("sys.stdin") as stdin,
+        ):
+            stdin.isatty.return_value = True
+            input_field("Enter value", default="d")
+            self.assertIn("Enter value", stderr_buffer.getvalue())
+
     @patch("builtins.input")
     def test_returns_default_without_prompting_if_not_atty(self, mocked_input):
         with (

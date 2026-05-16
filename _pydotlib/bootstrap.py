@@ -149,14 +149,14 @@ def configure_claude_code(
         logging.info(f"{dry_text}Setting Claude Code EDITOR={desired_editor}, REAL_EDITOR={desired_real_editor}")
         changed = True
     else:
-        logging.info(f"{dry_text}Claude Code editor already configured")
+        logging.debug(f"{dry_text}Claude Code editor already configured")
 
     if "statusLine" not in settings:
         settings["statusLine"] = {"type": "command", "command": "claude_status"}
         logging.info(f"{dry_text}Setting Claude Code statusLine to claude_status")
         changed = True
     else:
-        logging.info(f"{dry_text}Claude Code statusLine already configured")
+        logging.debug(f"{dry_text}Claude Code statusLine already configured")
 
     if changed and not dry_run:
         settings_path.write_text(json.dumps(settings, indent=2) + "\n")
@@ -478,8 +478,10 @@ def git_clone(url: str, dest: Path, dry_run: bool, depth: int | None = None) -> 
     logging.info(f"{dry_text}Cloning {url} to {dest}")
 
     if not dry_run:
+        # Let any OSError from mkdir propagate — a broken parent directory
+        # means the user's environment needs attention, not a silent skip.
+        dest.parent.mkdir(parents=True, exist_ok=True)
         try:
-            dest.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(cmd, check=True, capture_output=True)
         except subprocess.CalledProcessError as e:
             logging.error(f"Failed to clone {url}: {e.stderr.decode().strip()}")

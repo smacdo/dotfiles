@@ -61,7 +61,8 @@ def input_field(
     else:
         default_message = f"({default_message})"
 
-    input_result = input(f"{message} {default_message}: ")
+    print(f"{message} {default_message}: ", end="", file=sys.stderr)
+    input_result = input()
 
     if len(input_result.strip()) == 0:
         return default

@@ -247,7 +247,7 @@ def run_shell_syntax_tests() -> bool:
     return all_passed
 
 
-def run_pydotlib_tests() -> bool:
+def run_pydotlib_tests(verbose: bool = False) -> bool:
     loader = unittest.TestLoader()
     repo_root = Path(__file__).parent
     suite = loader.discover(
@@ -262,8 +262,7 @@ def run_pydotlib_tests() -> bool:
     print("=" * 70)
     print()
 
-    # Run tests with verbose output
-    runner = unittest.TextTestRunner(verbosity=2)
+    runner = unittest.TextTestRunner(verbosity=2 if verbose else 1)
     result = runner.run(suite)
 
     print()
@@ -290,12 +289,13 @@ def main() -> int:
         action="store_true",
         help="Enable verbose output (DEBUG level logging)",
     )
-    args_parser.add_argument(
+    docker = args_parser.add_mutually_exclusive_group()
+    docker.add_argument(
         "--no-docker",
         action="store_true",
         help="Skip Docker integration tests",
     )
-    args_parser.add_argument(
+    docker.add_argument(
         "--docker-only",
         action="store_true",
         help="Run only Docker integration tests",
@@ -317,7 +317,7 @@ def main() -> int:
             return 1
 
         # Run unit tests.
-        if not run_pydotlib_tests():
+        if not run_pydotlib_tests(verbose=args.verbose):
             logging.fatal("pydotlib unit tests failed - aborting")
             return 1
 

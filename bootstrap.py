@@ -34,7 +34,7 @@ WEATHER_LOCATION_PATH = xdg_config_dir() / "dotfiles" / "weather_location"
 
 
 def apply_dotfile_symlinks(
-    dotfiles_dir: Path, dry_run: bool, files: list[tuple[str | Path, Path]]
+    dotfiles_dir: Path, dry_run: bool, files: list[tuple[str, Path]]
 ) -> None:
     for source, target in files:
         safe_symlink(
