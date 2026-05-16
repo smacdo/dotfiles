@@ -6,9 +6,8 @@
 # TODO: Support custom paths, etc
 # TODO: Support grep if rg not found
 # TODO: Support multiple selections.
-# TODO: Dotfile path to rgcat.sh
 TODOFMT="TODO(\(.*\))?:"
-PICK=$(rg "$TODOFMT" --no-heading --line-number | fzf --preview 'rgcat.sh {}')
+PICK=$(rg "$TODOFMT" --no-heading --line-number | fzf --preview 'rgcat {}')
 file=$(echo "$PICK" | cut -d':' -f1)
 line=$(echo "$PICK" | cut -d':' -f2)
 
