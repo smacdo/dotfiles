@@ -9,15 +9,12 @@ help() {
   echo "Check if a local (dotfiles) repository is in sync with its remote origin"
   echo "and if not print how many commits behind and ahead it is."
   echo
-  echo "Usage: $0 [-h] [-r path/to/repository]"
+  echo "Usage: $0 [-h] [-s] [-r path/to/repository]"
   echo " -h        Show this help message"
   echo " -s        Silence - do not print a message if repo is in sync"
   echo " -r path   Optional path to git repository"
 }
 
-################################################################################
-# Script entry.
-################################################################################
 print_repo_status() {
   r_dir="$1"
   r_name="$2"
@@ -34,31 +31,23 @@ print_repo_status() {
   fi
 
   # Force repository to fetch the latest branch information from remote.
-  git -C "$r_dir" fetch 
+  git -C "$r_dir" fetch
   num_behind=$(git -C "$r_dir" rev-list HEAD..origin/master --count)
   num_ahead=$(git -C "$r_dir" rev-list origin/master..HEAD --count)
 
   # Custom message depending on the number behind/ahead.
   if [ "$num_behind" -gt 0 ]; then
     if [ "$num_ahead" -gt 0 ]; then
-      # Repo is both behind AND ahead.
-      printf \
-        "local $r_name is %d commits behind and %d commits ahead of remote\n" \
-        "$num_behind" \
-        "$num_ahead"
-    else 
-      # Repo is only behind.
-      printf \
-        "local $r_name is %d commits behind remote\n" \
-        "$num_behind"
+      printf 'local %s is %d commits behind and %d commits ahead of remote\n' \
+        "$r_name" "$num_behind" "$num_ahead"
+    else
+      printf 'local %s is %d commits behind remote\n' \
+        "$r_name" "$num_behind"
     fi
   elif [ "$num_ahead" -gt 0 ]; then
-    # Repo is only ahead.
-      printf \
-        "local $r_name is %d commits ahead of remote\n" \
-        "$num_ahead"
+    printf 'local %s is %d commits ahead of remote\n' \
+      "$r_name" "$num_ahead"
   else
-    # Repo is in sync.
     if [ "$SILENCE" != 1 ]; then
       echo "local $r_name in sync"
     fi
@@ -69,7 +58,7 @@ print_repo_status() {
 # Script entry.
 ################################################################################
 start() {
-  dotfiles_dir="${S_DOTFILE_ROOT}"
+  dotfiles_dir="${S_DOTFILE_ROOT:-$HOME/.dotfiles}"
 
   while getopts "hsVr:" opt; do
     case "${opt}" in
@@ -84,10 +73,10 @@ start() {
         SILENCE=1
         ;;
       *)
-        error "unknown option"
+        printf 'error: unknown option\n' >&2
         echo
         help
-        exit
+        exit 2
         ;;
     esac
   done
