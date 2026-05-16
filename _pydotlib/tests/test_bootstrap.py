@@ -505,7 +505,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             settings = json.loads(settings_path.read_text())
             self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
             self.assertIn(settings["env"]["REAL_EDITOR"], ("nvim", "vim", "vi"))
-            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude_status"})
+            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude-status"})
 
     def test_preserves_existing_keys(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -535,7 +535,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             real_editor = _detect_real_editor()
             existing = {
                 "env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor},
-                "statusLine": {"type": "command", "command": "claude_status"},
+                "statusLine": {"type": "command", "command": "claude-status"},
             }
             settings_path.write_text(json.dumps(existing))
             mtime_before = settings_path.stat().st_mtime
@@ -555,7 +555,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             configure_claude_code(settings_path, dry_run=False)
 
             settings = json.loads(settings_path.read_text())
-            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude_status"})
+            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude-status"})
 
     def test_does_not_overwrite_existing_statusline(self):
         with tempfile.TemporaryDirectory() as tmpdir:

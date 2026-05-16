@@ -115,7 +115,7 @@ def configure_claude_code(
 
     Sets `env.EDITOR` to `claude-editor` and `env.REAL_EDITOR` to whatever
     `_detect_real_editor()` resolves to, and adds a `statusLine` pointing at
-    the `claude_status` script.  Existing keys (including a custom
+    the `claude-status` script.  Existing keys (including a custom
     `statusLine`) are preserved.  Malformed JSON files are left untouched.
     """
     dry_text = "[DRY RUN] " if dry_run else ""
@@ -152,8 +152,8 @@ def configure_claude_code(
         logging.debug(f"{dry_text}Claude Code editor already configured")
 
     if "statusLine" not in settings:
-        settings["statusLine"] = {"type": "command", "command": "claude_status"}
-        logging.info(f"{dry_text}Setting Claude Code statusLine to claude_status")
+        settings["statusLine"] = {"type": "command", "command": "claude-status"}
+        logging.info(f"{dry_text}Setting Claude Code statusLine to claude-status")
         changed = True
     else:
         logging.debug(f"{dry_text}Claude Code statusLine already configured")
