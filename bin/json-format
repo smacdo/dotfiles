@@ -1,13 +1,5 @@
 #!/bin/sh
 # Pretty prints JSON text to the command line.
-. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
-
-error()             { printf '[ERROR]: %s\n' "$*" >&2; }
-exit_with_message() { code="$1"; shift; error "$@"; exit "${code:-1}"; }
-set_verbose()       { export VERBOSE="${1:-1}"; }
-is_verbose()        { [ "${VERBOSE:-0}" = "1" ]; }
-verbose()           { [ "${VERBOSE:-0}" = "1" ] && echo "$@"; return 0; }
-print_action()      { echo "$@"; }
 
 print_help() {
   echo "Pretty print JSON text from stdin or a file to the terminal."
@@ -17,29 +9,22 @@ print_help() {
 main() {
   while getopts 'hf:' opt; do
     case "$opt" in
-      h) print_help
-         exit
-         ;;
-      f) input_file="$OPTARG"
-         ;;
-      ?) print_help
-         exit 2
-         ;;
+      h) print_help; exit ;;
+      f) input_file="$OPTARG" ;;
+      ?) print_help; exit 2 ;;
     esac
   done
 
-  # Remove processed arguments.
-  shift "$((OPTIND -1))"
+  shift "$((OPTIND - 1))"
 
-  # Open JSON file or use standard input?
   if [ -n "$input_file" ]; then
     if [ ! -f "$input_file" ]; then
-      exit_with_message 3 "Input file does not exist: $input_file"
+      printf '[ERROR]: Input file does not exist: %s\n' "$input_file" >&2
+      exit 3
     fi
-
-    python3 -mjson.tool < "$input_file"
+    python3 -m json.tool < "$input_file"
   else
-    python3 -mjson.tool "$@"
+    python3 -m json.tool "$@"
   fi
 }
 
