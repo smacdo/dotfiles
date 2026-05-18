@@ -1,35 +1,38 @@
 #!/usr/bin/env python3
 import argparse
 import re
+import shutil
 import subprocess
 
-from typing import List
 
-def ip_list_from_ifconfig() -> List[str]:
-    inet_matcher = re.compile("^\\s*inet ((?:[0-9]{1,3}\\.){3}[0-9]{1,3})")
-    output = subprocess.check_output(["/sbin/ifconfig", "-a"]).decode("utf-8")
-    ip_addrs = []
+def list_local_ips() -> list[str]:
+    inet_matcher = re.compile(r"^\s*inet ((?:[0-9]{1,3}\.){3}[0-9]{1,3})")
 
-    # Extract any entries from `ifconfig` that look like "inet XXX.XXX.XXX.XXX"
-    for line in output.split("\n"):
-        match = inet_matcher.search(line)
-        if match:
-            ip_addrs.append(str(match.group(1)))
+    if shutil.which("ifconfig"):
+        output = subprocess.check_output(["ifconfig", "-a"], text=True)
+    elif shutil.which("ip"):
+        output = subprocess.check_output(["ip", "-4", "addr", "show"], text=True)
+    else:
+        raise RuntimeError("neither 'ifconfig' nor 'ip' found on PATH")
 
-    # Filter out "!27.0.0.1" before returning unless its the only IP address found.
+    ip_addrs = [m.group(1) for line in output.splitlines() if (m := inet_matcher.search(line))]
+
+    # Hide loopback unless it's the only address.
     if len(ip_addrs) > 1:
-        ip_addrs = list(filter(lambda ip: ip != "127.0.0.1", ip_addrs))
+        ip_addrs = [ip for ip in ip_addrs if ip != "127.0.0.1"]
 
     return ip_addrs
-            
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="myip",
-        description="Print this machine's IP address or a list of candidates")
+    parser = argparse.ArgumentParser(
+        prog="myip",
+        description="Print this machine's IP address or a list of candidates",
+    )
     parser.parse_args()
 
-    for ip in ip_list_from_ifconfig():
+    for ip in list_local_ips():
         print(ip)
 
-main()
-    
 
+main()
