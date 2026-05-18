@@ -24,7 +24,7 @@ main() {
   while getopts 'hV' opt; do
     case "$opt" in
       h) print_help
-         exit 1
+         exit
          ;;
       V) set_verbose 1
          ;;
