@@ -3,8 +3,6 @@
 # Author: Scott MacDonald
 # Purpose: Cross platform script to copy text to the system clipboard.
 #==============================================================================#
-# vim: set filetype=python
-
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 
 error()             { printf '[ERROR]: %s\n' "$*" >&2; }
