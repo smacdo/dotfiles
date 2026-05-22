@@ -141,6 +141,31 @@ Rules for `tests/docker/`:
   Dockerfiles' shape (install `git python3`, create `testuser`,
   `USER testuser`, `WORKDIR /home/testuser`).
 
+### Migration / backwards-compat policy
+
+**Bootstrap adds and overwrites-with-backup (`.ORIGINAL` suffix); never deletes or moves user data.** Cleanup is opt-in via `bin/dotfiles-cleanup`.
+
+When moving where bootstrap puts a generated artifact (e.g. `~/.vim/plugged/` → `$XDG_DATA_HOME/vim/plugged/`):
+
+1. Add the new code path; stop referencing the old one. Don't touch old data on disk.
+2. If bootstrap can detect an old artifact at the prior path, log one line naming the new location and noting the old is safe to remove.
+3. Add a `CHANGELOG.md` entry (format below).
+4. Add a stanza to `bin/dotfiles-cleanup` for the orphaned path (create the script if it doesn't exist).
+5. Add a container test under `tests/docker/upgrade_from_v<N>/` that pre-creates the old layout and asserts bootstrap completes cleanly. Same suite covers idempotency: run bootstrap twice from clean → second run is no-op-or-quiet.
+
+Any change a user with an existing install would notice → `CHANGELOG.md` entry.
+
+### `CHANGELOG.md`
+
+Reverse-chronological, one entry per noticeable change. Format:
+
+```
+## YYYY-MM-DD
+- **Moved** old/path → new/path. Old location orphaned; `bin/dotfiles-cleanup` removes it.
+- **Added** new/path. No action needed.
+- **Removed** support for X. Safe to `rm path/to/x` locally.
+```
+
 ### Top-level docs
 
 - `README.md` — public-facing setup/forking guide; don't duplicate setup steps from CLAUDE.md here.

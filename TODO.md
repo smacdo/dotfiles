@@ -15,6 +15,9 @@
   - check if expected env vars are set
   - etc
   - Check for MacOS Python SSL misconfiguration
+- After landing the vim → XDG migration, teach bootstrap to detect known-stale paths (e.g. `~/.dotfiles/.vim/autoload/plug.vim`, `~/.dotfiles/.vim/plugged/`) and log a one-line warning naming the new location + suggesting `bin/dotfiles-cleanup`. See CLAUDE.md "Migration / backwards-compat policy".
+- `bin/dotfiles-cleanup`: opt-in script that removes orphaned files left over from past migrations. Each migration adds a stanza that prompts before removing. Pairs with the "bootstrap never deletes" rule in CLAUDE.md.
+- Offline install: `bundled/` directory (gitignored, populated by `bin/export-dotfiles`) carrying pre-downloaded artifacts (`plug.vim`, `powerlevel10k`, vim plugins). Bootstrap checks `bundled/<name>` before falling back to network. Add `--offline` flag to force-prefer bundled. Pairs with the existing "Export dotfiles as a tarball/zip" item under Misc.
 
 ### MacOS Python SSL Misconfiguration
 error: ` urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer 
@@ -39,7 +42,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - [x] Print container runtime output when a test run fails
 - Extract container runtime ops (detect_runtime, discover_flavors, build_image, run_exec, remove_container) into `_pydotlib/container.py` with unit tests.
 - Install zsh, neovim, tmux in all test containers; add functional post-bootstrap checks (`zsh -nc 'source ~/.zshrc'`, `nvim --headless -c 'q'`, `tmux -f ~/.tmux.conf -C kill-server`).
-- Idempotency test: run bootstrap.py twice; second run must succeed and leave identical state.
+- Upgrade-path tests under `tests/docker/upgrade_from_v<N>/`: pre-populate the prior-layout state, run bootstrap, assert clean completion + new artifacts exist in their new homes. Same suite covers idempotency: run bootstrap twice from clean → second run is no-op-or-quiet. See CLAUDE.md "Migration / backwards-compat policy".
 - Dry-run test: run bootstrap with --dry-run; assert no symlinks/files were created.
 - Backup-behavior test: pre-create ~/.bashrc with custom content; bootstrap must preserve original in .bashrc.ORIGINAL.
 - Per-machine override test: write `~/.config/dotfiles/my_shell_profile.sh` exporting a var; `bash -lc 'echo $VAR'` should print it.
