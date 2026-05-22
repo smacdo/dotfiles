@@ -6,8 +6,10 @@ from _pydotlib.integration_checks import (
     BOOTSTRAP_CHECKS,
     CheckResult,
     check_command_output_matches,
+    check_command_succeeds,
     check_dir_exists,
     check_file_contains,
+    check_file_not_exists,
     check_symlink,
 )
 
@@ -109,6 +111,34 @@ class CheckFileContainsTests(unittest.TestCase):
         result = check_file_contains("/file", "Alice")(exec_fn)
         self.assertFalse(result.passed)
         self.assertIn("cat", result.detail)
+
+
+class CheckFileNotExistsTests(unittest.TestCase):
+    def test_passes_when_path_absent(self):
+        # `test -e` returns non-zero when the path doesn't exist.
+        exec_fn = MagicMock(return_value=_completed(1))
+        result = check_file_not_exists("/no/such/path")(exec_fn)
+        self.assertTrue(result.passed)
+
+    def test_fails_when_path_exists(self):
+        exec_fn = MagicMock(return_value=_completed(0))
+        result = check_file_not_exists("/some/path")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("exists but should not", result.detail)
+
+
+class CheckCommandSucceedsTests(unittest.TestCase):
+    def test_passes_when_command_exits_zero(self):
+        exec_fn = MagicMock(return_value=_completed(0))
+        result = check_command_succeeds(["true"])(exec_fn)
+        self.assertTrue(result.passed)
+
+    def test_fails_when_command_exits_nonzero(self):
+        exec_fn = MagicMock(return_value=_completed(1, stderr="bad config"))
+        result = check_command_succeeds(["zsh", "-c", "source ~/.zshrc"])(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("exit 1", result.detail)
+        self.assertIn("bad config", result.detail)
 
 
 class CheckCommandOutputMatchesTests(unittest.TestCase):

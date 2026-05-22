@@ -63,6 +63,38 @@ def check_dir_exists(path: str) -> Check:
     return _run
 
 
+def check_file_not_exists(path: str) -> Check:
+    """Inverse of file/dir-existence checks. Useful for dry-run assertions."""
+    name = f"path does not exist: {path}"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        result = exec_fn(["test", "-e", path])
+        if result.returncode == 0:
+            return CheckResult(name, False, f"{path} exists but should not")
+        return CheckResult(name, True)
+
+    return _run
+
+
+def check_command_succeeds(cmd: list[str]) -> Check:
+    """Pass if `cmd` exits 0; fail otherwise. Use for `zsh -c 'source ~/.zshrc'`,
+    `nvim --headless -c 'q'`, etc. — checks "does it load/run cleanly" without
+    asserting on output."""
+    name = f"`{' '.join(cmd)}` succeeds"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        result = exec_fn(cmd)
+        if result.returncode != 0:
+            return CheckResult(
+                name,
+                False,
+                f"exit {result.returncode}: {result.stderr.strip()}",
+            )
+        return CheckResult(name, True)
+
+    return _run
+
+
 def check_command_output_matches(cmd: list[str], expected_substring: str) -> Check:
     name = f"`{' '.join(cmd)}` output contains {expected_substring!r}"
 
@@ -115,19 +147,39 @@ def check_file_contains(path: str, expected: str) -> Check:
 _HOME = "/home/testuser"
 _DOTFILES = f"{_HOME}/.dotfiles"
 
+_XDG_DATA = f"{_HOME}/.local/share"
+
 BOOTSTRAP_CHECKS: list[Check] = [
+    # Symlinks (sample — same shape applies to the other dotfiles).
     check_symlink(f"{_HOME}/.bashrc", f"{_DOTFILES}/.bashrc"),
     check_symlink(f"{_HOME}/.bash_profile", f"{_DOTFILES}/.bash_profile"),
     check_symlink(f"{_HOME}/.gitconfig", f"{_DOTFILES}/.gitconfig"),
     check_symlink(f"{_HOME}/.tmux.conf", f"{_DOTFILES}/.tmux.conf"),
     check_symlink(f"{_HOME}/.vimrc", f"{_DOTFILES}/settings/nvim/init.vim"),
     check_symlink(f"{_HOME}/.vim", f"{_DOTFILES}/.vim"),
+    # XDG state dirs created by bootstrap.
     check_dir_exists(f"{_HOME}/.local/state/vim/backups"),
     check_dir_exists(f"{_HOME}/.local/state/vim/tmp"),
+    # --git-name / --git-email values written to ~/.my_gitconfig...
     check_file_contains(f"{_HOME}/.my_gitconfig", "Testy McTestFace"),
     check_file_contains(f"{_HOME}/.my_gitconfig", "testy@test.com"),
+    # ... and the gitconfig [include] chain plumbs them to `git config --global`.
+    check_command_output_matches(
+        ["git", "config", "--global", "user.name"], "Testy McTestFace"
+    ),
+    check_command_output_matches(
+        ["git", "config", "--global", "user.email"], "testy@test.com"
+    ),
     # --weather-location 'Seattle' → file written
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
-    # ... and the file propagates to $WEATHER_LOCATION via shell init
+    # ... and the file propagates to $WEATHER_LOCATION via shell init.
     check_command_output_matches(["bash", "-lc", "echo $WEATHER_LOCATION"], "Seattle"),
+    # Catch-all: bash login shell loads cleanly (exercises the full .bash_profile
+    # → .bashrc → env.sh → xdg.sh chain).
+    check_command_succeeds(["bash", "-lc", "true"]),
+    # Downloaded artifacts (plug.vim for vim and nvim).
+    check_file_contains(f"{_XDG_DATA}/vim/site/autoload/plug.vim", "plug#begin"),
+    check_file_contains(f"{_XDG_DATA}/nvim/site/autoload/plug.vim", "plug#begin"),
+    # powerlevel10k cloned — presence of .git confirms a real clone, not a stub dir.
+    check_dir_exists(f"{_XDG_DATA}/powerlevel10k/.git"),
 ]
