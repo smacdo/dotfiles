@@ -196,6 +196,7 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
                 "python3 bootstrap.py -v "
                 "--git-name 'Testy McTestFace' "
                 "--git-email 'testy@test.com' "
+                "--weather-location 'Seattle' "
                 "< /dev/null"
             ),
         ]

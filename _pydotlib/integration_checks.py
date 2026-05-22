@@ -63,6 +63,28 @@ def check_dir_exists(path: str) -> Check:
     return _run
 
 
+def check_command_output_matches(cmd: list[str], expected_substring: str) -> Check:
+    name = f"`{' '.join(cmd)}` output contains {expected_substring!r}"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        result = exec_fn(cmd)
+        if result.returncode != 0:
+            return CheckResult(
+                name,
+                False,
+                f"exit {result.returncode}: {result.stderr.strip()}",
+            )
+        if expected_substring not in result.stdout:
+            return CheckResult(
+                name,
+                False,
+                f"stdout did not contain {expected_substring!r}; got: {result.stdout!r}",
+            )
+        return CheckResult(name, True)
+
+    return _run
+
+
 def check_file_contains(path: str, expected: str) -> Check:
     name = f"{path} contains {expected!r}"
 
@@ -104,4 +126,8 @@ BOOTSTRAP_CHECKS: list[Check] = [
     check_dir_exists(f"{_HOME}/.local/state/vim/tmp"),
     check_file_contains(f"{_HOME}/.my_gitconfig", "Testy McTestFace"),
     check_file_contains(f"{_HOME}/.my_gitconfig", "testy@test.com"),
+    # --weather-location 'Seattle' → file written
+    check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
+    # ... and the file propagates to $WEATHER_LOCATION via shell init
+    check_command_output_matches(["bash", "-lc", "echo $WEATHER_LOCATION"], "Seattle"),
 ]

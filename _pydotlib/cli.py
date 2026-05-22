@@ -43,13 +43,14 @@ def input_field(
     Args:
         message: Prompt message to display
         default_message: Custom default message (overrides auto-generated)
-        default: Value to return if user enters nothing
+        default: Value to return if user enters nothing or stdin isn't a TTY
 
     Returns:
-        User input string or default_value if empty input
+        User input string, or `default` (which may be `None`) if the input
+        is empty or stdin isn't a TTY. Never raises on closed stdin.
     """
 
-    if not sys.stdin.isatty() and default is not None:
+    if not sys.stdin.isatty():
         return default
 
     if default_message is None:

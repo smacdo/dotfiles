@@ -39,6 +39,16 @@ class InputFieldTests(unittest.TestCase):
             self.assertEqual("", stderr_buffer.getvalue())
             self.assertFalse(mocked_input.called)
 
+    @patch("builtins.input")
+    def test_returns_none_when_non_tty_with_no_default(self, mocked_input):
+        # Regression: previously raised EOFError on closed stdin when no default
+        # was provided (bootstrap → configure_weather_location in CI).
+        self.mock_stdin.isatty.return_value = False
+        with redirect_stderr(StringIO()) as stderr_buffer:
+            self.assertIsNone(input_field("Enter value"))
+            self.assertEqual("", stderr_buffer.getvalue())
+            self.assertFalse(mocked_input.called)
+
     @patch("builtins.input", return_value="")
     def test_returns_default_value_when_input_empty(self, mock_input):
         with redirect_stderr(StringIO()):

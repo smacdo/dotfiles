@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from _pydotlib.integration_checks import (
     BOOTSTRAP_CHECKS,
     CheckResult,
+    check_command_output_matches,
     check_dir_exists,
     check_file_contains,
     check_symlink,
@@ -108,6 +109,26 @@ class CheckFileContainsTests(unittest.TestCase):
         result = check_file_contains("/file", "Alice")(exec_fn)
         self.assertFalse(result.passed)
         self.assertIn("cat", result.detail)
+
+
+class CheckCommandOutputMatchesTests(unittest.TestCase):
+    def test_passes_when_output_contains_substring(self):
+        exec_fn = MagicMock(return_value=_completed(0, stdout="prefix Seattle suffix\n"))
+        result = check_command_output_matches(["echo", "x"], "Seattle")(exec_fn)
+        self.assertTrue(result.passed)
+
+    def test_fails_when_command_errors(self):
+        exec_fn = MagicMock(return_value=_completed(2, stderr="boom"))
+        result = check_command_output_matches(["bad"], "anything")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("exit 2", result.detail)
+        self.assertIn("boom", result.detail)
+
+    def test_fails_when_substring_absent(self):
+        exec_fn = MagicMock(return_value=_completed(0, stdout="nothing here\n"))
+        result = check_command_output_matches(["echo", "x"], "Seattle")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("Seattle", result.detail)
 
 
 class BootstrapChecksSmokeTests(unittest.TestCase):
