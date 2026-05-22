@@ -20,13 +20,12 @@ from _pydotlib.bootstrap import (
     configure_weather_location,
     create_dirs,
     download_files,
+    find_dotfiles_root,
     git_clone_repos,
     initialize_vim_plugin_manager,
-    is_dotfiles_root,
     safe_symlink,
 )
 from _pydotlib.cli import ColoredLogFormatter
-from _pydotlib.git import get_repo_root
 from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
 MY_GITCONFIG_PATH = Path.home() / ".my_gitconfig"
@@ -80,18 +79,15 @@ def main() -> int:
     logging.getLogger().addHandler(log_handler)
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    # Verify this command is being run from the dotfiles checkout.
-    git_root = get_repo_root(Path(os.getcwd()).resolve())
-    logging.debug(f"current git repo root is {git_root}")
+    # Locate the dotfiles checkout by walking up from cwd looking for the
+    # `.__dotfiles_root__` marker. No git dependency — the marker is the
+    # canonical identity, and avoiding `git rev-parse` here means rootless
+    # podman bind mounts (which confuse git's safe.directory check) just work.
+    dotfiles_root = find_dotfiles_root(Path(os.getcwd()))
+    logging.debug(f"dotfiles root: {dotfiles_root}")
 
-    if git_root is None:
-        logging.error(f"{__file__} must be run from the root of a git repository")
-        return 1
-    
-    logging.debug(f"current git repo is dotfiles root: {is_dotfiles_root(git_root)}")
-
-    if not is_dotfiles_root(git_root):
-        logging.error(f"{__file__} must be run from the root of a dotfiles repository")
+    if dotfiles_root is None:
+        logging.error(f"{__file__} must be run from within a dotfiles checkout")
         return 1
 
     # Run installation commands.
@@ -106,7 +102,7 @@ def main() -> int:
     )
 
     apply_dotfile_symlinks(
-        dotfiles_dir=git_root,
+        dotfiles_dir=dotfiles_root,
         dry_run=args.dry_run,
         files=[
             (".gitconfig", home_dir / ".gitconfig"),

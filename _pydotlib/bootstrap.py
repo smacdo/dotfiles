@@ -233,6 +233,22 @@ def is_dotfiles_root(path: Path) -> bool:
     return path.joinpath(".__dotfiles_root__").is_file()
 
 
+def find_dotfiles_root(start: Path) -> Path | None:
+    """Walk up from `start` looking for the `.__dotfiles_root__` marker file.
+
+    Returns the first ancestor (or `start` itself) containing the marker, or
+    `None` if no marker is found before reaching the filesystem root.
+    """
+    current = start.resolve()
+    while True:
+        if is_dotfiles_root(current):
+            return current
+        parent = current.parent
+        if parent == current:
+            return None
+        current = parent
+
+
 def create_backup_filename(target: Path) -> Path:
     backup_path = Path(str(target) + ".ORIGINAL")
 

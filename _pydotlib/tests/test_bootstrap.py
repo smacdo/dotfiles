@@ -19,6 +19,7 @@ from _pydotlib.bootstrap import (
     download_files,
     git_clone,
     git_clone_repos,
+    find_dotfiles_root,
     is_dotfiles_root,
     safe_symlink,
 )
@@ -37,6 +38,33 @@ class TestIsDotfilesRoot(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             self.assertFalse(is_dotfiles_root(tmp_path))
+
+
+class TestFindDotfilesRoot(unittest.TestCase):
+    def test_returns_path_when_marker_in_start_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / ".__dotfiles_root__").touch()
+            self.assertEqual(find_dotfiles_root(root), root.resolve())
+
+    def test_walks_up_to_find_marker(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / ".__dotfiles_root__").touch()
+            deep = root / "a" / "b" / "c"
+            deep.mkdir(parents=True)
+            self.assertEqual(find_dotfiles_root(deep), root.resolve())
+
+    def test_returns_none_when_no_marker_in_ancestry(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.assertIsNone(find_dotfiles_root(Path(tmpdir)))
+
+    def test_stops_at_filesystem_root_without_infinite_loop(self):
+        # Sanity: a deeply nested path with no marker anywhere terminates.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            deep = Path(tmpdir) / "x" / "y" / "z"
+            deep.mkdir(parents=True)
+            self.assertIsNone(find_dotfiles_root(deep))
 
 
 class TestConfigureVcsAuthor(unittest.TestCase):
