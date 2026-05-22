@@ -108,11 +108,6 @@ problem is the python installed via homebrew or standalone doesn't use the syste
   (key type, hostname, public key). Hostname completion almost certainly doesn't work as intended.
   Fix: either remove this line or point to a proper hostfile.
 
-- **`functions.sh:27-31` `lsb_release` command not checked before use**: Checks if `/etc/lsb-release`
-  file exists but doesn't verify the `lsb_release` command is installed. On systems where the file
-  exists but the package isn't installed, `DOT_DIST` silently becomes empty.
-  Fix: add `&& command -v lsb_release >/dev/null 2>&1` to the condition.
-
 - **`.zshrc:167` `BREW_PREFIX` may be unset when fzf loads**: `BREW_PREFIX` is only set if
   `type brew` succeeded inside the p10k block (lines 130–137). If brew wasn't found, `BREW_PREFIX` is
   unset and `"${BREW_PREFIX}/opt/fzf/..."` silently expands to `/opt/fzf/...`. Fix: guard with

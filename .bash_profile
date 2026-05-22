@@ -24,4 +24,4 @@ fi
 if [ -f "$HOME/.dotfiles/shell_profile/env.sh" ]; then
     source "$HOME/.dotfiles/shell_profile/env.sh"
 fi
-. "$HOME/.local/share/../bin/env"
+[ -f "$HOME/.local/share/../bin/env" ] && . "$HOME/.local/share/../bin/env"

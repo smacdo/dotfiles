@@ -205,8 +205,10 @@ BOOTSTRAP_CHECKS: list[Check] = [
     ),
     # zsh interactive login: exercises the full .zshenv → .zshrc chain
     # (incl. p10k / fzf / iterm2 fragments). `script` wraps the call in a pty
-    # so `-i` doesn't trip MONITOR / gitstatus on missing tty. Three `script`
-    # flags carry real weight here:
+    # so `-i` doesn't trip MONITOR / gitstatus on missing tty. `TERM=dumb` is
+    # set because `podman exec` doesn't propagate it; some zsh / terminfo
+    # paths emit "TERM environment variable not set" otherwise (Fedora).
+    # Three `script` flags carry real weight here:
     #   - `-e` REQUIRED to propagate the inner zsh's exit code; without it
     #     `script` always exits 0 and the rc-branch of `check_command_silent`
     #     is dead.
@@ -219,7 +221,9 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # saying "unexpected stdout: ..." may actually be the inner shell's stderr.
     # `script(1)` is provided by bsdutils (Essential) on debian/ubuntu and
     # util-linux on fedora — no explicit install needed in the Dockerfiles.
-    check_command_silent(["script", "-e", "-qc", "zsh -ilc true", "/dev/null"]),
+    check_command_silent(
+        ["env", "TERM=dumb", "script", "-e", "-qc", "zsh -ilc true", "/dev/null"]
+    ),
     # vim and nvim CRASH-ONLY smoke test: confirm the binary launches, parses
     # CLI flags, and quits without segfault. Does NOT meaningfully exercise
     # init.vim — both vim (`-e -s`) and nvim (`--headless`) silently swallow

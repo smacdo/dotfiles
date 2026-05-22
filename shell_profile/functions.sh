@@ -23,8 +23,9 @@ detect_os() {
       export DOT_OS="linux"
 
       # Use LSB to identify distribution if installed (it's not always installed
-      # by default).
-      if [ -f /etc/lsb-release ] || [ -d /etc/lsb-release.d ]; then
+      # by default). The file may exist (e.g. on Ubuntu) without the
+      # `lsb_release` command being installed — check both.
+      if { [ -f /etc/lsb-release ] || [ -d /etc/lsb-release.d ]; } && command -v lsb_release >/dev/null 2>&1; then
           DOT_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'// | tr "[:upper:]" "[:lower:]")
           export DOT_DIST
           DOT_DIST_VERSION=$(lsb_release -r | cut -d: -f2 | sed s/'^\t'//)
