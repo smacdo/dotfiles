@@ -65,7 +65,7 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 - **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). See *`bin/` script policy* below for when `bin/` scripts may use it.
 - **`.vim/`** — Vim configs (colorschemes, ftplugins, spell files, native packages)
 - **`tools/`** — Post-bootstrap install scripts for external dependencies (Nerd Fonts, uv, p10k, VS Code)
-- **`tests/docker/`** — Container-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora/alpine. `Dockerfile.<flavor>` per distro; post-bootstrap verification lives in `_pydotlib/integration_checks.py`. See *Integration test policy* below.
+- **`tests/docker/`** — Container-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora. `Dockerfile.<flavor>` per distro; post-bootstrap verification lives in `_pydotlib/integration_checks.py`. See *Integration test policy* below.
 - **`vendor/`** — Vendored third-party shell integrations (iterm2, bash, zsh completions); do not edit
 - **`fonts/`** — Local font files installed by `tools/install_nerd_fonts.sh`
 
