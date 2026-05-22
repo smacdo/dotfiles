@@ -146,8 +146,20 @@ problem is the python installed via homebrew or standalone doesn't use the syste
   should be `source "${S_DOTFILE_ROOT}/shell_profile/paths.sh"` to handle paths with spaces.
 
 # Misc
-- Github action to run linter
-- Github action to run tests
+- [x] Github action to run linter
+- [x] Github action to run tests
+
+# CI workflow improvements
+
+- Container runtime decay coverage: add a SINGLE extra integration job pinned to the non-default runtime (e.g. `--runtime docker` while auto-detect prefers podman). Catches "we silently regressed to runtime-X-only" without doubling CI cost. Don't full-matrix runtime×distro — overkill for what's basically a regression-detection problem.
+- Secret scanning: add `gitleaks-action` (or equivalent) on every PR. Enforces the confidentiality clause in CLAUDE.md. Should be one-line addition to the workflow.
+- Cache `uv` install: `actions/cache` on `~/.cache/uv`. Saves ~20s/run, basically free.
+- Markdown link checker (e.g. `lychee-action`) on `README.md`, `CHANGELOG.md`, `TODO.md`. Catches link/file rot.
+- Performance budget: emit unit-test runtime + image build time as job summary. Visibility-only, no fail threshold. Defer until something starts feeling slow.
+- Coverage report: `coverage.py` run + summary. Visibility-only, no threshold. Helps spot under-tested modules.
+- macOS partial-bootstrap test: GHA `macos-latest` runs only lint+unit today. Real macOS code paths (`is_osx`, `pmset`, `pbcopy/pbpaste`, sysctl parsing) have zero coverage. Approach: run `python3 bootstrap.py --dry-run` on the macOS runner to exercise platform-detected orchestration without modifying the runner's `$HOME`. Requires bootstrap's `--dry-run` to be trustworthy (already is for symlinks/dirs; verify for downloads/clones too). Bonus: `-h` smoke-test on every `bin/` script.
+- CHANGELOG enforcement (deferred — needs design): a CI check that fails if a PR touches `bootstrap.py` / `_pydotlib/bootstrap.py` substantively without adding a `CHANGELOG.md` line. Problem: not every change is user-visible (lint fix, internal refactor, comment-only). Options: (a) require manual opt-in/out via PR-description tag like `[no-changelog]`; (b) heuristic on which files changed (brittle); (c) skip automation, rely on CLAUDE.md policy + reviewer discipline. (c) is fine for a solo repo; revisit if oversight happens.
+- Python version matrix (deferred — likely not needed): could matrix-test 3.10/3.11/3.12/3.13 on the unit job. Counterpoint: the docker integration job already exercises whatever Python ships on alpine/debian/fedora/ubuntu (currently 3.11–3.13), which covers the "does it actually run on my machines" question more honestly than a synthetic matrix. Skip unless we adopt new-version-only syntax.
 
 # Tools (`tools/`)
 
