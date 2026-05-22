@@ -132,7 +132,7 @@ def main() -> int:
         urls=[
             (
                 "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",
-                home_dir / ".vim/autoload/plug.vim",
+                xdg_data_dir() / "vim/site/autoload/plug.vim",
             ),
             (
                 "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim",

@@ -145,8 +145,22 @@ endif
 "===============================================================================
 " Note to readers: Make sure to call :PlugInstall after updating the plugin
 " list.
+
+" Make vim-plug discoverable for vim. nvim already has $XDG_DATA_HOME/nvim/site
+" on its default runtimepath via stdpath('data'); vim doesn't auto-resolve XDG
+" paths so we add it explicitly. plug.vim is autoloaded from <rtp>/autoload/.
+"
+" If you ever add a vim-specific `plug#begin(...)` block below, point it at
+" `s:xdg_data . '/vim/plugged'` — NEVER `~/.vim/plugged`. `~/.vim` is symlinked
+" to ~/.dotfiles/.vim, so plug would install plugins into the repo tree (which
+" is read-only in CI and pollutes git status locally). See CHANGELOG 2026-05-22.
+if !has('nvim')
+  let s:xdg_data = empty($XDG_DATA_HOME) ? expand('~/.local/share') : $XDG_DATA_HOME
+  let &runtimepath = s:xdg_data . '/vim/site,' . &runtimepath
+endif
+
 if has('nvim')
-  call plug#begin(has('nvim') ? stdpath('data') . '/plugged' : '~/.vim/plugged')
+  call plug#begin(stdpath('data') . '/plugged')
 
   Plug 'catppuccin/nvim', { 'as': 'catppuccin' }
 

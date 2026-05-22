@@ -16,6 +16,7 @@
   - etc
   - Check for MacOS Python SSL misconfiguration
 - After landing the vim → XDG migration, teach bootstrap to detect known-stale paths (e.g. `~/.dotfiles/.vim/autoload/plug.vim`, `~/.dotfiles/.vim/plugged/`) and log a one-line warning naming the new location + suggesting `bin/dotfiles-cleanup`. See CLAUDE.md "Migration / backwards-compat policy".
+- Symlink-write hygiene: `~/.vim`, `~/.zsh`, and `~/.local/share/nvim/site/plugin` are directory symlinks into the repo, so any subpath write under them lands in `~/.dotfiles/`. Audit candidates: vim/nvim runtime artifacts (netrw history, swap, undo) that default to `~/.vim/`; if any escape into the repo, configure them to write to `$XDG_STATE_HOME/vim/` instead. Same caution applies to `~/.zsh/` and the nvim plugin dir if anything ever starts writing there.
 - `bin/dotfiles-cleanup`: opt-in script that removes orphaned files left over from past migrations. Each migration adds a stanza that prompts before removing. Pairs with the "bootstrap never deletes" rule in CLAUDE.md.
 - Offline install: `bundled/` directory (gitignored, populated by `bin/export-dotfiles`) carrying pre-downloaded artifacts (`plug.vim`, `powerlevel10k`, vim plugins). Bootstrap checks `bundled/<name>` before falling back to network. Add `--offline` flag to force-prefer bundled. Pairs with the existing "Export dotfiles as a tarball/zip" item under Misc.
 
