@@ -6,6 +6,7 @@ from _pydotlib.integration_checks import (
     BOOTSTRAP_CHECKS,
     CheckResult,
     check_command_output_matches,
+    check_command_silent,
     check_command_succeeds,
     check_dir_exists,
     check_file_contains,
@@ -139,6 +140,43 @@ class CheckCommandSucceedsTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("exit 1", result.detail)
         self.assertIn("bad config", result.detail)
+
+
+class CheckCommandSilentTests(unittest.TestCase):
+    def test_passes_when_silent_and_exit_zero(self):
+        exec_fn = MagicMock(return_value=_completed(0))
+        result = check_command_silent(["zsh", "-ilc", "true"])(exec_fn)
+        self.assertTrue(result.passed)
+        self.assertEqual(result.detail, "")
+
+    def test_fails_when_command_exits_nonzero(self):
+        exec_fn = MagicMock(return_value=_completed(1, stderr="bad config"))
+        result = check_command_silent(["zsh", "-ilc", "true"])(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("exit 1", result.detail)
+        self.assertIn("bad config", result.detail)
+
+    def test_fails_on_unexpected_stdout(self):
+        exec_fn = MagicMock(return_value=_completed(0, stdout="hello\n"))
+        result = check_command_silent(["zsh", "-ilc", "true"])(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("unexpected stdout", result.detail)
+        self.assertIn("hello", result.detail)
+
+    def test_fails_on_unexpected_stderr(self):
+        exec_fn = MagicMock(return_value=_completed(0, stderr="deprecated: foo\n"))
+        result = check_command_silent(["zsh", "-ilc", "true"])(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("unexpected stderr", result.detail)
+        self.assertIn("deprecated", result.detail)
+
+    def test_fails_when_both_streams_nonempty(self):
+        # Documents the "noisy on both streams still fails" invariant, without
+        # pinning down which stream is named first in the detail message.
+        exec_fn = MagicMock(return_value=_completed(0, stdout="out\n", stderr="err\n"))
+        result = check_command_silent(["zsh", "-ilc", "true"])(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertRegex(result.detail, r"unexpected (stdout|stderr)")
 
 
 class CheckCommandOutputMatchesTests(unittest.TestCase):

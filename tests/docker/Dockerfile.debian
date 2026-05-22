@@ -3,7 +3,10 @@ FROM debian:bookworm-slim
 # Install essential packages
 RUN apt-get update && apt-get install -y \
     git \
+    neovim \
     python3 \
+    vim \
+    zsh \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a test user (not root) to simulate real usage

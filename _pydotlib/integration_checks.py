@@ -95,6 +95,29 @@ def check_command_succeeds(cmd: list[str]) -> Check:
     return _run
 
 
+def check_command_silent(cmd: list[str]) -> Check:
+    """Stricter variant of `check_command_succeeds`: also fails if anything is
+    written to stdout or stderr. Use for init checks where any output is itself
+    a bug (e.g. shell login should be silent)."""
+    name = f"`{' '.join(cmd)}` succeeds silently"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        result = exec_fn(cmd)
+        if result.returncode != 0:
+            return CheckResult(
+                name,
+                False,
+                f"exit {result.returncode}: {result.stderr.strip()}",
+            )
+        if result.stdout:
+            return CheckResult(name, False, f"unexpected stdout: {result.stdout!r}")
+        if result.stderr:
+            return CheckResult(name, False, f"unexpected stderr: {result.stderr!r}")
+        return CheckResult(name, True)
+
+    return _run
+
+
 def check_command_output_matches(cmd: list[str], expected_substring: str) -> Check:
     name = f"`{' '.join(cmd)}` output contains {expected_substring!r}"
 
@@ -174,9 +197,37 @@ BOOTSTRAP_CHECKS: list[Check] = [
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
     # ... and the file propagates to $WEATHER_LOCATION via shell init.
     check_command_output_matches(["bash", "-lc", "echo $WEATHER_LOCATION"], "Seattle"),
-    # Catch-all: bash login shell loads cleanly (exercises the full .bash_profile
-    # → .bashrc → env.sh → xdg.sh chain).
-    check_command_succeeds(["bash", "-lc", "true"]),
+    # Catch-all: bash login shell loads silently. DOTFILE_CI_TEST_MODE=1
+    # bypasses .bashrc's "skip if not interactive" early-return so we actually
+    # exercise the full .bash_profile → .bashrc → env.sh → xdg.sh chain.
+    check_command_silent(
+        ["env", "DOTFILE_CI_TEST_MODE=1", "bash", "-lc", "true"]
+    ),
+    # zsh interactive login: exercises the full .zshenv → .zshrc chain
+    # (incl. p10k / fzf / iterm2 fragments). `script` wraps the call in a pty
+    # so `-i` doesn't trip MONITOR / gitstatus on missing tty. Three `script`
+    # flags carry real weight here:
+    #   - `-e` REQUIRED to propagate the inner zsh's exit code; without it
+    #     `script` always exits 0 and the rc-branch of `check_command_silent`
+    #     is dead.
+    #   - `-q` REQUIRED to suppress `script`'s own "Script started/done"
+    #     banners (they go to stderr and would trip the silent check).
+    #   - `-c` runs the command; the trailing `/dev/null` is the typescript
+    #     file we don't want.
+    # `script` also merges the inner stdout+stderr into a single stream (which
+    # we see as stdout). Total-silence is preserved, but a failure detail
+    # saying "unexpected stdout: ..." may actually be the inner shell's stderr.
+    # `script(1)` is provided by bsdutils (Essential) on debian/ubuntu and
+    # util-linux on fedora — no explicit install needed in the Dockerfiles.
+    check_command_silent(["script", "-e", "-qc", "zsh -ilc true", "/dev/null"]),
+    # vim and nvim CRASH-ONLY smoke test: confirm the binary launches, parses
+    # CLI flags, and quits without segfault. Does NOT meaningfully exercise
+    # init.vim — both vim (`-e -s`) and nvim (`--headless`) silently swallow
+    # init-time errors (verified: a `.vimrc` containing
+    # `call ThisFunctionDoesNotExist()` still exits 0 with no output).
+    # See TODO.md for the path to a real init-validation check.
+    check_command_succeeds(["vim", "-e", "-s", "-c", "q"]),
+    check_command_succeeds(["nvim", "--headless", "-c", "q"]),
     # Downloaded artifacts (plug.vim for vim and nvim).
     check_file_contains(f"{_XDG_DATA}/vim/site/autoload/plug.vim", "plug#begin"),
     check_file_contains(f"{_XDG_DATA}/nvim/site/autoload/plug.vim", "plug#begin"),
