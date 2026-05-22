@@ -186,13 +186,13 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # --git-name / --git-email values written to ~/.my_gitconfig...
     check_file_contains(f"{_HOME}/.my_gitconfig", "Testy McTestFace"),
     check_file_contains(f"{_HOME}/.my_gitconfig", "testy@test.com"),
-    # ... and the gitconfig [include] chain plumbs them to `git config --global`.
-    check_command_output_matches(
-        ["git", "config", "--global", "user.name"], "Testy McTestFace"
-    ),
-    check_command_output_matches(
-        ["git", "config", "--global", "user.email"], "testy@test.com"
-    ),
+    # ... and git reads them via the .gitconfig [include] chain. NOT using
+    # `--global` here: `git config --global` defaults to `--no-includes`
+    # ("--includes... Defaults to off when a specific file is given"), which
+    # would correctly show the literal `include.path` directive but miss the
+    # included user.name/email — the exact bug we hit before this fix.
+    check_command_output_matches(["git", "config", "user.name"], "Testy McTestFace"),
+    check_command_output_matches(["git", "config", "user.email"], "testy@test.com"),
     # --weather-location 'Seattle' → file written
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
     # ... and the file propagates to $WEATHER_LOCATION via shell init.
