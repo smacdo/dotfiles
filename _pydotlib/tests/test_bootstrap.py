@@ -40,7 +40,11 @@ class TestIsDotfilesRoot(unittest.TestCase):
 
 
 class TestConfigureVcsAuthor(unittest.TestCase):
-    def test_adds_missing_email_when_arg_provided(self):
+    @patch(
+        "_pydotlib.bootstrap.input_field",
+        side_effect=lambda *_, **kw: kw.get("default"),
+    )
+    def test_adds_missing_email_when_arg_provided(self, _):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / ".my_gitconfig"
             path.write_text("[user]\n\tname = Alice\n")

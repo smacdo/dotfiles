@@ -65,7 +65,7 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 - **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). See *`bin/` script policy* below for when `bin/` scripts may use it.
 - **`.vim/`** — Vim configs (colorschemes, ftplugins, spell files, native packages)
 - **`tools/`** — Post-bootstrap install scripts for external dependencies (Nerd Fonts, uv, p10k, VS Code)
-- **`tests/docker/`** — Docker-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora/alpine
+- **`tests/docker/`** — Container-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora/alpine. `Dockerfile.<flavor>` per distro; post-bootstrap verification lives in `_pydotlib/integration_checks.py`. See *Integration test policy* below.
 - **`vendor/`** — Vendored third-party shell integrations (iterm2, bash, zsh completions); do not edit
 - **`fonts/`** — Local font files installed by `tools/install_nerd_fonts.sh`
 
@@ -104,6 +104,42 @@ Naming and form:
 - **No file suffixes** (`.py`, `.sh`) — invoke as `weather`, not `weather.py`. Use a shebang to declare the interpreter.
 - **Kebab-case** filenames (`next-meeting`, not `next_meeting` or `nextMeeting`).
 - **Always `chmod +x`** — scripts must be directly executable from `$PATH`.
+
+### Integration test policy
+
+Container integration tests live in `tests/docker/` plus
+`_pydotlib/integration_checks.py`. The runner (`run_tests.py`) builds one
+container per `tests/docker/Dockerfile.<flavor>`, execs `bootstrap.py`
+inside it, then runs the Python check suite from
+`integration_checks.BOOTSTRAP_CHECKS`.
+
+Rules for `_pydotlib/integration_checks.py`:
+
+- **Must NOT import from `_pydotlib.bootstrap`** (or any other module the
+  tests are validating). It only observes container state via a provided
+  `exec_fn` plus stdlib types. The reason: checks must reflect what an
+  external observer sees, not what the implementation thinks it did.
+- **Each check is a pure function `(exec_fn: ExecFn) -> CheckResult`.**
+  Use the `check_symlink` / `check_dir_exists` / `check_file_contains`
+  helpers as templates when adding new ones. A check returns a
+  `CheckResult` with a descriptive `name` and (on failure) a `detail`
+  string showing expected vs. actual.
+- **Register new checks in `BOOTSTRAP_CHECKS`** — that's the canonical
+  post-bootstrap suite the runner iterates.
+- **Add unit tests in `_pydotlib/tests/test_integration_checks.py`** for
+  every new check function. Mock `exec_fn` with `MagicMock` returning
+  crafted `subprocess.CompletedProcess` values; cover the pass path and
+  each distinct failure path.
+
+Rules for `tests/docker/`:
+
+- One `Dockerfile.<flavor>` per distro, flat in `tests/docker/`. No
+  per-target subdirectory. Container user is `testuser`; repo is
+  read-only mounted at `/home/testuser/.dotfiles`.
+- New distros: drop in `Dockerfile.<name>` and the runner picks it up
+  automatically via `discover_flavors()`. Match the existing
+  Dockerfiles' shape (install `git python3`, create `testuser`,
+  `USER testuser`, `WORKDIR /home/testuser`).
 
 ### Top-level docs
 

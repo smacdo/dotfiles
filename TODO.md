@@ -31,20 +31,21 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 
 ## Testing
 - [x] Add script to automate dotfile updating, syncing
-- [ ] Support podman instead of docker
+- [x] Support podman instead of docker (auto-detect, --runtime flag)
 - ~~Finish post init scripts~~
 - Discover and run python unit tests in bin/ scripts
 - run_pydotlib_tests: Search for pydotlib modules without having to hardcode the names.
 - ColoredLogFormatter: figure out how to test the actual ANSI escape codes are emitted (or not). Today's test only checks that level/message round-trip — color output is coupled to the import-time `Colors` singleton, which depends on the `should_use_colors()` cache.
-- Print docker output when a docker test run fails
-- Refactor docker script code into pydotlib module.
-- Docker test: Run bootstrap.py to validate functionality for debian, fedora and ubuntu
-- Docker test: post bootstrap, check if bash OK
-- Docker test: post bootstrap, check if ZSH OK
-- Docker test: post bootstrap, check if vim OK
-- Docker test: post bootstrap, check if neovim OK
-- Docker test: post bootstrap, check if tmux OK
-- Docker test: post bootstrap, check if git OK
+- [x] Print container runtime output when a test run fails
+- Extract container runtime ops (detect_runtime, discover_flavors, build_image, run_exec, remove_container) into `_pydotlib/container.py` with unit tests.
+- Install zsh, neovim, tmux in all test containers; add functional post-bootstrap checks (`zsh -nc 'source ~/.zshrc'`, `nvim --headless -c 'q'`, `tmux -f ~/.tmux.conf -C kill-server`).
+- Idempotency test: run bootstrap.py twice; second run must succeed and leave identical state.
+- Dry-run test: run bootstrap with --dry-run; assert no symlinks/files were created.
+- Backup-behavior test: pre-create ~/.bashrc with custom content; bootstrap must preserve original in .bashrc.ORIGINAL.
+- Per-machine override test: write `~/.config/dotfiles/my_shell_profile.sh` exporting a var; `bash -lc 'echo $VAR'` should print it.
+- Parallelize distro runs (ThreadPoolExecutor over `discover_flavors`).
+- CI: matrix-test against both podman and docker via `--runtime`.
+- Optional `--keep-containers` flag for debugging failed runs.
 
 ## Misc
 - Export dotfiles as a tarball/zip for machines that cannot connect to internet. The archive should include out of tree files, and be made to expand in user home dir, eg

@@ -13,184 +13,222 @@ import unittest
 from pathlib import Path
 
 from _pydotlib.cli import ColoredLogFormatter
+from _pydotlib.integration_checks import BOOTSTRAP_CHECKS
 
-DOCKER_FLAVORS = ["debian", "ubuntu", "fedora", "alpine"]
+RUNTIME_AUTO = "auto"
+RUNTIME_CHOICES = (RUNTIME_AUTO, "podman", "docker")
 
 
-def check_docker() -> bool:
-    """Check that Docker is installed on the system. Logs warnings if a check fails."""
-    if shutil.which("docker") is None:
-        logging.warning("Docker was not found. Please install docker.")
-        return False
+def detect_runtime(preferred: str | None = None) -> str:
+    """Resolve a usable container runtime.
 
-    try:
-        subprocess.check_output(["docker", "version"])
-        return True
-    except subprocess.CalledProcessError:
-        logging.warning(
-            "Docker failed to start. Please check that the Docker daemon is running."
+    If `preferred` is given (and is not "auto"), require that exact runtime
+    to be on PATH or raise. Otherwise probe "podman" then "docker" in order.
+    Podman is preferred in auto-detect because it is rootless by default.
+    """
+    if preferred and preferred != RUNTIME_AUTO:
+        if shutil.which(preferred):
+            return preferred
+        raise SystemExit(f"requested runtime {preferred!r} not on PATH")
+
+    for name in ("podman", "docker"):
+        if shutil.which(name):
+            return name
+    raise SystemExit("no container runtime found (need podman or docker on PATH)")
+
+
+def check_runtime(runtime: str) -> bool:
+    """Verify the runtime can actually talk to its backend."""
+    result = subprocess.run(
+        [runtime, "version"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        logging.error(
+            f"{runtime} version failed (exit {result.returncode}): {result.stderr.strip()}"
         )
         return False
-
-
-def format_docker_image_name(target: str, flavor: str) -> str:
-    return f"dotfiles_{target}_{flavor}"
-
-
-def format_docker_container_name(target: str, flavor: str) -> str:
-    return f"dotfiles-test-{target}-{flavor}"
-
-
-def build_docker_image(target: str, flavor: str) -> bool:
-    dockerfile_path = (
-        Path(__file__).parent / "tests" / "docker" / target / f"Dockerfile.{flavor}"
-    )
-
-    if not dockerfile_path.exists():
-        logging.error(f"Docker file {dockerfile_path} does not exist")
-        return False
-
-    subprocess.check_output(
-        [
-            "docker",
-            "build",
-            "-f",
-            dockerfile_path,
-            "-t",
-            format_docker_image_name(target, flavor),
-            ".",
-        ]
-    )
     return True
 
 
-def docker_container_exists(target: str, flavor: str) -> bool:
+def format_image_name(flavor: str) -> str:
+    return f"dotfiles_{flavor}"
+
+
+def format_container_name(flavor: str) -> str:
+    return f"dotfiles-test-{flavor}"
+
+
+def discover_flavors(repo_root: Path) -> list[str]:
+    """Return distro flavors discovered from tests/docker/Dockerfile.<flavor>."""
+    flavors: list[str] = []
+    tests_root = repo_root / "tests" / "docker"
+    if not tests_root.is_dir():
+        return flavors
+    for df in sorted(tests_root.glob("Dockerfile.*")):
+        flavor = df.suffix.lstrip(".")
+        if flavor:
+            flavors.append(flavor)
+    return flavors
+
+
+def _log_subprocess_failure(
+    header: str, stdout: str | None, stderr: str | None
+) -> None:
+    """Log a single ERROR record with header and any stdout/stderr collated together."""
+    parts = [header]
+    if stdout:
+        parts.append(f"stdout:\n{stdout.rstrip()}")
+    if stderr:
+        parts.append(f"stderr:\n{stderr.rstrip()}")
+    logging.error("\n".join(parts))
+
+
+def build_image(runtime: str, repo_root: Path, flavor: str) -> bool:
+    """Build the container image for `flavor`. Returns False on failure."""
+    dockerfile_path = repo_root / "tests" / "docker" / f"Dockerfile.{flavor}"
+    if not dockerfile_path.exists():
+        logging.error(f"Dockerfile {dockerfile_path} does not exist")
+        return False
+
+    image_name = format_image_name(flavor)
     result = subprocess.run(
-        ["docker", "ps", "-a", "--format", "{{.Names}}"],
+        [runtime, "build", "-f", str(dockerfile_path), "-t", image_name, str(repo_root)],
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
-
-    containers = [line.strip() for line in result.stdout.splitlines()]
-
-    return format_docker_container_name(target, flavor) in containers
-
-
-def delete_docker_container(target: str, flavor: str) -> bool:
-    container_name = format_docker_container_name(target, flavor)
-
-    if not docker_container_exists(target, flavor):
-        logging.info(
-            f"Could not delete container {container_name} because it was not found"
+    if result.returncode != 0:
+        _log_subprocess_failure(
+            f"{runtime} build failed for {image_name} (exit {result.returncode})",
+            result.stdout,
+            result.stderr,
         )
         return False
-
-    # Remove the container.
-    subprocess.check_output(
-        [
-            "docker",
-            "rm",
-            "-f",
-            container_name,
-        ]
-    )
-
-    logging.info(f"Deleted container {container_name}")
-
     return True
 
 
-def run_docker_test(target: str, flavor: str) -> bool:
-    # Make sure the image is built before running tests.
-    build_docker_image(target, flavor)
+def remove_container(runtime: str, container_name: str) -> None:
+    """Force-remove a container if it exists. Never raises."""
+    subprocess.run(
+        [runtime, "rm", "-f", container_name],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
-    # Clear the container if it already exists - we want to start fresh when testing.
-    if docker_container_exists(target, flavor):
-        delete_docker_container(target, flavor)
 
-    # Start the container in detached mode.
-    container_name = format_docker_container_name(target, flavor)
-    image_name = format_docker_image_name(target, flavor)
+def run_exec(
+    runtime: str,
+    container_name: str,
+    cmd: list[str],
+    *,
+    timeout: float,
+    label: str,
+) -> bool:
+    """Run `<runtime> exec` and log output on failure. Returns False on failure/timeout."""
+    full_cmd = [runtime, "exec", container_name, *cmd]
+    try:
+        result = subprocess.run(
+            full_cmd, capture_output=True, text=True, check=False, timeout=timeout
+        )
+    except subprocess.TimeoutExpired as e:
+        # With text=True, e.stdout/e.stderr are str | None — no bytes decode needed.
+        _log_subprocess_failure(
+            f"{label} timed out after {timeout}s in {container_name}",
+            e.stdout,
+            e.stderr,
+        )
+        return False
 
-    logging.info(f"Running tests for {container_name}")
+    if result.returncode != 0:
+        _log_subprocess_failure(
+            f"{label} failed (exit {result.returncode}) in {container_name}",
+            result.stdout,
+            result.stderr,
+        )
+        return False
+    return True
 
-    docker_process = subprocess.Popen(
+
+def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
+    """Build the image, start a container, run bootstrap then verify; always clean up."""
+    if not build_image(runtime, repo_root, flavor):
+        return False
+
+    container_name = format_container_name(flavor)
+    image_name = format_image_name(flavor)
+    logging.info(f"Running {flavor} in {container_name} via {runtime}")
+
+    # Defensive: nuke any stale container from a previous crashed run before starting.
+    remove_container(runtime, container_name)
+
+    create = subprocess.run(
         [
-            "docker",
+            runtime,
             "run",
             "-d",
             "--name",
             container_name,
             "-v",
-            f"{Path(__file__).parent}:/home/testuser/.dotfiles:ro",
+            f"{repo_root}:/home/testuser/.dotfiles:ro",
             image_name,
             "sleep",
             "infinity",
         ],
-        stdout=subprocess.PIPE,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    container_id = docker_process.stdout.readline().decode().strip()
+    if create.returncode != 0:
+        _log_subprocess_failure(
+            f"{runtime} run failed for {container_name} (exit {create.returncode})",
+            create.stdout,
+            create.stderr,
+        )
+        return False
 
-    logging.info(f"Created docker container {container_name} with id {container_id}")
-
-    # Run bootstrap.py:
     try:
-        subprocess.check_output(
-            [
-                "docker",
-                "exec",
-                container_name,
-                "bash",
-                "-c",
-                "cd /home/testuser/.dotfiles && python3 bootstrap.py -v --git-name 'Testy McTestFace' --git-email 'testy@test.com' < /dev/null",
-            ],
-            timeout=30,
-        )
-    except subprocess.CalledProcessError as e:
-        logging.exception(
-            f"failed to run test: {e.stdout}",
-            exc_info=e,
-        )
-        return False
-    except subprocess.TimeoutExpired as e:
-        logging.error(
-            "timed out waiting for bootstrap.py - it is probably waiting for stdin", e
-        )
-        return False
-    finally:
-        # Stop the container after tests have completed.
-        subprocess.check_output(["docker", "stop", container_name])
+        bootstrap_cmd = [
+            "bash",
+            "-c",
+            (
+                "cd /home/testuser/.dotfiles && "
+                "python3 bootstrap.py -v "
+                "--git-name 'Testy McTestFace' "
+                "--git-email 'testy@test.com' "
+                "< /dev/null"
+            ),
+        ]
+        if not run_exec(
+            runtime, container_name, bootstrap_cmd, timeout=30, label="bootstrap.py"
+        ):
+            return False
 
-    # Run post-bootstrap verification:
-    try:
-        subprocess.check_output(
-            [
-                "docker",
-                "start",
-                container_name,
-            ]
-        )
-        subprocess.check_output(
-            [
-                "docker",
-                "exec",
-                container_name,
-                "sh",
-                "/home/testuser/.dotfiles/tests/docker/bootstrap/verify_bootstrap.sh",
-            ],
-            timeout=10,
-        )
-    except subprocess.CalledProcessError as e:
-        logging.exception(
-            f"post-bootstrap verification failed: {e.stdout}",
-            exc_info=e,
-        )
-        return False
+        return run_integration_checks(runtime, container_name)
     finally:
-        subprocess.check_output(["docker", "stop", container_name])
+        remove_container(runtime, container_name)
 
-    return True
+
+def run_integration_checks(runtime: str, container_name: str) -> bool:
+    """Run the BOOTSTRAP_CHECKS suite inside `container_name`, log each, return overall pass."""
+
+    def exec_in_container(cmd: list[str]) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [runtime, "exec", container_name, *cmd],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    all_passed = True
+    for check in BOOTSTRAP_CHECKS:
+        result = check(exec_in_container)
+        if result.passed:
+            logging.info(f"  ✓ {result.name}")
+        else:
+            logging.error(f"  ✗ {result.name}: {result.detail}")
+            all_passed = False
+    return all_passed
 
 
 def run_shell_syntax_tests() -> bool:
@@ -262,8 +300,21 @@ def run_pydotlib_tests(verbose: bool = False) -> bool:
     print("=" * 70)
     print()
 
-    runner = unittest.TextTestRunner(verbosity=2 if verbose else 1)
-    result = runner.run(suite)
+    # Detach our log handler so that INFO/ERROR records from code under
+    # test don't bypass unittest's stdout/stderr capture. assertLogs adds its
+    # own handler so tests that exercise log assertions still work.
+    root_logger = logging.getLogger()
+    saved_handlers = root_logger.handlers[:]
+    if not verbose:
+        root_logger.handlers = []
+
+    try:
+        runner = unittest.TextTestRunner(
+            verbosity=2 if verbose else 1, buffer=not verbose
+        )
+        result = runner.run(suite)
+    finally:
+        root_logger.handlers = saved_handlers
 
     print()
     print("=" * 70)
@@ -276,12 +327,10 @@ def run_pydotlib_tests(verbose: bool = False) -> bool:
     print(f"Skipped: {len(result.skipped)}")
     print("=" * 70)
 
-    # Return exit code based on results
     return result.wasSuccessful()
 
 
 def main() -> int:
-    # Argument parsing.
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument(
         "-v",
@@ -289,21 +338,26 @@ def main() -> int:
         action="store_true",
         help="Enable verbose output (DEBUG level logging)",
     )
+    args_parser.add_argument(
+        "--runtime",
+        choices=RUNTIME_CHOICES,
+        default=RUNTIME_AUTO,
+        help="Container runtime for integration tests (default: auto-detect, podman preferred)",
+    )
     docker = args_parser.add_mutually_exclusive_group()
     docker.add_argument(
         "--no-docker",
         action="store_true",
-        help="Skip Docker integration tests",
+        help="Skip container integration tests",
     )
     docker.add_argument(
         "--docker-only",
         action="store_true",
-        help="Run only Docker integration tests",
+        help="Run only container integration tests",
     )
 
     args = args_parser.parse_args()
 
-    # Set up more verbose logging if the user requested it.
     log_handler = logging.StreamHandler(sys.stdout)
     log_handler.setFormatter(ColoredLogFormatter())
 
@@ -311,24 +365,28 @@ def main() -> int:
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     if not args.docker_only:
-        # Run shell syntax tests.
         if not run_shell_syntax_tests():
-            logging.fatal("shell syntax tests failed - aborting")
+            logging.critical("shell syntax tests failed - aborting")
             return 1
 
-        # Run unit tests.
         if not run_pydotlib_tests(verbose=args.verbose):
-            logging.fatal("pydotlib unit tests failed - aborting")
+            logging.critical("pydotlib unit tests failed - aborting")
             return 1
 
-    # Run integration tests using Docker.
     if not args.no_docker:
-        if not check_docker():
+        runtime = detect_runtime(args.runtime)
+        logging.info(f"using container runtime: {runtime}")
+        if not check_runtime(runtime):
             return 1
+
+        repo_root = Path(__file__).parent
+        flavors = discover_flavors(repo_root)
+        if not flavors:
+            logging.warning(f"no Dockerfiles found under {repo_root / 'tests' / 'docker'}")
 
         all_passed = True
-        for flavor in DOCKER_FLAVORS:
-            if not run_docker_test("bootstrap", flavor):
+        for flavor in flavors:
+            if not run_container_test(runtime, repo_root, flavor):
                 all_passed = False
         if not all_passed:
             return 1

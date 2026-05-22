@@ -3,6 +3,8 @@
 # Author: Scott MacDonald <root@smacdo.com>
 # Purpose: Lock the desktop screen.
 #==============================================================================#
+# vim: set filetype=python
+
 . "$S_DOTFILE_ROOT"/shell_profile/functions.sh
 
 error()             { printf '[ERROR]: %s\n' "$*" >&2; }
@@ -22,7 +24,7 @@ main() {
   while getopts 'hV' opt; do
     case "$opt" in
       h) print_help
-         exit
+         exit 1
          ;;
       V) set_verbose 1
          ;;

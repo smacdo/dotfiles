@@ -14,7 +14,7 @@
 # Prints usage information to stderr and then exits the process.
 ################################################################################
 usage_and_die() {
-  printf "Pretty print several lines of a file (ripgrep cat)\n" >&2
+  printf "Pretty print several lines of a file (ripgrep cat)"
   printf "Usage: %s path/to/file:line_number\n" "$(basename "$0")" >&2
   exit 2
 }
@@ -26,7 +26,7 @@ usage_and_die() {
 #  $1..$N  Text to print.  
 ################################################################################
 err() {
-  printf 'ERROR: %s\n' "$*" >&2
+  echo "ERROR: " "$@"
 }
 
 ################################################################################

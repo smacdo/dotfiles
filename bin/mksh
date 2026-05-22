@@ -66,8 +66,8 @@ chmod u+x "$script_filepath"
 # Let the user continue editing the file.
 case "$EDITOR" in
   *nvim*|*neovim*|*vim*)
-    # Open at end of file so the cursor lands where the user will start writing.
-    "$EDITOR" + "$script_filepath"
+    # open the file to line 9 when using vim or neovim
+    "$EDITOR" +14 "$script_filepath"
     ;;
   *)
     "$EDITOR" "$script_filepath"
