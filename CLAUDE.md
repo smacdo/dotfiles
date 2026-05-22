@@ -17,6 +17,22 @@ This is a personal, publicly-visible repository. It must never contain proprieta
 
 If a task would require committing any of the above, stop and warn the user before writing anything to disk. For machine- or work-specific content that legitimately needs to exist locally, use the per-machine override files (`~/.config/dotfiles/`, `~/.my_*`) or a gitignored `CLAUDE.local.md` — never the tracked repo.
 
+### Not in scope
+
+The rules above cover *work-internal* content. Public, third-party, and standard
+conventions are not confidentiality leaks and don't need to be flagged:
+
+- Standard third-party tool conventions: `~/.local/bin/env` (uv), `~/.cargo/env`
+  (Rust), `~/.npmrc`, `~/.gnupg/`, etc.
+- Standard XDG / cross-platform paths: `$XDG_CONFIG_HOME`, `~/.config/`,
+  `~/.local/share/`, `~/Library/Application Support/`.
+- Names of public software / OSS projects depended on (vim, tmux, zsh, fzf,
+  uv, podman, etc.).
+- Generic Unix paths: `/etc/profile`, `/usr/local/`, `/var/log/`, etc.
+
+When in doubt: would a stranger on the internet recognize this as a standard
+pattern, or as a private detail? If the former, it's fine.
+
 ### Enforcement
 
 Before writing any file, staging changes, or creating a commit in this repo, audit the diff against the rules above. If anything matches — even ambiguously — you must:
