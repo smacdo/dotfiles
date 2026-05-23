@@ -205,6 +205,21 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         ):
             return False
 
+        # Idempotency: re-running bootstrap on an already-bootstrapped tree
+        # must complete cleanly. Catches the family of "symlink already
+        # exists, can't create", "download tries to overwrite valid state",
+        # and "interactive prompt fires on re-run" bugs. CLI args still apply
+        # on the second run, so configure_vcs_author won't re-prompt.
+        # Per CLAUDE.md "Migration / backwards-compat policy".
+        if not run_exec(
+            runtime,
+            container_name,
+            bootstrap_cmd,
+            timeout=30,
+            label="bootstrap.py (re-run, idempotency)",
+        ):
+            return False
+
         return run_integration_checks(runtime, container_name)
     finally:
         remove_container(runtime, container_name)
