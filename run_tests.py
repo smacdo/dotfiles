@@ -18,6 +18,18 @@ from _pydotlib.integration_checks import BOOTSTRAP_CHECKS
 RUNTIME_AUTO = "auto"
 RUNTIME_CHOICES = (RUNTIME_AUTO, "podman", "docker")
 
+# Cold-cache image builds take a few minutes on debian/ubuntu/fedora. 10 min
+# is generous headroom; if exceeded, the build daemon is likely wedged.
+BUILD_TIMEOUT_SECS = 600
+# Full bootstrap.py budget. First-run downloads (plug.vim, powerlevel10k) and
+# package-manager passes take ~10-20s; 30s covers both first run and the
+# idempotent re-run that follows it.
+BOOTSTRAP_TIMEOUT_SECS = 30
+# Per-check budget. The slowest legitimate check today is the script-wrap zsh
+# at ~1s; 15s catches hangs (e.g. an interactive prompt firing on a shell
+# whose init misbehaved) without false positives.
+CHECK_TIMEOUT_SECS = 15
+
 
 def detect_runtime(preferred: str | None = None) -> str:
     """Resolve a usable container runtime.
@@ -91,12 +103,21 @@ def build_image(runtime: str, repo_root: Path, flavor: str) -> bool:
         return False
 
     image_name = format_image_name(flavor)
-    result = subprocess.run(
-        [runtime, "build", "-f", str(dockerfile_path), "-t", image_name, str(repo_root)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [runtime, "build", "-f", str(dockerfile_path), "-t", image_name, str(repo_root)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=BUILD_TIMEOUT_SECS,
+        )
+    except subprocess.TimeoutExpired as e:
+        _log_subprocess_failure(
+            f"{runtime} build for {image_name} timed out after {BUILD_TIMEOUT_SECS}s",
+            e.stdout,
+            e.stderr,
+        )
+        return False
     if result.returncode != 0:
         _log_subprocess_failure(
             f"{runtime} build failed for {image_name} (exit {result.returncode})",
@@ -201,7 +222,11 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
             ),
         ]
         if not run_exec(
-            runtime, container_name, bootstrap_cmd, timeout=30, label="bootstrap.py"
+            runtime,
+            container_name,
+            bootstrap_cmd,
+            timeout=BOOTSTRAP_TIMEOUT_SECS,
+            label="bootstrap.py",
         ):
             return False
 
@@ -215,7 +240,7 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
             runtime,
             container_name,
             bootstrap_cmd,
-            timeout=30,
+            timeout=BOOTSTRAP_TIMEOUT_SECS,
             label="bootstrap.py (re-run, idempotency)",
         ):
             return False
@@ -229,12 +254,23 @@ def run_integration_checks(runtime: str, container_name: str) -> bool:
     """Run the BOOTSTRAP_CHECKS suite inside `container_name`, log each, return overall pass."""
 
     def exec_in_container(cmd: list[str]) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            [runtime, "exec", container_name, *cmd],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        full_cmd = [runtime, "exec", container_name, *cmd]
+        try:
+            return subprocess.run(
+                full_cmd, capture_output=True, text=True, check=False,
+                timeout=CHECK_TIMEOUT_SECS,
+            )
+        except subprocess.TimeoutExpired as e:
+            # Synthesize a failing CompletedProcess so the check function sees
+            # rc != 0 and surfaces a meaningful detail. Prevents one stuck
+            # check (e.g. a shell init misbehaving and prompting on stdin)
+            # from hanging the entire test suite.
+            return subprocess.CompletedProcess(
+                args=full_cmd,
+                returncode=124,  # GNU `timeout(1)` convention
+                stdout=e.stdout or "",
+                stderr=(e.stderr or "") + f"\n<timed out after {CHECK_TIMEOUT_SECS}s>",
+            )
 
     all_passed = True
     for check in BOOTSTRAP_CHECKS:
