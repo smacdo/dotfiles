@@ -5,7 +5,7 @@
 - Add a `choose()` helper in `_pydotlib/cli.py` for multi-option prompts (e.g. backup / skip / overwrite-without-backup). Then revisit `safe_symlink`'s prompt UX. Want to iterate on copy and option set.
 - [x] Check if target exists, is a symlink and was symlinked somewhere in dotfiles repo for safe_symlink.
 - download_file: Download to temporary location, and compare to dest. Prompt user if there is mismatch.
-- `initialize_vim_plugin_manager`: appears to be misbehaving — investigate. Also add test coverage; either unit tests (mock `subprocess.check_call` and the `shutil.which` lookups) or a docker integration test that runs bootstrap end-to-end and verifies plugins were installed (e.g. check `~/.vim/plugged/` contents).
+- [x] `initialize_vim_plugin_manager`: fixed silent no-op (`+'PlugInstall --sync'` → `-c "PlugInstall --sync" -c qa`); nvim's `plugged/` is now integration-checked. Vim has no `plug#begin` yet — add a vim-side check if that changes.
 - Move `~/.my_gitconfig` into `$XDG_CONFIG_HOME/dotfiles/my_gitconfig` so it lives next to `weather_location` and the other XDG-managed state. Needs a migration plan for existing users (detect the legacy path and either move it or warn). Also update the `[include]` entry in the committed `.gitconfig`. While we're at it, audit other `$HOME` dotfiles (`.my_*`, `.config/dotfiles/0_my_*`, etc.) and figure out a general migration strategy before doing one-off moves.
 - Initialize ~/.config/dotfiles/... (the path to the my shell env file)
   - Interactive prompt for weather location

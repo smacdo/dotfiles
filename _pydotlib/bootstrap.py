@@ -225,7 +225,11 @@ def initialize_vim_plugin_manager(dry_run: bool) -> None:
         logging.info(f"{dry_text}Initializing vim-plug for {editor}")
 
         if not dry_run:
-            subprocess.check_call([editor, "+'PlugInstall --sync'", "+qa"])
+            # Use `-c "CMD"` per Ex command, not `+'CMD'`. The `+'CMD'` form
+            # works in a shell (which strips the single quotes) but via
+            # `subprocess` the literal quotes are passed to vim, which then
+            # parses `'P` as a mark reference and silently no-ops the install.
+            subprocess.check_call([editor, "-c", "PlugInstall --sync", "-c", "qa"])
 
 
 def is_dotfiles_root(path: Path) -> bool:

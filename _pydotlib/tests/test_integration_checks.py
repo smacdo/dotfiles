@@ -9,6 +9,7 @@ from _pydotlib.integration_checks import (
     check_command_silent,
     check_command_succeeds,
     check_dir_exists,
+    check_dir_non_empty,
     check_file_contains,
     check_file_not_exists,
     check_symlink,
@@ -112,6 +113,46 @@ class CheckFileContainsTests(unittest.TestCase):
         result = check_file_contains("/file", "Alice")(exec_fn)
         self.assertFalse(result.passed)
         self.assertIn("cat", result.detail)
+
+
+class CheckDirNonEmptyTests(unittest.TestCase):
+    def test_passes_when_dir_has_entries(self):
+        exec_fn = MagicMock(
+            side_effect=[
+                _completed(0),  # test -d
+                _completed(0, stdout="/some/dir/sub1\n/some/dir/sub2\n"),  # find
+            ]
+        )
+        result = check_dir_non_empty("/some/dir")(exec_fn)
+        self.assertTrue(result.passed)
+
+    def test_fails_when_dir_missing(self):
+        exec_fn = MagicMock(return_value=_completed(1))
+        result = check_dir_non_empty("/some/dir")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("not a directory", result.detail)
+
+    def test_fails_when_dir_empty(self):
+        exec_fn = MagicMock(
+            side_effect=[
+                _completed(0),  # test -d
+                _completed(0, stdout=""),  # find produces no output
+            ]
+        )
+        result = check_dir_non_empty("/some/dir")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("empty", result.detail)
+
+    def test_fails_when_find_errors(self):
+        exec_fn = MagicMock(
+            side_effect=[
+                _completed(0),
+                _completed(1, stderr="find: bad"),
+            ]
+        )
+        result = check_dir_non_empty("/some/dir")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("find", result.detail)
 
 
 class CheckFileNotExistsTests(unittest.TestCase):

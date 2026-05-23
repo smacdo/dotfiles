@@ -76,6 +76,29 @@ def check_file_not_exists(path: str) -> Check:
     return _run
 
 
+def check_dir_non_empty(path: str) -> Check:
+    """Pass if `path` is a directory containing at least one entry. Stronger
+    than `check_dir_exists` for cases where the directory must have been
+    populated (e.g. `:PlugInstall` actually installed plugins)."""
+    name = f"dir non-empty: {path}"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        is_dir = exec_fn(["test", "-d", path])
+        if is_dir.returncode != 0:
+            return CheckResult(name, False, f"{path} is not a directory")
+
+        # `find -mindepth 1 -maxdepth 1` lists immediate children (including
+        # hidden) without shell quoting concerns.
+        result = exec_fn(["find", path, "-mindepth", "1", "-maxdepth", "1"])
+        if result.returncode != 0:
+            return CheckResult(name, False, f"find {path} failed: {result.stderr.strip()}")
+        if not result.stdout.strip():
+            return CheckResult(name, False, f"{path} exists but is empty")
+        return CheckResult(name, True)
+
+    return _run
+
+
 def check_command_succeeds(cmd: list[str]) -> Check:
     """Pass if `cmd` exits 0; fail otherwise. Use for `zsh -c 'source ~/.zshrc'`,
     `nvim --headless -c 'q'`, etc. — checks "does it load/run cleanly" without
@@ -235,6 +258,11 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # Downloaded artifacts (plug.vim for vim and nvim).
     check_file_contains(f"{_XDG_DATA}/vim/site/autoload/plug.vim", "plug#begin"),
     check_file_contains(f"{_XDG_DATA}/nvim/site/autoload/plug.vim", "plug#begin"),
+    # Plugins were actually installed by `:PlugInstall` (catches the silent
+    # no-op bug we hit when bootstrap was using `+'PlugInstall --sync'`).
+    # Only nvim has plugins configured today (vim has no plug#begin block in
+    # init.vim); add a vim check too if that ever changes.
+    check_dir_non_empty(f"{_XDG_DATA}/nvim/plugged"),
     # powerlevel10k cloned — presence of .git confirms a real clone, not a stub dir.
     check_dir_exists(f"{_XDG_DATA}/powerlevel10k/.git"),
 ]
