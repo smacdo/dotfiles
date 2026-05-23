@@ -147,6 +147,7 @@ def run_exec(
     label: str,
 ) -> bool:
     """Run `<runtime> exec` and log output on failure. Returns False on failure/timeout."""
+    logging.info(f"  → {label}")
     full_cmd = [runtime, "exec", container_name, *cmd]
     try:
         result = subprocess.run(
