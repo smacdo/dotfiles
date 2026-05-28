@@ -15,18 +15,14 @@ fi
 # Make neovim -> vim -> nano -> vi the default editor.
 # (Weird note that `nvim -s` is not silent despite the man page on OSX stating
 #  it doesn't print output!)
-if which nvim >/dev/null; then
+if command -v nvim >/dev/null 2>&1; then
   export EDITOR='nvim'
+elif command -v vim >/dev/null 2>&1; then
+  export EDITOR='vim'
+elif command -v nano >/dev/null 2>&1; then
+  export EDITOR='nano'
 else
-  if which vim >/dev/null; then
-    export EDITOR='vim'
-  else
-    if which nano >/dev/null; then
-      export EDITOR='nano'
-    else
-      export EDITOR='vi'
-    fi
-  fi
+  export EDITOR='vi'
 fi
 
 ### TODO: Only apply these settings for interactive shells. ###
