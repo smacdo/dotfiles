@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 from _pydotlib.cli import ColoredLogFormatter
-from _pydotlib.integration_checks import BOOTSTRAP_CHECKS
+from _pydotlib.integration_checks import BACKUP_SENTINEL, BOOTSTRAP_CHECKS
 
 RUNTIME_AUTO = "auto"
 RUNTIME_CHOICES = (RUNTIME_AUTO, "podman", "docker")
@@ -210,6 +210,24 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         return False
 
     try:
+        # Seed pre-existing user content in ~/.bashrc so bootstrap has
+        # something to back up. The .bashrc.ORIGINAL check in BOOTSTRAP_CHECKS
+        # verifies safe_symlink() preserved this content before symlinking —
+        # the "bootstrap never destroys user data" invariant.
+        seed_cmd = [
+            "bash",
+            "-c",
+            f"echo '{BACKUP_SENTINEL}' > /home/testuser/.bashrc",
+        ]
+        if not run_exec(
+            runtime,
+            container_name,
+            seed_cmd,
+            timeout=10,
+            label="seed pre-bootstrap ~/.bashrc (backup test)",
+        ):
+            return False
+
         bootstrap_cmd = [
             "bash",
             "-c",

@@ -195,9 +195,19 @@ _DOTFILES = f"{_HOME}/.dotfiles"
 
 _XDG_DATA = f"{_HOME}/.local/share"
 
+# Pre-bootstrap sentinel content the runner writes to ~/.bashrc before invoking
+# bootstrap. After bootstrap, this content must appear in ~/.bashrc.ORIGINAL —
+# the file safe_symlink() backs up before replacing. Anchors the "bootstrap
+# never destroys user data" check below.
+BACKUP_SENTINEL = "SENTINEL_BACKUP_TEST_PRE_BOOTSTRAP"
+
 BOOTSTRAP_CHECKS: list[Check] = [
     # Symlinks (sample — same shape applies to the other dotfiles).
     check_symlink(f"{_HOME}/.bashrc", f"{_DOTFILES}/.bashrc"),
+    # Backup safety: bootstrap must NEVER destroy user data. The runner seeds
+    # ~/.bashrc with BACKUP_SENTINEL pre-bootstrap; verify safe_symlink()
+    # moved the original content to ~/.bashrc.ORIGINAL before symlinking.
+    check_file_contains(f"{_HOME}/.bashrc.ORIGINAL", BACKUP_SENTINEL),
     check_symlink(f"{_HOME}/.bash_profile", f"{_DOTFILES}/.bash_profile"),
     check_symlink(f"{_HOME}/.gitconfig", f"{_DOTFILES}/.gitconfig"),
     check_symlink(f"{_HOME}/.tmux.conf", f"{_DOTFILES}/.tmux.conf"),
