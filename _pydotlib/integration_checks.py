@@ -201,6 +201,11 @@ def check_tmux_config(conf_path: str, socket: str = "dotfiles_ci_test") -> Check
     name = f"tmux loads {conf_path}"
 
     def _run(exec_fn: ExecFn) -> CheckResult:
+        # Best-effort: clear any server left on this socket by an interrupted
+        # prior run, so a leftover "probe" session can't fail new-session below
+        # with "duplicate session". No-op when no server is running.
+        exec_fn(["tmux", "-L", socket, "kill-server"])
+
         # Start with an empty config (`-f /dev/null`) so `source-file` is the
         # sole, error-surfacing load.
         start = exec_fn(
