@@ -14,6 +14,7 @@ from _pydotlib.integration_checks import (
     check_file_contains,
     check_file_not_exists,
     check_symlink,
+    check_tmux_config,
 )
 
 
@@ -253,6 +254,59 @@ class BootstrapChecksSmokeTests(unittest.TestCase):
         for check in BOOTSTRAP_CHECKS:
             result = check(exec_fn)
             self.assertIsInstance(result, CheckResult)
+
+
+class CheckTmuxConfigTests(unittest.TestCase):
+    def test_passes_when_source_file_succeeds(self):
+        exec_fn = MagicMock(
+            side_effect=[
+                _completed(0),  # new-session (start server)
+                _completed(0),  # source-file
+                _completed(0),  # kill-server
+            ]
+        )
+        result = check_tmux_config("/h/.tmux.conf")(exec_fn)
+        self.assertTrue(result.passed)
+        self.assertEqual(exec_fn.call_count, 3)
+
+    def test_uses_isolated_socket_and_empty_startup_config(self):
+        # The two load-bearing design choices: never touch a real server (-L)
+        # and let source-file be the sole error-surfacing load (-f /dev/null).
+        exec_fn = MagicMock(side_effect=[_completed(0), _completed(0), _completed(0)])
+        check_tmux_config("/h/.tmux.conf", socket="probe_sock")(exec_fn)
+        start_cmd = exec_fn.call_args_list[0].args[0]
+        self.assertIn("-L", start_cmd)
+        self.assertIn("probe_sock", start_cmd)
+        self.assertIn("/dev/null", start_cmd)
+        source_cmd = exec_fn.call_args_list[1].args[0]
+        self.assertIn("source-file", source_cmd)
+
+    def test_always_kills_server_after_source_file(self):
+        exec_fn = MagicMock(side_effect=[_completed(0), _completed(1), _completed(0)])
+        check_tmux_config("/h/.tmux.conf")(exec_fn)
+        kill_cmd = exec_fn.call_args_list[-1].args[0]
+        self.assertIn("kill-server", kill_cmd)
+
+    def test_fails_when_server_does_not_start(self):
+        exec_fn = MagicMock(return_value=_completed(1, stderr="no server"))
+        result = check_tmux_config("/h/.tmux.conf")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("failed to start", result.detail)
+        # Bails before source-file/kill — only the start call happened.
+        self.assertEqual(exec_fn.call_count, 1)
+
+    def test_fails_when_source_file_errors(self):
+        exec_fn = MagicMock(
+            side_effect=[
+                _completed(0),
+                _completed(1, stderr="invalid option: foo"),
+                _completed(0),
+            ]
+        )
+        result = check_tmux_config("/h/.tmux.conf")(exec_fn)
+        self.assertFalse(result.passed)
+        self.assertIn("source-file exit 1", result.detail)
+        self.assertIn("invalid option", result.detail)
 
 
 class NativeChecksSmokeTests(unittest.TestCase):

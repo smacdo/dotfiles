@@ -186,6 +186,47 @@ def check_file_contains(path: str, expected: str) -> Check:
     return _run
 
 
+def check_tmux_config(conf_path: str, socket: str = "dotfiles_ci_test") -> Check:
+    """Pass if tmux loads `conf_path` without error.
+
+    Loads the config via an explicit `source-file` against a detached server on
+    a private `-L` socket. This matters two ways: `-L` never touches the user's
+    real (default-socket) server, and `source-file` surfaces config errors that
+    `tmux -f conf` at startup silently swallows (no attached client → errors
+    discarded). Catches renamed/removed options across tmux versions, unknown
+    commands, bad args/values, and missing `run-shell` binaries. Does NOT catch
+    unterminated quotes or unmatched `#{` format braces — tmux validates formats
+    lazily at render. See TODO.md for the gaps and helper-script coverage.
+    """
+    name = f"tmux loads {conf_path}"
+
+    def _run(exec_fn: ExecFn) -> CheckResult:
+        # Start with an empty config (`-f /dev/null`) so `source-file` is the
+        # sole, error-surfacing load.
+        start = exec_fn(
+            ["tmux", "-L", socket, "-f", "/dev/null", "new-session", "-d", "-s", "probe"]
+        )
+        if start.returncode != 0:
+            return CheckResult(
+                name, False, f"tmux server failed to start: {start.stderr.strip()}"
+            )
+
+        try:
+            res = exec_fn(["tmux", "-L", socket, "source-file", conf_path])
+        finally:
+            exec_fn(["tmux", "-L", socket, "kill-server"])
+
+        if res.returncode != 0:
+            return CheckResult(
+                name,
+                False,
+                f"source-file exit {res.returncode}: {res.stderr.strip()}",
+            )
+        return CheckResult(name, True)
+
+    return _run
+
+
 # `/home/testuser` is the container user's home — set by every Dockerfile's
 # `useradd -m testuser` and matched by the runner's bind mount of the repo at
 # `/home/testuser/.dotfiles`. Keep these three in sync (see CLAUDE.md
@@ -237,6 +278,7 @@ def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Chec
         check_dir_exists(f"{xdg_data}/powerlevel10k/.git"),
         check_command_succeeds(["vim", "-e", "-s", "-c", "q"]),
         check_command_succeeds(["nvim", "--headless", "-c", "q"]),
+        check_tmux_config(f"{home}/.tmux.conf"),
     ]
 
     if platform == "darwin":
@@ -322,6 +364,9 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # See TODO.md for the path to a real init-validation check.
     check_command_succeeds(["vim", "-e", "-s", "-c", "q"]),
     check_command_succeeds(["nvim", "--headless", "-c", "q"]),
+    # tmux loads the config under this distro's tmux version (catches option
+    # drift across versions). source-file surfaces errors that `tmux -f` swallows.
+    check_tmux_config(f"{_HOME}/.tmux.conf"),
     # Downloaded artifacts (plug.vim for vim and nvim).
     check_file_contains(f"{_XDG_DATA}/vim/site/autoload/plug.vim", "plug#begin"),
     check_file_contains(f"{_XDG_DATA}/nvim/site/autoload/plug.vim", "plug#begin"),

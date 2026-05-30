@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y \
     git \
     neovim \
     python3 \
+    tmux \
     vim \
     zsh \
     && rm -rf /var/lib/apt/lists/*
