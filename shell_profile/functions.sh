@@ -83,7 +83,8 @@ detect_os() {
       export DOT_ARCH_BITS=32
       export DOT_ARCH=x86_32
       ;;
-  arm64)
+  arm64 | aarch64)
+      # macOS reports "arm64", Linux reports "aarch64"; both are 64-bit ARM.
       export DOT_ARCH_BITS=64
       export DOT_ARCH=arm64
       ;;
