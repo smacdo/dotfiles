@@ -283,11 +283,21 @@ def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Chec
 
     if platform == "darwin":
         checks.extend([
+            # DOTFILE_CI_TEST_MODE=1 bypasses .bashrc's non-interactive early
+            # return so detect_os() actually runs (it's sourced after the guard;
+            # .bash_profile doesn't load functions.sh). `env -u` clears any
+            # inherited DOT_OS/DOT_DIST so the check passes only if detect_os set
+            # them — otherwise an ambient value from the caller's shell masks a
+            # broken detection.
             check_command_output_matches(
-                ["bash", "-lc", "echo $DOT_OS"], "macos"
+                ["env", "-u", "DOT_OS", "DOTFILE_CI_TEST_MODE=1",
+                 "bash", "-lc", "echo $DOT_OS"],
+                "macos",
             ),
             check_command_output_matches(
-                ["bash", "-lc", "echo $DOT_DIST"], "darwin"
+                ["env", "-u", "DOT_DIST", "DOTFILE_CI_TEST_MODE=1",
+                 "bash", "-lc", "echo $DOT_DIST"],
+                "darwin",
             ),
             # BSD script(1): -q suppresses banners but still emits control
             # characters, so use check_command_succeeds (not _silent). Exit
