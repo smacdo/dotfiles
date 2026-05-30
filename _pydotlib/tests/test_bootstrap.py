@@ -20,6 +20,7 @@ from _pydotlib.bootstrap import (
     git_clone,
     git_clone_repos,
     find_dotfiles_root,
+    initialize_vim_plugin_manager,
     is_dotfiles_root,
     safe_symlink,
 )
@@ -526,6 +527,49 @@ class TestGitClone(unittest.TestCase):
             )
 
             mock_run.assert_called_once()
+
+
+class TestInitializeVimPluginManager(unittest.TestCase):
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("subprocess.check_call")
+    @patch("shutil.which", return_value="/usr/bin/nvim")
+    def test_runs_plug_install_for_nvim(self, _which, mock_check_call, _net):
+        initialize_vim_plugin_manager(dry_run=False)
+        mock_check_call.assert_called_once()
+        cmd = mock_check_call.call_args[0][0]
+        self.assertEqual(cmd[0], "nvim")
+        self.assertIn("PlugInstall --sync", cmd)
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("subprocess.check_call")
+    @patch("shutil.which", return_value="/usr/bin/anything")
+    def test_never_invokes_vim_even_when_present(self, _which, mock_check_call, _net):
+        # Regression guard: vim has no plug#begin, so it must never be invoked
+        # even though it's "installed". Catches reintroducing the editor loop.
+        initialize_vim_plugin_manager(dry_run=False)
+        invoked = [c.args[0][0] for c in mock_check_call.call_args_list]
+        self.assertEqual(invoked, ["nvim"])
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("subprocess.check_call")
+    @patch("shutil.which", return_value="/usr/bin/nvim")
+    def test_dry_run_does_not_invoke_editor(self, _which, mock_check_call, _net):
+        initialize_vim_plugin_manager(dry_run=True)
+        mock_check_call.assert_not_called()
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=True)
+    @patch("subprocess.check_call")
+    @patch("shutil.which", return_value=None)
+    def test_skips_when_nvim_not_installed(self, _which, mock_check_call, _net):
+        initialize_vim_plugin_manager(dry_run=False)
+        mock_check_call.assert_not_called()
+
+    @patch("_pydotlib.bootstrap._has_internet", return_value=False)
+    @patch("subprocess.check_call")
+    @patch("shutil.which", return_value="/usr/bin/nvim")
+    def test_skips_when_offline(self, _which, mock_check_call, _net):
+        initialize_vim_plugin_manager(dry_run=False)
+        mock_check_call.assert_not_called()
 
 
 class TestConfigureClaudeCode(unittest.TestCase):

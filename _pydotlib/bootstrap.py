@@ -209,7 +209,13 @@ def configure_weather_location(
 
 def initialize_vim_plugin_manager(dry_run: bool) -> None:
     """
-    Initializes the vim-plug plugin manager for vim and neovim, if they are installed on the system.
+    Initializes the vim-plug plugin manager for neovim, if it is installed.
+
+    Only nvim is handled: init.vim sets up vim-plug under `has('nvim')`, so plain
+    vim has no `plug#begin` block and no plugins to install — running PlugInstall
+    there errors with `E492: Not an editor command`. (plug.vim is still
+    downloaded for vim so it's available if plugins are added manually.) Add vim
+    here if it ever gets a `plug#begin` block.
     """
     dry_text = "[DRY RUN] " if dry_run else ""
 
@@ -217,19 +223,18 @@ def initialize_vim_plugin_manager(dry_run: bool) -> None:
         logging.warning("No internet connectivity detected - skipping vim plugin install")
         return
 
-    for editor in ("nvim", "vim"):
-        if shutil.which(editor) is None:
-            logging.info(f"{dry_text}{editor} not installed - skip initializing vim-plug")
-            continue
+    if shutil.which("nvim") is None:
+        logging.info(f"{dry_text}nvim not installed - skip initializing vim-plug")
+        return
 
-        logging.info(f"{dry_text}Initializing vim-plug for {editor}")
+    logging.info(f"{dry_text}Initializing vim-plug for nvim")
 
-        if not dry_run:
-            # Use `-c "CMD"` per Ex command, not `+'CMD'`. The `+'CMD'` form
-            # works in a shell (which strips the single quotes) but via
-            # `subprocess` the literal quotes are passed to vim, which then
-            # parses `'P` as a mark reference and silently no-ops the install.
-            subprocess.check_call([editor, "-c", "PlugInstall --sync", "-c", "qa"])
+    if not dry_run:
+        # Use `-c "CMD"` per Ex command, not `+'CMD'`. The `+'CMD'` form works in
+        # a shell (which strips the single quotes) but via `subprocess` the
+        # literal quotes are passed to nvim, which parses `'P` as a mark
+        # reference and silently no-ops the install.
+        subprocess.check_call(["nvim", "-c", "PlugInstall --sync", "-c", "qa"])
 
 
 def is_dotfiles_root(path: Path) -> bool:
