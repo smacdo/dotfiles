@@ -201,6 +201,63 @@ _XDG_DATA = f"{_HOME}/.local/share"
 # never destroys user data" check below.
 BACKUP_SENTINEL = "SENTINEL_BACKUP_TEST_PRE_BOOTSTRAP"
 
+
+def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Check]:
+    """Build a check list for native (non-container) host testing.
+
+    Unlike BOOTSTRAP_CHECKS, this list is parameterized by paths and uses
+    structural assertions (e.g. "git config user.name exits 0") rather than
+    value assertions (e.g. "git config user.name contains Testy McTestFace").
+    This lets the same check list work for both CI (fresh bootstrap with test
+    values) and local (user's real values).
+    """
+    xdg_data = f"{home}/.local/share"
+    xdg_state = f"{home}/.local/state"
+
+    checks: list[Check] = [
+        check_symlink(f"{home}/.bashrc", f"{dotfiles}/.bashrc"),
+        check_symlink(f"{home}/.bash_profile", f"{dotfiles}/.bash_profile"),
+        check_symlink(f"{home}/.gitconfig", f"{dotfiles}/.gitconfig"),
+        check_symlink(f"{home}/.tmux.conf", f"{dotfiles}/.tmux.conf"),
+        check_symlink(f"{home}/.vimrc", f"{dotfiles}/settings/nvim/init.vim"),
+        check_symlink(f"{home}/.vim", f"{dotfiles}/.vim"),
+        check_dir_exists(f"{xdg_state}/vim/backups"),
+        check_dir_exists(f"{xdg_state}/vim/tmp"),
+        check_command_succeeds(["git", "config", "user.name"]),
+        check_command_succeeds(["git", "config", "user.email"]),
+        check_command_silent(
+            ["env", "DOTFILE_CI_TEST_MODE=1", "bash", "-lc", "true"]
+        ),
+        check_file_contains(
+            f"{xdg_data}/vim/site/autoload/plug.vim", "plug#begin"
+        ),
+        check_file_contains(
+            f"{xdg_data}/nvim/site/autoload/plug.vim", "plug#begin"
+        ),
+        check_dir_exists(f"{xdg_data}/powerlevel10k/.git"),
+        check_command_succeeds(["vim", "-e", "-s", "-c", "q"]),
+        check_command_succeeds(["nvim", "--headless", "-c", "q"]),
+    ]
+
+    if platform == "darwin":
+        checks.extend([
+            check_command_output_matches(
+                ["bash", "-lc", "echo $DOT_OS"], "macos"
+            ),
+            check_command_output_matches(
+                ["bash", "-lc", "echo $DOT_DIST"], "darwin"
+            ),
+            # BSD script(1): -q suppresses banners but still emits control
+            # characters, so use check_command_succeeds (not _silent). Exit
+            # code propagation is default on BSD (no -e flag needed).
+            check_command_succeeds(
+                ["script", "-q", "/dev/null", "zsh", "-ilc", "true"]
+            ),
+        ])
+
+    return checks
+
+
 BOOTSTRAP_CHECKS: list[Check] = [
     # Symlinks (sample — same shape applies to the other dotfiles).
     check_symlink(f"{_HOME}/.bashrc", f"{_DOTFILES}/.bashrc"),

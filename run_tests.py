@@ -13,7 +13,13 @@ import unittest
 from pathlib import Path
 
 from _pydotlib.cli import ColoredLogFormatter
-from _pydotlib.integration_checks import BACKUP_SENTINEL, BOOTSTRAP_CHECKS
+from _pydotlib.integration_checks import (
+    BACKUP_SENTINEL,
+    BOOTSTRAP_CHECKS,
+    Check,
+    ExecFn,
+    build_native_checks,
+)
 
 RUNTIME_AUTO = "auto"
 RUNTIME_CHOICES = (RUNTIME_AUTO, "podman", "docker")
@@ -269,37 +275,56 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         remove_container(runtime, container_name)
 
 
-def run_integration_checks(runtime: str, container_name: str) -> bool:
-    """Run the BOOTSTRAP_CHECKS suite inside `container_name`, log each, return overall pass."""
+def _make_timeout_exec_fn(base_cmd: list[str]) -> ExecFn:
+    """Build an exec_fn that prefixes commands with `base_cmd` and handles timeouts."""
 
-    def exec_in_container(cmd: list[str]) -> subprocess.CompletedProcess:
-        full_cmd = [runtime, "exec", container_name, *cmd]
+    def exec_fn(cmd: list[str]) -> subprocess.CompletedProcess:
+        full_cmd = [*base_cmd, *cmd]
         try:
             return subprocess.run(
                 full_cmd, capture_output=True, text=True, check=False,
                 timeout=CHECK_TIMEOUT_SECS,
             )
         except subprocess.TimeoutExpired as e:
-            # Synthesize a failing CompletedProcess so the check function sees
-            # rc != 0 and surfaces a meaningful detail. Prevents one stuck
-            # check (e.g. a shell init misbehaving and prompting on stdin)
-            # from hanging the entire test suite.
+            # Synthesize rc=124 so the check sees a failure instead of hanging the suite.
             return subprocess.CompletedProcess(
                 args=full_cmd,
-                returncode=124,  # GNU `timeout(1)` convention
+                returncode=124,
                 stdout=e.stdout or "",
                 stderr=(e.stderr or "") + f"\n<timed out after {CHECK_TIMEOUT_SECS}s>",
             )
 
+    return exec_fn
+
+
+def run_checks(checks: list[Check], exec_fn: ExecFn) -> bool:
+    """Run a check suite, log each result, return overall pass."""
     all_passed = True
-    for check in BOOTSTRAP_CHECKS:
-        result = check(exec_in_container)
+    for check in checks:
+        result = check(exec_fn)
         if result.passed:
             logging.info(f"  ✓ {result.name}")
         else:
             logging.error(f"  ✗ {result.name}: {result.detail}")
             all_passed = False
     return all_passed
+
+
+def run_integration_checks(runtime: str, container_name: str) -> bool:
+    """Run the BOOTSTRAP_CHECKS suite inside `container_name`."""
+    exec_fn = _make_timeout_exec_fn([runtime, "exec", container_name])
+    return run_checks(BOOTSTRAP_CHECKS, exec_fn)
+
+
+def run_native_test(repo_root: Path) -> bool:
+    """Run native host smoke tests against the current machine's bootstrapped state."""
+    home = str(Path.home())
+    dotfiles = str(repo_root.resolve())
+    platform = sys.platform
+    checks = build_native_checks(home, dotfiles, platform=platform)
+    logging.info(f"running {len(checks)} native checks (platform={platform})")
+    exec_fn = _make_timeout_exec_fn([])
+    return run_checks(checks, exec_fn)
 
 
 def run_shell_syntax_tests() -> bool:
@@ -415,16 +440,26 @@ def main() -> int:
         default=RUNTIME_AUTO,
         help="Container runtime for integration tests (default: auto-detect, podman preferred)",
     )
-    docker = args_parser.add_mutually_exclusive_group()
-    docker.add_argument(
+    args_parser.add_argument(
         "--no-docker",
         action="store_true",
         help="Skip container integration tests",
     )
-    docker.add_argument(
+    only = args_parser.add_mutually_exclusive_group()
+    only.add_argument(
         "--docker-only",
         action="store_true",
         help="Run only container integration tests",
+    )
+    only.add_argument(
+        "--native-only",
+        action="store_true",
+        help="Run only native host smoke tests",
+    )
+    args_parser.add_argument(
+        "--native",
+        action="store_true",
+        help="Include native host smoke tests (for macOS development)",
     )
 
     args = args_parser.parse_args()
@@ -435,7 +470,16 @@ def main() -> int:
     logging.getLogger().addHandler(log_handler)
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    if not args.docker_only:
+    run_syntax_and_unit = not args.docker_only and not args.native_only
+    run_docker = not args.no_docker and not args.native_only
+    run_native = args.native or args.native_only
+
+    if not run_syntax_and_unit and not run_docker and not run_native:
+        args_parser.error("flag combination results in no tests being selected")
+
+    repo_root = Path(__file__).parent
+
+    if run_syntax_and_unit:
         if not run_shell_syntax_tests():
             logging.critical("shell syntax tests failed - aborting")
             return 1
@@ -444,13 +488,12 @@ def main() -> int:
             logging.critical("pydotlib unit tests failed - aborting")
             return 1
 
-    if not args.no_docker:
+    if run_docker:
         runtime = detect_runtime(args.runtime)
         logging.info(f"using container runtime: {runtime}")
         if not check_runtime(runtime):
             return 1
 
-        repo_root = Path(__file__).parent
         flavors = discover_flavors(repo_root)
         if not flavors:
             logging.warning(f"no Dockerfiles found under {repo_root / 'tests' / 'docker'}")
@@ -460,6 +503,11 @@ def main() -> int:
             if not run_container_test(runtime, repo_root, flavor):
                 all_passed = False
         if not all_passed:
+            return 1
+
+    if run_native:
+        if not run_native_test(repo_root):
+            logging.critical("native host tests failed")
             return 1
 
     logging.info("All tests passed!")

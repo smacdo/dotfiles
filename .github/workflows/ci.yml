@@ -40,3 +40,31 @@ jobs:
 
       - name: Integration tests
         run: python3 run_tests.py --docker-only
+
+  macos-integration:
+    runs-on: macos-latest
+    needs: lint-and-test
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install vim and neovim
+        run: |
+          command -v vim >/dev/null || brew install vim
+          brew install neovim
+
+      - name: Link dotfiles to HOME
+        run: ln -s "$GITHUB_WORKSPACE" "$HOME/.dotfiles"
+
+      - name: Bootstrap (run twice for idempotency)
+        run: |
+          for _ in 1 2; do
+            python3 bootstrap.py -v \
+              --git-name 'Testy McTestFace' \
+              --git-email 'testy@test.com' \
+              --weather-location 'Seattle' \
+              < /dev/null
+          done
+
+      - name: Native integration tests
+        run: python3 run_tests.py --native-only

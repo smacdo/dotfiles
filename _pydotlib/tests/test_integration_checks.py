@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from _pydotlib.integration_checks import (
     BOOTSTRAP_CHECKS,
     CheckResult,
+    build_native_checks,
     check_command_output_matches,
     check_command_silent,
     check_command_succeeds,
@@ -252,3 +253,42 @@ class BootstrapChecksSmokeTests(unittest.TestCase):
         for check in BOOTSTRAP_CHECKS:
             result = check(exec_fn)
             self.assertIsInstance(result, CheckResult)
+
+
+class NativeChecksSmokeTests(unittest.TestCase):
+    def test_linux_returns_non_empty_list(self):
+        checks = build_native_checks("/home/user", "/home/user/.dotfiles", platform="linux")
+        self.assertTrue(len(checks) > 0)
+
+    def test_darwin_returns_more_checks_than_linux(self):
+        linux = build_native_checks("/home/user", "/home/user/.dotfiles", platform="linux")
+        darwin = build_native_checks("/Users/user", "/Users/user/.dotfiles", platform="darwin")
+        self.assertGreater(len(darwin), len(linux))
+
+    def test_symlink_targets_point_from_home_into_dotfiles(self):
+        # Guards against swapping the home/dotfiles args or a wrong subpath:
+        # check counts/callability alone stay green if the link/target reverse.
+        checks = build_native_checks("/h", "/h/.dotfiles", platform="linux")
+        names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
+        self.assertTrue(
+            any("/h/.bashrc -> /h/.dotfiles/.bashrc" in n for n in names)
+        )
+
+    def test_darwin_includes_macos_specific_checks(self):
+        checks = build_native_checks("/Users/user", "/Users/user/.dotfiles", platform="darwin")
+        names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
+        macos_names = [n for n in names if "DOT_OS" in n or "DOT_DIST" in n or "zsh" in n]
+        self.assertGreater(len(macos_names), 0)
+
+    def test_linux_excludes_macos_specific_checks(self):
+        checks = build_native_checks("/home/user", "/home/user/.dotfiles", platform="linux")
+        names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
+        macos_names = [n for n in names if "DOT_OS" in n or "DOT_DIST" in n or "zsh" in n]
+        self.assertEqual(len(macos_names), 0)
+
+    def test_every_check_is_callable_and_returns_result(self):
+        exec_fn = MagicMock(return_value=_completed(0, stdout=""))
+        for platform in ("linux", "darwin"):
+            for check in build_native_checks("/home/u", "/home/u/.dotfiles", platform=platform):
+                result = check(exec_fn)
+                self.assertIsInstance(result, CheckResult)
