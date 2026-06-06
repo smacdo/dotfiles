@@ -110,9 +110,6 @@ HISTCONTROL=ignoredups  # Do not write duplicate commands to history.
 HISTTIMEFORMAT='%F %T  ' # Add timestamps to history entries.
 HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/bash_history_actual # Use non-standard name to avoid wiping out history file.
 
-# Complete hostnames using this file
-export HOSTFILE=${HOME}/.ssh/known_hosts
-
 # Readline config
 export INPUTRC=${HOME}/.inputrc
 

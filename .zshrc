@@ -69,9 +69,7 @@ HISTSIZE=10000          # Ten thousand entries for in-memory storage.
 SAVEHIST=1000000        # One million entries
 HISTFILE=${XDG_STATE_HOME:-${HOME}/.local/state}/zsh_history
 
-setopt SHARE_HISTORY      # Share history across multiple zsh sessions.
-setopt APPEND_HISTORY     # Append to history file instead of overwriting.
-setopt INC_APPEND_HISTORY # Update history after every command.
+setopt SHARE_HISTORY      # Share history across sessions (implies INC_APPEND_HISTORY).
 setopt HIST_FIND_NO_DUPS  # Ignore duplicates when searching
 setopt HIST_REDUCE_BLANKS # Remove blank lines from history.
 
@@ -159,13 +157,15 @@ fi
 
 # Load iTerm2 shell integration script.
 if [[ "${TERM_PROGRAM}" = "iTerm.app" ]]; then
-    source "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
+    source_first "${S_DOTFILE_ROOT}/vendor/iterm2/zsh"
 fi
 
 # Load fzf support.
 if is_osx; then
-  source_first "${BREW_PREFIX}/opt/fzf/shell/completion.zsh"
-  source_first "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
+  if [[ -n "${BREW_PREFIX:-}" ]]; then
+    source_first "${BREW_PREFIX}/opt/fzf/shell/completion.zsh"
+    source_first "${BREW_PREFIX}/opt/fzf/shell/key-bindings.zsh"
+  fi
 else
   if [[ -f /usr/share/fzf/shell/key-bindings.zsh ]]; then
     source /usr/share/fzf/shell/completion.zsh 2>/dev/null

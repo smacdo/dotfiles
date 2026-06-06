@@ -28,6 +28,9 @@ xdg_define()
     if [ ! -d "${ACTUAL_VAL}" ]; then
         mkdir -p "${ACTUAL_VAL}"
     fi
+
+    # Don't leak the temporaries into the shell environment after returning.
+    unset ENV_NAME CURRENT_VAL DEFAULT_DIR ACTUAL_VAL
 }
 
 xdg_define "XDG_DATA_HOME" "${XDG_DATA_HOME}" "${HOME}/.local/share"

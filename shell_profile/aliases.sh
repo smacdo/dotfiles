@@ -13,30 +13,30 @@ alias v='/usr/bin/env "$EDITOR"'
 alias vi='/usr/bin/env "$EDITOR"'
 
 ### ls
+# `la`/`ll`/`lls` below inherit color via the `ls` alias (recursive first-word
+# alias expansion), so they don't need to repeat the color flag.
 if is_osx; then
     alias ls='ls -G'
-    ls_color_flag='-G'
 else
     alias ls='ls --color'
-    ls_color_flag='--color'
 fi
 
 # List all files (including hidden files).
 #  -a, --all      [do not ignore entries starting with '.']
-alias la='ls -a "${ls_color_flag}"'
+alias la='ls -a'
 
 # List files in a tabular form.
 #  -a, --all      [do not ignore entries starting with `.`]
 #  -l             [use a long listing format]
 #  -F, --classify [append indicator (*/=>@|) to entries]
-alias ll='ls -alF "${ls_color_flag}"'
+alias ll='ls -alF'
 
 # List files in a tabular form with human readable sizes.
 #  -a, --all      [do not ignore entries starting with `.`]
 #  -l             [use a long listing format]
 #  -F, --classify [append indicator (*/=>@|) to entries]
 #  -h             [use human readable sizes]
-alias lls='ls -alFh "${ls_color_flag}"'
+alias lls='ls -alFh'
 
 # go two directories up.
 alias ...='../..'
@@ -93,8 +93,8 @@ alias cp='cp -i'
 
 # Colorize grep output.
 alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+alias fgrep='grep -F --color=auto'
+alias egrep='grep -E --color=auto'
 alias zgrep='zgrep --color=auto'
 alias zegrep='zegrep --color=auto'
 alias zfgrep='zfgrep --color=auto'
@@ -103,8 +103,8 @@ alias zfgrep='zfgrep --color=auto'
 #   sleep 10; alert
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
 
-# Prints the current path, with one directory per line.
-alias printpath='echo -e ${PATH//:/\\n}'
+# Prints the current path, with one directory per line (delegates to show_path).
+alias printpath='show_path'
 
 # Force shell to reload. This is brute force, not sure if recommended...
 alias reloadshell="exec \"\${SHELL}\" -l"
