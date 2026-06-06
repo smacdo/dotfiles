@@ -146,7 +146,7 @@ def main() -> int:
         depth=1,
         repos=[
             (
-                "https://gitee.com/romkatv/powerlevel10k.git",
+                "https://github.com/romkatv/powerlevel10k.git",
                 xdg_data_dir() / "powerlevel10k",
             ),
         ],

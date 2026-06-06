@@ -75,25 +75,6 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - neovim not detecting BUCK file type
 - neovim should detect hg commit message, and then not hard linebreak on them
 
-## Shell Profile Bugs (from code review)
-
-- **`functions.sh:167` `is_cygwin` broken regex**: `expr "$(uname -s)" : '^CYGWIN*'` uses BRE where
-  `*` means "zero or more of the preceding char", so `CYGWIN*` matches "CYGWI" + zero-or-more "N"s.
-  Fix: change to `'^CYGWIN.*'`.
-
-- **`functions.sh:227` `mkd` passes multiple args to `cd`**: `mkdir -p "$@" && cd "$@"` fails when
-  called with more than one argument since `cd` accepts exactly one. Fix: `cd "$1"` or `cd "${1:-.}"`.
-
-- **`functions.sh:238` `mktmp`: `type pushd` leaks stderr**: In POSIX sh environments where `pushd`
-  doesn't exist, `type pushd >/dev/null` may still emit an error on stderr. Fix: `>/dev/null 2>&1`.
-
-- **`.bash_profile:24` hardcoded `$HOME/.dotfiles` path**: Line 21 correctly uses `$S_DOTFILE_ROOT`
-  but line 24 hardcodes `$HOME/.dotfiles/shell_profile/env.sh`. Breaks non-default install paths.
-  Fix: use `$S_DOTFILE_ROOT/shell_profile/env.sh`.
-
-- **`.bashrc:40` unquoted variable in `[ -z ]`**: `[ -z ${S_DOTFILE_ROOT+x} ]` should be
-  `[ -z "${S_DOTFILE_ROOT+x}" ]`. Inconsistent with the correctly-quoted version in `.zshrc:29`.
-
 ## Shell Profile Potential Issues (from code review)
 
 - **`env.sh:18-29` `which` is not portable**: `which` is not POSIX, not universally available, and on
@@ -141,10 +122,6 @@ problem is the python installed via homebrew or standalone doesn't use the syste
   only checks `lesspipe.sh` variants, but Debian/Ubuntu installs it as `/usr/bin/lesspipe`.
   `.zshrc:149` separately handles this with `eval "$(lesspipe)"`, creating two overlapping code paths
   that could conflict. Consolidate into one approach.
-
-- **`functions.sh:66-69` fragile `sysctl` character-offset parsing on macOS**: Uses hardcoded column
-  offsets (`cut -c 17-`, `cut -c 18-`) to strip the `kern.osrelease: ` prefix. Fix: use
-  `sysctl -n kern.osrelease` and `sysctl -n kern.osrevision` which print only the value.
 
 - **`.zshenv:5-6` unquoted variables in `source` calls**: `source ${S_DOTFILE_ROOT}/shell_profile/paths.sh`
   should be `source "${S_DOTFILE_ROOT}/shell_profile/paths.sh"` to handle paths with spaces.

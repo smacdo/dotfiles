@@ -16,6 +16,12 @@ if [ -f "$HOME/.bashrc" ]; then
     source "$HOME/.bashrc"
 fi
 
+# .bashrc normally exports S_DOTFILE_ROOT, but its non-interactive early-return
+# (e.g. `bash -lc`) returns before doing so. Ensure it's set for the sources below.
+if [ -z "${S_DOTFILE_ROOT+x}" ]; then
+    export S_DOTFILE_ROOT="$HOME/.dotfiles"
+fi
+
 # Load XDG and other custom environment variables.
 if [ -f "$S_DOTFILE_ROOT/shell_profile/xdg.sh" ]; then
     source "$S_DOTFILE_ROOT/shell_profile/xdg.sh"

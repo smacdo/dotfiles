@@ -14,6 +14,11 @@ Entry format:
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
 
+## 2026-06-05
+- **Fixed** `bootstrap.py` cloning powerlevel10k from `gitee.com`, which is unreachable from most networks (and CI), leaving zsh without the powerlevel10k prompt theme. Now clones from `github.com/romkatv/powerlevel10k` (canonical source, matching `tools/install_powerlevel10k.sh`). Existing installs with a populated `~/.local/share/powerlevel10k` are untouched — bootstrap skips clones when the destination exists; installs where the gitee clone had failed get the theme on the next `./bootstrap.py`.
+- **Fixed** `.bash_profile` not sourcing `xdg.sh`/`env.sh` in non-interactive login shells (e.g. `bash -lc`). `.bashrc`'s non-interactive early-return runs before it exports `S_DOTFILE_ROOT`, so the subsequent `$S_DOTFILE_ROOT`-based sources silently no-op'd; `.bash_profile` now sets `S_DOTFILE_ROOT` itself first. Effect: env vars like `EDITOR` and `WEATHER_LOCATION` are now set in `bash -lc` login shells. No action needed.
+- **Fixed** shell-helper bugs in `shell_profile/functions.sh`: `is_cygwin` regex (`^CYGWIN*` matched `CYGWI`), `mkd` failing on multiple args, `mktmp` leaking a `type` error to stderr, and fragile macOS `sysctl` column slicing (now `sysctl -n`). No action needed.
+
 ## 2026-05-29
 - **Fixed** `detect_os()` not recognizing 64-bit ARM on Linux. `uname -m` reports `aarch64` there (macOS reports `arm64`); the unmatched case printed `WARN: Could not detect architecture via 'uname -m'!` at every shell startup and left `DOT_ARCH=0`. Both now map to `DOT_ARCH=arm64`. Affects Linux ARM machines (incl. containers on Apple Silicon); no action needed beyond re-sourcing your shell.
 - **Fixed** `bootstrap.py` running `:PlugInstall` for plain vim, which printed `E492: Not an editor command` on every run — `init.vim` only configures vim-plug under `has('nvim')`, so vim has no `PlugInstall` command. Bootstrap now initializes plugins for nvim only (vim still gets `plug.vim` downloaded, in case you add plugins manually). No action needed.
