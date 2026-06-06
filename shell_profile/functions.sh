@@ -64,9 +64,9 @@ detect_os() {
   elif [ "$UNAME" = "darwin" ] ; then
       export DOT_OS="macos"
       export DOT_DIST="$UNAME"
-      DOT_DIST_VERSION=$(sysctl kern.osrelease | cut -c 17- )
+      DOT_DIST_VERSION=$(sysctl -n kern.osrelease)
       export DOT_DIST_VERSION
-      DOT_DIST_REVISION=$(sysctl kern.osrevision | cut -c 18- )
+      DOT_DIST_REVISION=$(sysctl -n kern.osrevision)
       export DOT_DIST_REVISION
   else
       # Could not detect the operating system or distro :(
@@ -166,7 +166,7 @@ is_wsl() {
 # Returns 0 if the shell is in a Windows Cygwin environment, 1 otherwise.      #
 #------------------------------------------------------------------------------#
 is_cygwin() {
-    expr "$(uname -s)" : '^CYGWIN*' > /dev/null || return 1
+    expr "$(uname -s)" : 'CYGWIN' > /dev/null || return 1
 }
 
 #------------------------------------------------------------------------------#
@@ -226,7 +226,7 @@ cdd() {
 #------------------------------------------------------------------------------#
 mkd() {
     # NOTE: this was `cd "$_"` but `$_` is not supported in POSIX sh.
-    mkdir -p "$@" && cd "$@" || return
+    mkdir -p "$@" && cd "$1" || return
 }
 
 #------------------------------------------------------------------------------#
@@ -237,7 +237,7 @@ mkd() {
 #------------------------------------------------------------------------------#
 mktmp() {
     temp_dir="$(mktemp -d)"
-    if type pushd >/dev/null ; then
+    if type pushd >/dev/null 2>&1 ; then
       # shellcheck disable=SC3044
       pushd "$temp_dir" >/dev/null || return
     else

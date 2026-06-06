@@ -21,7 +21,7 @@ if [ -f "$S_DOTFILE_ROOT/shell_profile/xdg.sh" ]; then
     source "$S_DOTFILE_ROOT/shell_profile/xdg.sh"
 fi
 
-if [ -f "$HOME/.dotfiles/shell_profile/env.sh" ]; then
-    source "$HOME/.dotfiles/shell_profile/env.sh"
+if [ -f "$S_DOTFILE_ROOT/shell_profile/env.sh" ]; then
+    source "$S_DOTFILE_ROOT/shell_profile/env.sh"
 fi
 [ -f "$HOME/.local/share/../bin/env" ] && . "$HOME/.local/share/../bin/env"
