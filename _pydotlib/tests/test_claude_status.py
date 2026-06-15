@@ -50,5 +50,37 @@ class BuildDurationSectionTests(unittest.TestCase):
         self.assertEqual(cs.build_duration_section({"cost": {"total_duration_ms": 2 * 3600 * 1000}}), "◷ 2h")
 
 
+class BuildUsageSectionTests(unittest.TestCase):
+    USAGE = {"total_input_tokens": 12000, "total_output_tokens": 3000}
+
+    def test_shows_actual_cost_from_payload(self):
+        data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 1.2345}}
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k ($1.23)")
+
+    def test_omits_cost_when_absent(self):
+        data = {"context_window": self.USAGE}
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k")
+
+    def test_omits_cost_when_zero(self):
+        data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 0.0}}
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k")
+
+    def test_short_mode_omits_cost(self):
+        data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 1.23}}
+        self.assertEqual(cs.build_usage_section(data, short=True), "↓12k ↑3k")
+
+    def test_rate_limits_take_priority_over_cost(self):
+        data = {
+            "rate_limits": {
+                "five_hour": {"used_percentage": 12},
+                "seven_day": {"used_percentage": 4},
+            },
+            "cost": {"total_cost_usd": 9.99},
+        }
+        result = cs.build_usage_section(data, short=False)
+        self.assertTrue(result.startswith("⏱"))
+        self.assertNotIn("$", result)
+
+
 if __name__ == "__main__":
     unittest.main()

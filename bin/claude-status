@@ -101,24 +101,6 @@ def fmt_tokens(n: int) -> str:
     return f"{round(n / 1000)}k" if n >= 1000 else str(n)
 
 
-# Per-million token prices (input, output) — rough approximations for cost display
-MODEL_PRICING: dict[str, tuple[float, float]] = {
-    "claude-opus": (15.0, 75.0),
-    "claude-sonnet": (3.0, 15.0),
-    "claude-haiku": (0.25, 1.25),
-}
-
-
-def estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float:
-    model_id_lower = model_id.lower()
-    price_in, price_out = 3.0, 15.0  # sonnet fallback
-    for key, (p_in, p_out) in MODEL_PRICING.items():
-        if key in model_id_lower:
-            price_in, price_out = p_in, p_out
-            break
-    return (input_tokens / 1_000_000) * price_in + (output_tokens / 1_000_000) * price_out
-
-
 def color_rate_pct(pct: float, raw: str) -> str:
     if pct >= 80:
         return bold_red(raw)
@@ -130,8 +112,6 @@ def color_rate_pct(pct: float, raw: str) -> str:
 def build_usage_section(data: dict, short: bool) -> str:
     rate_limits = data.get("rate_limits")
     ctx = data.get("context_window") or {}
-    model = data.get("model") or {}
-    model_id = model.get("id", "")
 
     if rate_limits:
         parts: list[str] = []
@@ -148,7 +128,7 @@ def build_usage_section(data: dict, short: bool) -> str:
     out_str = f"↑{fmt_tokens(total_out)}"
     if short:
         return f"{in_str} {out_str}"
-    cost = estimate_cost(model_id, total_in, total_out)
+    cost = (data.get("cost") or {}).get("total_cost_usd") or 0.0
     return f"{in_str} {out_str} (${cost:.2f})" if cost > 0.0 else f"{in_str} {out_str}"
 
 
