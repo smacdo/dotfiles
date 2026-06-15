@@ -10,7 +10,6 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
 
 RESET = "\033[0m"
 DIM = "\033[2m"
@@ -235,37 +234,20 @@ def build_dir_branch_section(data: dict) -> str:
     return result
 
 
-def _get_birth_ts(path: str) -> int | None:
-    # macOS stat: birth time as epoch seconds (-f %SB -t %s)
-    try:
-        r = subprocess.run(
-            ["stat", "-f", "%SB", "-t", "%s", path],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        return int(r.stdout.strip()) if r.returncode == 0 else None
-    except Exception:
-        return None
-
-
 def build_duration_section(data: dict) -> str:
-    # No session start time in the spec; use transcript file birth time as proxy
-    transcript_path = data.get("transcript_path")
-    if not transcript_path:
+    # Wall-clock session duration from the JSON payload. Platform-neutral, unlike
+    # the prior transcript-birth-time proxy (BSD `stat -f` is a no-op on Linux).
+    cost = data.get("cost") or {}
+    duration_ms = cost.get("total_duration_ms") or 0
+    if duration_ms <= 0:
         return ""
-    try:
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        birth_ts = _get_birth_ts(transcript_path) or int(os.path.getmtime(transcript_path))
-        elapsed = max(0, now_ts - birth_ts)
-        if elapsed < 60:
-            return "◷ <1min"
-        if elapsed < 3600:
-            return f"◷ {elapsed // 60}min"
-        h, m = elapsed // 3600, (elapsed % 3600) // 60
-        return f"◷ {h}h {m}m" if m else f"◷ {h}h"
-    except Exception:
-        return ""
+    elapsed = duration_ms // 1000
+    if elapsed < 60:
+        return "◷ <1min"
+    if elapsed < 3600:
+        return f"◷ {elapsed // 60}min"
+    h, m = elapsed // 3600, (elapsed % 3600) // 60
+    return f"◷ {h}h {m}m" if m else f"◷ {h}h"
 
 
 def main() -> None:
