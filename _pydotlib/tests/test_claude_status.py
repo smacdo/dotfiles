@@ -54,23 +54,23 @@ class BuildDurationSectionTests(unittest.TestCase):
 
 
 class BuildUsageSectionTests(unittest.TestCase):
-    USAGE = {"total_input_tokens": 12000, "total_output_tokens": 3000}
+    USAGE = {"total_input_tokens": 1250000, "total_output_tokens": 10100}
 
     def test_shows_actual_cost_from_payload(self):
         data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 1.2345}}
-        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k ($1.23)")
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓1.25m ↑10.1k ($1.23)")
 
     def test_omits_cost_when_absent(self):
         data = {"context_window": self.USAGE}
-        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k")
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓1.25m ↑10.1k")
 
     def test_omits_cost_when_zero(self):
         data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 0.0}}
-        self.assertEqual(cs.build_usage_section(data, short=False), "↓12k ↑3k")
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓1.25m ↑10.1k")
 
     def test_short_mode_omits_cost(self):
         data = {"context_window": self.USAGE, "cost": {"total_cost_usd": 1.23}}
-        self.assertEqual(cs.build_usage_section(data, short=True), "↓12k ↑3k")
+        self.assertEqual(cs.build_usage_section(data, short=True), "↓1.25m ↑10.1k")
 
     def test_rate_limits_take_priority_over_cost(self):
         data = {
@@ -88,18 +88,23 @@ class BuildUsageSectionTests(unittest.TestCase):
 class FmtTokensTests(unittest.TestCase):
     def test_under_one_thousand(self):
         self.assertEqual(cs.fmt_tokens(0), "0")
+        self.assertEqual(cs.fmt_tokens(125), "125")
         self.assertEqual(cs.fmt_tokens(999), "999")
 
-    def test_thousands_trim_trailing_zeros(self):
-        self.assertEqual(cs.fmt_tokens(1000), "1k")
-        self.assertEqual(cs.fmt_tokens(1500), "1.5k")
-        self.assertEqual(cs.fmt_tokens(45000), "45k")
-        self.assertEqual(cs.fmt_tokens(12340), "12.34k")
+    def test_thousands_three_sig_figs(self):
+        self.assertEqual(cs.fmt_tokens(1000), "1.00k")
+        self.assertEqual(cs.fmt_tokens(1250), "1.25k")
+        self.assertEqual(cs.fmt_tokens(10100), "10.1k")
+        self.assertEqual(cs.fmt_tokens(12340), "12.3k")
+        self.assertEqual(cs.fmt_tokens(45000), "45.0k")
+        self.assertEqual(cs.fmt_tokens(100000), "100k")
 
-    def test_millions_trim_trailing_zeros(self):
-        self.assertEqual(cs.fmt_tokens(1_000_000), "1m")
-        self.assertEqual(cs.fmt_tokens(1_200_000), "1.2m")
+    def test_millions_three_sig_figs(self):
+        self.assertEqual(cs.fmt_tokens(1_000_000), "1.00m")
+        self.assertEqual(cs.fmt_tokens(1_500_000), "1.50m")
         self.assertEqual(cs.fmt_tokens(1_234_567), "1.23m")
+        self.assertEqual(cs.fmt_tokens(12_500_000), "12.5m")
+        self.assertEqual(cs.fmt_tokens(125_000_000), "125m")
 
 
 class ParseDiffstatTests(unittest.TestCase):

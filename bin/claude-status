@@ -98,11 +98,12 @@ def build_model_section(data: dict) -> str:
 
 
 def fmt_tokens(n: int) -> str:
-    # 1234567 -> "1.23m", 1500 -> "1.5k", 999 -> "999". Two decimals, trailing
-    # zeros trimmed (the ".2f" guarantees a "." so rstrip never eats real digits).
+    # Three significant figures with a k/m suffix: 125, 1.25k, 10.1k, 100k, 1.50m.
     for divisor, suffix in ((1_000_000, "m"), (1000, "k")):
         if n >= divisor:
-            return f"{n / divisor:.2f}".rstrip("0").rstrip(".") + suffix
+            v = n / divisor
+            decimals = 0 if v >= 100 else 1 if v >= 10 else 2
+            return f"{v:.{decimals}f}{suffix}"
     return str(n)
 
 
