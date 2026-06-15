@@ -14,6 +14,11 @@ Entry format:
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
 
+## 2026-06-15
+- **Fixed** `bin/claude-status` (Claude Code status line) reporting session duration as `<1min` forever on Linux — it derived elapsed time from a BSD-only `stat -f` call. Duration now comes from the status-line payload (`cost.total_duration_ms`) and is correct on all platforms.
+- **Changed** `bin/claude-status` to show the real session cost (`cost.total_cost_usd`) instead of a guess from a hard-coded price table, render large token counts as `1.2m` (not `1200k`), and label the working dir with the git branch *or* Sapling bookmark plus a live `+/-` diffstat. If your `~/.claude/settings.json` `statusLine` points at a custom script, set its command to `claude-status` to pick this up.
+- **Added** `CLAUDE_STATUS_MONOREPOS` env var: space/comma-separated repo basenames whose deep paths collapse to `~/<repo>/.../<dir>` in the status line. Unset by default (no collapsing); set it in `~/.config/dotfiles/my_shell_profile.sh`.
+
 ## 2026-06-05
 - **Fixed** `bootstrap.py` cloning powerlevel10k from `gitee.com`, which is unreachable from most networks (and CI), leaving zsh without the powerlevel10k prompt theme. Now clones from `github.com/romkatv/powerlevel10k` (canonical source, matching `tools/install_powerlevel10k.sh`). Existing installs with a populated `~/.local/share/powerlevel10k` are untouched — bootstrap skips clones when the destination exists; installs where the gitee clone had failed get the theme on the next `./bootstrap.py`.
 - **Fixed** `.bash_profile` not sourcing `xdg.sh`/`env.sh` in non-interactive login shells (e.g. `bash -lc`). `.bashrc`'s non-interactive early-return runs before it exports `S_DOTFILE_ROOT`, so the subsequent `$S_DOTFILE_ROOT`-based sources silently no-op'd; `.bash_profile` now sets `S_DOTFILE_ROOT` itself first. Effect: env vars like `EDITOR` and `WEATHER_LOCATION` are now set in `bash -lc` login shells. No action needed.

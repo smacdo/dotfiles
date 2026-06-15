@@ -128,6 +128,19 @@ All settings are optional environment variables, set in
 | `NEXT_MEETING_CACHE_TTL` | 120 | Seconds between calendar refreshes |
 | `NEXT_MEETING_ALERT_AT` | 5,0 | Fire tmux alerts at these minute marks |
 
+## Claude Code status line
+`bin/claude-status` renders the Claude Code status line — model + effort, token
+usage and cost, context-window fill, working directory with git branch / Sapling
+bookmark, and session duration. `bootstrap.py` points Claude Code's `statusLine`
+at it.
+
+### Configuration
+Optional environment variable, set in `~/.config/dotfiles/my_shell_profile.sh`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_STATUS_MONOREPOS` | (unset) | Space/comma-separated repo basenames whose deep paths collapse to `~/<repo>/.../<dir>` in the status line (e.g. `export CLAUDE_STATUS_MONOREPOS="monorepo bigrepo"`). |
+
 ## Packages
 * lesspipe
 

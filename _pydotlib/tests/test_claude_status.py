@@ -208,6 +208,48 @@ class BuildDirBranchSectionTests(unittest.TestCase):
         data = {"workspace": {"current_dir": "/some/repo"}}
         self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ feature-x")
 
+    @patch.object(cs, "_detect_vcs", return_value=None)
+    def test_monorepo_path_collapsed_in_output(self, _):
+        home = os.path.expanduser("~")
+        data = {"workspace": {"current_dir": home + "/bigrepo/a/b/c/d"}}
+        with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": "bigrepo"}):
+            self.assertEqual(cs.build_dir_branch_section(data), "⌂ ~/bigrepo/.../c/d")
+
+
+class MonoreposEnvTests(unittest.TestCase):
+    def test_unset_is_empty(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(cs._monorepos(), ())
+
+    def test_space_and_comma_separated(self):
+        with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": "alpha, beta  gamma,delta"}):
+            self.assertEqual(cs._monorepos(), ("alpha", "beta", "gamma", "delta"))
+
+
+class ShortenMonorepoPathTests(unittest.TestCase):
+    REPOS = ("bigrepo", "src")
+
+    def test_no_repos_configured_is_noop(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c/d", ()), "~/bigrepo/a/b/c/d")
+
+    def test_not_under_home_is_noop(self):
+        self.assertEqual(cs._shorten_monorepo_path("/etc/a/b/c/d", self.REPOS), "/etc/a/b/c/d")
+
+    def test_unlisted_repo_is_noop(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/other/a/b/c/d", self.REPOS), "~/other/a/b/c/d")
+
+    def test_deep_path_collapses(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c/d", self.REPOS), "~/bigrepo/.../c/d")
+
+    def test_digit_suffix_matches_basename(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo2/a/b/c/d", self.REPOS), "~/bigrepo2/.../c/d")
+
+    def test_shallow_path_is_noop(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c", self.REPOS), "~/bigrepo/a/b/c")
+
+    def test_repo_root_is_noop(self):
+        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo", self.REPOS), "~/bigrepo")
+
 
 if __name__ == "__main__":
     unittest.main()

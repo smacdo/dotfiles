@@ -250,6 +250,27 @@ def _sl_stat(cwd: str) -> str:
     return _parse_diffstat(summary)
 
 
+def _monorepos() -> tuple[str, ...]:
+    # Repo basenames whose deep paths get collapsed. Kept out of the tracked repo
+    # (these may be internal codenames) — supplied per-machine via this env var.
+    return tuple(os.environ.get("CLAUDE_STATUS_MONOREPOS", "").replace(",", " ").split())
+
+
+def _shorten_monorepo_path(display_dir: str, repos: tuple[str, ...]) -> str:
+    # "~/repo2/a/b/c/d" -> "~/repo2/.../c/d" when repo2's basename is configured
+    # and the path runs more than 3 levels deep. Trailing digits (repo2) are a
+    # multi-checkout suffix and don't affect the basename match.
+    if not repos or not display_dir.startswith("~/"):
+        return display_dir
+    parts = display_dir[2:].split("/")
+    if parts[0].rstrip("0123456789") not in repos:
+        return display_dir
+    tail = parts[1:]
+    if len(tail) <= 3:
+        return display_dir
+    return f"~/{parts[0]}/.../" + "/".join(tail[-2:])
+
+
 def build_dir_branch_section(data: dict) -> str:
     workspace = data.get("workspace") or {}
     cwd = workspace.get("current_dir") or data.get("cwd") or ""
@@ -258,6 +279,7 @@ def build_dir_branch_section(data: dict) -> str:
 
     home = os.path.expanduser("~")
     display_dir = "~" + cwd[len(home):] if cwd.startswith(home) else cwd
+    display_dir = _shorten_monorepo_path(display_dir, _monorepos())
     result = f"⌂ {display_dir}"
 
     vcs = _detect_vcs(cwd)
