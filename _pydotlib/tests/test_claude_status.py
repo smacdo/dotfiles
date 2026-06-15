@@ -1,7 +1,10 @@
 import importlib.util
+import os
+import tempfile
 import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from unittest.mock import patch
 
 # bin/claude-status has no .py extension and a hyphen, so it can't be imported by
 # name. Load it from its path instead — the test depends on the bin script, not
@@ -80,6 +83,130 @@ class BuildUsageSectionTests(unittest.TestCase):
         result = cs.build_usage_section(data, short=False)
         self.assertTrue(result.startswith("⏱"))
         self.assertNotIn("$", result)
+
+
+class FmtTokensTests(unittest.TestCase):
+    def test_under_one_thousand(self):
+        self.assertEqual(cs.fmt_tokens(0), "0")
+        self.assertEqual(cs.fmt_tokens(999), "999")
+
+    def test_thousands_trim_trailing_zeros(self):
+        self.assertEqual(cs.fmt_tokens(1000), "1k")
+        self.assertEqual(cs.fmt_tokens(1500), "1.5k")
+        self.assertEqual(cs.fmt_tokens(45000), "45k")
+        self.assertEqual(cs.fmt_tokens(12340), "12.34k")
+
+    def test_millions_trim_trailing_zeros(self):
+        self.assertEqual(cs.fmt_tokens(1_000_000), "1m")
+        self.assertEqual(cs.fmt_tokens(1_200_000), "1.2m")
+        self.assertEqual(cs.fmt_tokens(1_234_567), "1.23m")
+
+
+class ParseDiffstatTests(unittest.TestCase):
+    def test_insertions_and_deletions(self):
+        self.assertEqual(cs._parse_diffstat("3 files changed, 12 insertions(+), 4 deletions(-)"), "+12 -4")
+
+    def test_only_insertions(self):
+        self.assertEqual(cs._parse_diffstat("1 file changed, 7 insertions(+)"), "+7")
+
+    def test_only_deletions(self):
+        self.assertEqual(cs._parse_diffstat("1 file changed, 2 deletions(-)"), "-2")
+
+    def test_no_line_changes(self):
+        self.assertEqual(cs._parse_diffstat("1 file changed"), "")
+
+    def test_empty(self):
+        self.assertEqual(cs._parse_diffstat(""), "")
+
+
+class ParseSlLabelTests(unittest.TestCase):
+    def test_bookmark_wins(self):
+        self.assertEqual(cs._parse_sl_label("feature-x\ndraft\nabc123def456"), "feature-x")
+
+    def test_skips_main_bookmark(self):
+        self.assertEqual(cs._parse_sl_label("main feature-y\ndraft\nabc123"), "feature-y")
+
+    def test_main_only_bookmark_is_blank(self):
+        self.assertEqual(cs._parse_sl_label("main\npublic\nabc123"), "")
+
+    def test_draft_without_bookmark_uses_short_hash(self):
+        self.assertEqual(cs._parse_sl_label("\ndraft\nabc123def456"), "abc123def456")
+
+    def test_public_without_bookmark_is_blank(self):
+        self.assertEqual(cs._parse_sl_label("\npublic\nabc123"), "")
+
+    def test_empty(self):
+        self.assertEqual(cs._parse_sl_label(""), "")
+
+
+class DetectVcsTests(unittest.TestCase):
+    def test_git_marker_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.mkdir(os.path.join(d, ".git"))
+            self.assertEqual(cs._detect_vcs(d), "git")
+
+    def test_git_marker_file(self):
+        # git worktrees use a .git *file*, not a directory
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, ".git"), "w") as f:
+                f.write("gitdir: /elsewhere\n")
+            self.assertEqual(cs._detect_vcs(d), "git")
+
+    def test_sl_marker(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.mkdir(os.path.join(d, ".sl"))
+            self.assertEqual(cs._detect_vcs(d), "sl")
+
+    def test_hg_marker_is_sapling(self):
+        # Sapling marks its root with .hg on many installs; driven via `sl`.
+        with tempfile.TemporaryDirectory() as d:
+            os.mkdir(os.path.join(d, ".hg"))
+            self.assertEqual(cs._detect_vcs(d), "sl")
+
+    def test_walks_up_to_ancestor_marker(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.mkdir(os.path.join(d, ".git"))
+            sub = os.path.join(d, "a", "b")
+            os.makedirs(sub)
+            self.assertEqual(cs._detect_vcs(sub), "git")
+
+
+class BuildDirBranchSectionTests(unittest.TestCase):
+    def test_no_cwd_returns_empty(self):
+        self.assertEqual(cs.build_dir_branch_section({}), "")
+
+    @patch.object(cs, "_detect_vcs", return_value=None)
+    def test_home_substitution_no_repo(self, _):
+        home = os.path.expanduser("~")
+        data = {"workspace": {"current_dir": home + "/projects/foo"}}
+        self.assertEqual(cs.build_dir_branch_section(data), "⌂ ~/projects/foo")
+
+    @patch.object(cs, "_git_stat", return_value="+5 -1")
+    @patch.object(cs, "_git_label", return_value="feature-x")
+    @patch.object(cs, "_detect_vcs", return_value="git")
+    def test_git_branch_and_stat(self, *_):
+        data = {"workspace": {"current_dir": "/some/repo"}}
+        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ feature-x +5 -1")
+
+    @patch.object(cs, "_sl_stat", return_value="+9")
+    @patch.object(cs, "_sl_label", return_value="bookmark-z")
+    @patch.object(cs, "_detect_vcs", return_value="sl")
+    def test_sapling_bookmark_and_stat(self, *_):
+        data = {"workspace": {"current_dir": "/some/repo"}}
+        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ bookmark-z +9")
+
+    @patch.object(cs, "_git_label", return_value="")
+    @patch.object(cs, "_detect_vcs", return_value="git")
+    def test_main_branch_no_decoration(self, *_):
+        data = {"workspace": {"current_dir": "/some/repo"}}
+        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo")
+
+    @patch.object(cs, "_git_stat", return_value="")
+    @patch.object(cs, "_git_label", return_value="feature-x")
+    @patch.object(cs, "_detect_vcs", return_value="git")
+    def test_branch_without_changes_omits_stat(self, *_):
+        data = {"workspace": {"current_dir": "/some/repo"}}
+        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ feature-x")
 
 
 if __name__ == "__main__":
