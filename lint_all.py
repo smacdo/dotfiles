@@ -274,7 +274,11 @@ def main() -> int:
             break
 
     if not py_lint_skipped:
-        failed_py_files = lint_py_files(DOTFILES_PY_SCRIPTS)
+        # Core scripts + every _pydotlib module are required to pass (fatal).
+        fatal_py_files = DOTFILES_PY_SCRIPTS + find_shell_scripts(
+            "_pydotlib", PY_EXTS, PY_SHEBANGS
+        )
+        failed_py_files = lint_py_files(fatal_py_files)
 
         if len(failed_py_files) > 0:
             has_fatal_lints = True

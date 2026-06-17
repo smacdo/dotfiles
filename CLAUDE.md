@@ -79,7 +79,7 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 - **`zsh_files/`** — Zsh-only config (symlinked to `~/.zsh/`): keybindings, zsh functions
 - **`bin/`** — Custom scripts on `$PATH` via `shell_profile/paths.sh`
 - **`settings/`** — Editor/tool configs (nvim, VSCode, Ghostty, Wezterm, clang-format)
-- **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). See *`bin/` script policy* below for when `bin/` scripts may use it.
+- **`_pydotlib/`** — Python utility library for repo scripts (top-level `bootstrap.py`, `lint_all.py`, `run_tests.py`, and `tools/`). `bin/` scripts may import it freely (see *`bin/` script policy* below).
 - **`.vim/`** — Vim configs (colorschemes, ftplugins, spell files, native packages)
 - **`tools/`** — Post-bootstrap install scripts for external dependencies (Nerd Fonts, uv, p10k, VS Code)
 - **`tests/docker/`** — Container-based integration tests exercising `bootstrap.py` on debian/ubuntu/fedora. `Dockerfile.<flavor>` per distro; post-bootstrap verification lives in `_pydotlib/integration_checks.py`. See *Integration test policy* below.
@@ -109,18 +109,33 @@ Not checked in. Loaded automatically at shell startup:
 
 ### `bin/` script policy
 
-Scripts in `bin/` should be **portable** — written so someone could copy a single file out of this repo into their own setup and have it work. That means:
+Scripts in `bin/` ship and run as part of this repo, so they may freely depend on
+`_pydotlib/` (shared logging via `cli.py`, `colors`, `git`, etc.). There is **no
+copy-one-file-out portability requirement** — if you ever want a script to live outside
+the repo, extract it and its dependencies by hand.
 
-- Default to standalone: no imports from `_pydotlib/` or other repo-local modules.
-- Short commands and one-liners may be POSIX sh; reach for Python once logic is non-trivial. Python scripts use only the standard library (no `pip` deps).
-- Only reach for `_pydotlib/` when 2+ `bin/` scripts share genuinely non-trivial logic (e.g., weather data fetching, shared logging setup). One-off helpers belong inline in the script.
-- When in doubt, duplicate a few lines rather than introducing a shared dependency — readability and portability beat DRY here.
+Two shapes, both with the executable entrypoint in `bin/`:
+
+- **Self-contained** — the whole script is one `bin/` file. Best for simple or one-off
+  tools. Short commands may be POSIX sh; reach for Python once the logic is non-trivial.
+- **Module-backed** — non-trivial logic lives in a `_pydotlib/<name>.py` module (imported
+  via the `_pydotlib.` package, unit-tested by normal `import`) behind a thin executable
+  wrapper in `bin/` that resolves the repo root, adds it to `sys.path`, and calls in. Use
+  this when the logic is non-trivial, shared across commands, or you want the
+  implementation hidden (non-executable, off `$PATH`) and unit-tested. A family of
+  commands (e.g. `ccopy`/`cpaste`) can share one module via several wrappers.
+
+Start self-contained; promote to module-backed when the logic grows or a second command
+needs it. Cross-cutting helpers (logging, colors, git) belong in `_pydotlib/`. Python uses
+the standard library only — no `pip` deps.
 
 Naming and form:
 
-- **No file suffixes** (`.py`, `.sh`) — invoke as `weather`, not `weather.py`. Use a shebang to declare the interpreter.
+- **No file suffixes** (`.py`, `.sh`) on entrypoints — invoke as `weather`, not
+  `weather.py`; use a shebang. (Library modules under `_pydotlib/` keep their `.py`.)
 - **Kebab-case** filenames (`next-meeting`, not `next_meeting` or `nextMeeting`).
-- **Always `chmod +x`** — scripts must be directly executable from `$PATH`.
+- **Always `chmod +x`** entrypoints — directly executable from `$PATH`. Modules under
+  `_pydotlib/` stay non-executable.
 
 ### Integration test policy
 

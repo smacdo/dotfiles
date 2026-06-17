@@ -1,8 +1,8 @@
 import os
 import re
 import subprocess
-import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -63,7 +63,7 @@ def read_git_config(config_text: str, keys: list[str]) -> dict[str, str]:
     return matched_keys
 
 
-def update_git_config(config_text: str, keys: dict[str, str | None]) -> str:
+def update_git_config(config_text: str, keys: Mapping[str, str | None]) -> str:
     """Apply key→value updates to a gitconfig-format string and return the result.
 
     Keys present in the input are replaced in place, preserving their original
@@ -126,7 +126,7 @@ def read_git_config_file(path: Path, keys: list[str]) -> dict[str, str]:
         return read_git_config(f.read(), keys)
 
 
-def update_git_config_file(path: Path, keys: dict[str, str | None]) -> None:
+def update_git_config_file(path: Path, keys: Mapping[str, str | None]) -> None:
     """Apply `update_git_config` to the file at `path`, atomically.
 
     Writes the result to a temporary file in the same directory, then

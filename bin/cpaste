@@ -1,52 +1,73 @@
-#!/bin/sh
-#==============================================================================#
-# Author: Scott MacDonald
-# Purpose: Cross platform script to paste text from the system clipboard.
-#==============================================================================#
-# vim: set filetype=python
+#!/usr/bin/env python3
+"""Paste text from the clipboard to stdout (best-effort OSC 52 read over SSH).
 
-. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+CLI shell only — the reusable logic lives in _pydotlib/clipboard.py.
+"""
 
-error()             { printf '[ERROR]: %s\n' "$*" >&2; }
-exit_with_message() { code="$1"; shift; error "$@"; exit "${code:-1}"; }
-set_verbose()       { export VERBOSE="${1:-1}"; }
-is_verbose()        { [ "${VERBOSE:-0}" = "1" ]; }
-verbose()           { [ "${VERBOSE:-0}" = "1" ] && echo "$@"; return 0; }
-print_action()      { echo "$@"; }
+import argparse
+import os
+import pathlib
+import sys
 
-print_help() {
-  echo "Cross platform tool to paste text from the system clipboard to stdout."
-  echo "Usage: $(basename "$0") [-V]"
-}
+_root = os.environ.get("S_DOTFILE_ROOT") or str(
+    pathlib.Path(__file__).resolve().parent.parent
+)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
-main() {
-  # Tool option parsing.
-  while getopts 'hV' opt; do
-    case "$opt" in
-      h) print_help
-         exit 1
-         ;;
-      V) set_verbose 1
-         ;;
-      ?) print_help
-         exit 2
-         ;;
-    esac
-  done
+from _pydotlib import clipboard  # noqa: E402  (sys.path set above)
 
-  # Remove process arguments.
-  shift "$((OPTIND -1))"
+_EPILOG = """\
+Backend is auto-detected: locally cpaste reads the native clipboard
+(pbpaste / wl-paste / xclip / xsel / powershell.exe). Paste over SSH is
+best-effort — most terminals disable OSC 52 reads and tmux never forwards them,
+so remote paste usually fails fast (exit 5); use your terminal's paste
+(Ctrl/Cmd-Shift-V) or a tmux paste-buffer instead. Tune the read wait with
+CLIPBOARD_PASTE_TIMEOUT_MS (default 5000; covers terminals that prompt to
+approve a clipboard read).
 
-  # Command to copy is different on different platforms.
-  if is_osx ; then
-    pbpaste
-  elif is_wsl ; then
-    pwsh Get-Clipboard | sed 's/\r$//' | head -c -1
-  elif is_linux ; then
-    xsel -o
-  else
-    exit_with_message 2 "This platform is not supported"
-  fi
-}
+Exit codes: 0 ok | 2 usage | 4 no usable backend | 5 remote paste unsupported.
+"""
 
-main "$@"
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="cpaste",
+        description="Paste text from the clipboard to stdout.",
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    backend = parser.add_mutually_exclusive_group()
+    backend.add_argument(
+        "--osc52", action="store_const", const=clipboard.BACKEND_OSC52, dest="prefer",
+        help="force the OSC 52 escape-sequence backend",
+    )
+    backend.add_argument(
+        "--native", action="store_const", const=clipboard.BACKEND_NATIVE, dest="prefer",
+        help="force the native clipboard tool",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="log the chosen backend")
+    parser.add_argument(
+        "-V", "--version", action="version", version=f"%(prog)s (dotfiles @ {_root})"
+    )
+    args = parser.parse_args(argv)
+
+    env = clipboard.default_environment()
+    prefer = clipboard.resolve_prefer(args.prefer)
+    if args.verbose:
+        chosen = clipboard.choose_backend(env, "paste", prefer)
+        if chosen == clipboard.BACKEND_NATIVE_UNREACHABLE:
+            chosen = "native (unavailable)"
+        print(
+            f"clipboard: os={env.os} ssh={env.is_ssh} tmux={env.is_tmux} backend={chosen}",
+            file=sys.stderr,
+        )
+    code, data = clipboard.paste(env, prefer=prefer, timeout=clipboard.paste_timeout())
+    if data:
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

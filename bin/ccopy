@@ -1,92 +1,107 @@
-#!/bin/sh
-#==============================================================================#
-# Author: Scott MacDonald
-# Purpose: Cross platform script to copy text to the system clipboard.
-#==============================================================================#
-# vim: set filetype=python
+#!/usr/bin/env python3
+"""Copy stdin / a file (-f) / arguments to the clipboard (OSC 52 over SSH).
 
-. "$S_DOTFILE_ROOT"/shell_profile/functions.sh
+CLI shell only — the reusable logic lives in _pydotlib/clipboard.py.
+"""
 
-error()             { printf '[ERROR]: %s\n' "$*" >&2; }
-exit_with_message() { code="$1"; shift; error "$@"; exit "${code:-1}"; }
-set_verbose()       { export VERBOSE="${1:-1}"; }
-is_verbose()        { [ "${VERBOSE:-0}" = "1" ]; }
-verbose()           { [ "${VERBOSE:-0}" = "1" ] && echo "$@"; return 0; }
-print_action()      { echo "$@"; }
+import argparse
+import os
+import pathlib
+import sys
 
-print_help() {
-  echo "Cross platform tool to copy text from stdin to the system clipboard."
-  echo "Usage: $(basename "$0") [-V] [-f path/to/input] [text...]"
-  echo
-  echo "To copy text from a file:       $(basename "$0") -f path/to/file"
-  echo " .. or directly from arguments: $(basename "$0") your text here"
-  echo " .. or from standard input:     $(basename "$0")"
-}
+_root = os.environ.get("S_DOTFILE_ROOT") or str(
+    pathlib.Path(__file__).resolve().parent.parent
+)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
-main() {
-  # Tool option parsing.
-  while getopts 'hf:V' opt; do
-    case "$opt" in
-      h) print_help
-         exit
-         ;;
-      f) input_file="$OPTARG"
-         # Verify file exists.
-         if [ ! -f "$input_file" ]; then
-          exit_with_message 3 "Input file does not exist: $input_file"
-         fi
-         ;;
-      V) set_verbose 1
-         ;;
-      ?) print_help
-         exit 2
-         ;;
-    esac
-  done
+from _pydotlib import clipboard  # noqa: E402  (sys.path set above)
 
-  # Remove process arguments.
-  shift "$((OPTIND -1))"
+_EPILOG = """\
+Backend is auto-detected: over SSH, ccopy emits an OSC 52 escape sequence so your
+LOCAL terminal's clipboard is set; locally it uses the native tool
+(pbcopy / wl-copy / xclip / xsel / clip.exe). Force with --native/--osc52 or
+CLIPBOARD_BACKEND=native|osc52|auto.
 
-  # Command to copy is different on different platforms.
-  if [ -n "$input_file" ]; then
-    verbose "Using file as input source: $input_file"
+Text passed as ARGUMENTS is visible in shell history and `ps` — pipe via stdin
+for secrets. ccopy copies exactly the bytes given (args are space-joined, no
+added newline).
 
-    if is_osx; then
-      pbcopy < "$input_file"
-    elif is_wsl; then
-      clip.exe < "$input_file"
-    elif is_linux; then
-      xsel -i < "$input_file"
-    else
-      exit_with_message 2 "platform not supported"
-    fi
-  elif [ "$#" -gt 0 ]; then
-    verbose "Using command args as input source: $*"
+Exit codes: 0 ok | 2 usage | 3 input file missing | 4 no usable backend |
+6 payload too large for OSC 52.
+"""
 
-    if is_osx; then
-      echo "$*" | pbcopy
-    elif is_wsl; then
-      # Powershell version below works fine, but clip.exe is simpler!
-      #pwsh.exe -NoProfile -NoLogo -NonInteractive -command "Set-Clipboard -Value \"$(printf "%s" "$*")\""
-      echo "$*" | clip.exe
-    elif is_linux; then
-      echo "$*" | xsel -i
-    else
-      exit_with_message 2 "platform not supported"
-    fi
-  else
-    verbose "Using stdin as input source"
 
-    if is_osx; then
-      pbcopy
-    elif is_wsl; then
-      cat | clip.exe
-    elif is_linux; then
-      xsel -i
-    else
-      exit_with_message 2 "platform not supported"
-    fi
-  fi
-}
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="ccopy",
+        description="Copy text to the clipboard (OSC 52 over SSH).",
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("-f", "--file", help="read input from FILE")
+    parser.add_argument(
+        "-c", "--clear", action="store_true",
+        help="clear the clipboard (ignores any input)",
+    )
+    backend = parser.add_mutually_exclusive_group()
+    backend.add_argument(
+        "--osc52", action="store_const", const=clipboard.BACKEND_OSC52, dest="prefer",
+        help="force the OSC 52 escape-sequence backend",
+    )
+    backend.add_argument(
+        "--native", action="store_const", const=clipboard.BACKEND_NATIVE, dest="prefer",
+        help="force the native clipboard tool",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="log the chosen backend")
+    parser.add_argument(
+        "-V", "--version", action="version", version=f"%(prog)s (dotfiles @ {_root})"
+    )
+    parser.add_argument("text", nargs="*", help="text to copy (else stdin)")
+    args = parser.parse_args(argv)
 
-main "$@"
+    if args.clear:
+        data = b""
+    else:
+        if args.file is not None:
+            try:
+                with open(args.file, "rb") as handle:
+                    data = handle.read()
+            except FileNotFoundError:
+                print(f"input file does not exist: {args.file}", file=sys.stderr)
+                return clipboard.EXIT_NO_FILE
+            except OSError as exc:
+                print(f"cannot read {args.file}: {exc}", file=sys.stderr)
+                return clipboard.EXIT_NO_FILE
+        elif args.text:
+            # Space-join the args and copy exactly that — no added trailing
+            # newline, so the args path is byte-exact like the -f/stdin paths.
+            data = " ".join(args.text).encode("utf-8")
+        elif sys.stdin.isatty():
+            print("no input: pass text, -f FILE, or pipe data via stdin", file=sys.stderr)
+            return clipboard.EXIT_USAGE
+        else:
+            data = sys.stdin.buffer.read()
+
+        if not data:
+            print(
+                "refusing to copy empty input (would clear the clipboard); use --clear",
+                file=sys.stderr,
+            )
+            return clipboard.EXIT_USAGE
+
+    env = clipboard.default_environment()
+    prefer = clipboard.resolve_prefer(args.prefer)
+    if args.verbose:
+        chosen = clipboard.choose_backend(env, "copy", prefer)
+        if chosen == clipboard.BACKEND_NATIVE_UNREACHABLE:
+            chosen = "native (unavailable)"
+        print(
+            f"clipboard: os={env.os} ssh={env.is_ssh} tmux={env.is_tmux} backend={chosen}",
+            file=sys.stderr,
+        )
+    return clipboard.copy(data, env, prefer=prefer)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

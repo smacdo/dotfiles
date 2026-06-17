@@ -141,6 +141,47 @@ Optional environment variable, set in `~/.config/dotfiles/my_shell_profile.sh`:
 |----------|---------|-------------|
 | `CLAUDE_STATUS_MONOREPOS` | (unset) | Space/comma-separated repo basenames whose deep paths collapse to `~/<repo>/.../<dir>` in the status line (e.g. `export CLAUDE_STATUS_MONOREPOS="monorepo bigrepo"`). |
 
+## Clipboard (ccopy / cpaste)
+`ccopy` copies stdin / a file (`-f`) / command-line arguments to the clipboard;
+`cpaste` writes the clipboard to stdout. They work both locally and over SSH:
+
+- **Locally** they use the native clipboard tool (`pbcopy`/`pbpaste` on macOS,
+  `wl-copy`/`wl-paste` or `xclip`/`xsel` on Linux, `clip.exe`/`powershell.exe`
+  on WSL).
+- **Over SSH** there is no local clipboard to reach, so `ccopy` emits an
+  [OSC 52](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) escape
+  sequence and your *terminal* puts the text on your local machine's clipboard —
+  no X11 forwarding, no extra daemon.
+
+Copy over SSH works on most modern terminals (Ghostty, WezTerm, kitty,
+alacritty, Windows Terminal, …). **Paste over SSH is best-effort**: terminals
+disable OSC 52 clipboard *reads* by default (a remote host could otherwise
+exfiltrate your clipboard), and tmux never forwards the read query — so remote
+`cpaste` usually fails fast with a hint to use your terminal's paste
+(Ctrl/Cmd-Shift-V) or a tmux paste-buffer.
+
+### Configuration
+Optional environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLIPBOARD_BACKEND` | `auto` | Force a backend: `native`, `osc52`, or `auto`. |
+| `CLIPBOARD_PASTE_TIMEOUT_MS` | `5000` | How long `cpaste` waits for an OSC 52 read reply — covers terminals that prompt to approve the read (e.g. Ghostty/kitty); raise it over slow links. |
+
+You can also force per-invocation with `--native` / `--osc52`, and `ccopy --clear` empties the
+clipboard deliberately. Run `ccopy --help` / `cpaste --help` for the full flag and exit-code reference.
+
+### Troubleshooting
+- **tmux:** the default `set-clipboard external` already forwards copies to your
+  OS clipboard. If copy does nothing, confirm `tmux show -gv set-clipboard` isn't
+  `off`, and that your terminal advertises the `Ms` terminfo capability
+  (otherwise add `set -ga terminal-features ',<your-TERM>:clipboard'`).
+- **iTerm2:** enable *Settings → General → Selection → "Applications in terminal
+  may access clipboard"* (off by default).
+- **macOS Terminal.app:** no OSC 52 support — copy works locally via `pbcopy`,
+  but not over SSH; use iTerm2/Ghostty/WezTerm for remote copy.
+- **mosh** may drop OSC 52 sequences.
+
 ## Packages
 * lesspipe
 

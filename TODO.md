@@ -66,6 +66,9 @@ problem is the python installed via homebrew or standalone doesn't use the syste
   - ./.config/neovim
   - ...
 - Export the _pydotlib so python bin scripts can use them.
+- Refactor the builtin tooling (`bootstrap`, linting, test runner) into a nested submodule under
+  `_pydotlib/` (e.g. `_pydotlib/builtin/`), separating repo-infra code from helpers shared with
+  `bin/` scripts. Cleaner organization now that `bin/` scripts may depend on `_pydotlib`.
 
 # Configs
 ## Neovim
