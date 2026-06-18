@@ -38,14 +38,16 @@ case "$state" in
         ;;
 esac
 
-# An owner is stale if its pane no longer exists (Claude crashed / pane closed),
-# in which case the window is up for grabs again.
-pane_alive() {
-    tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qxF "$1"
+# An owner is stale if its pane is no longer in THIS window -- it exited (Claude
+# crashed / pane closed) or was relocated out (break-pane/move-pane/join-pane) --
+# leaving the window up for grabs. Scope the check to the current window
+# (-t "$pane"), not the whole server (-a), so a moved-out owner releases the icon.
+owner_in_window() {
+    tmux list-panes -t "$pane" -F '#{pane_id}' 2>/dev/null | grep -qxF "$1"
 }
 
 owner=$(tmux show-option -wqv -t "$pane" @claude_owner 2>/dev/null || true)
-if [ -n "$owner" ] && [ "$owner" != "$pane" ] && ! pane_alive "$owner"; then
+if [ -n "$owner" ] && [ "$owner" != "$pane" ] && ! owner_in_window "$owner"; then
     owner=""
 fi
 
@@ -61,7 +63,9 @@ fi
 # A live, different owner wins; otherwise (re)claim the window.
 [ -z "$owner" ] || [ "$owner" = "$pane" ] || exit 0
 
-# Best-effort: a vanished pane between checks must never fail a hook.
+# Best-effort: a vanished pane between checks must never fail a hook. Set
+# @claude_since before @claude_state so a status redraw triggered by the state
+# change always sees a timestamp (an empty @claude_since would read as stale).
 tmux set-option -w -t "$pane" @claude_owner "$pane" 2>/dev/null || true
-tmux set-option -w -t "$pane" @claude_state "$state" 2>/dev/null || true
 tmux set-option -w -t "$pane" @claude_since "$(date +%s)" 2>/dev/null || true
+tmux set-option -w -t "$pane" @claude_state "$state" 2>/dev/null || true

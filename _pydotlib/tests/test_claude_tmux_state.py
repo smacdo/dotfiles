@@ -110,6 +110,18 @@ class ClaudeTmuxStateTests(unittest.TestCase):
         self.assertEqual(self._opt("@claude_owner"), pane2)
         self.assertEqual(self._opt("@claude_state"), "busy")
 
+    def test_owner_relocated_out_of_window_is_reclaimable(self):
+        # Owner pane that is moved to another window (break-pane) is still alive
+        # server-wide but no longer in this window, so a remaining in-window pane
+        # must be able to reclaim the icon (regression test for the -a vs -t fix).
+        self._run("busy")
+        pane2 = self._split()
+        self._tmux("break-pane", "-d", "-s", self.pane)
+        r = self._run("needs-input", pane=pane2)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(self._opt("@claude_owner", pane=pane2), pane2)
+        self.assertEqual(self._opt("@claude_state", pane=pane2), "needs-input")
+
 
 if __name__ == "__main__":
     unittest.main()

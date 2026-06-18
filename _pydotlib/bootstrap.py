@@ -152,19 +152,39 @@ def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
     marker, so re-running never duplicates and a changed command updates in
     place. Returns True if anything changed.
     """
-    hooks: dict[str, Any] = settings.setdefault("hooks", {})
+    if "hooks" not in settings:
+        hooks: dict[str, Any] = {}
+        settings["hooks"] = hooks
+    elif isinstance(settings["hooks"], dict):
+        hooks = settings["hooks"]
+    else:
+        logging.warning("Claude Code settings 'hooks' is not an object; skipping tmux hook merge")
+        return False
+
     changed = False
 
     for spec in CLAUDE_TMUX_STATE_HOOKS:
-        groups: list[dict[str, Any]] = hooks.setdefault(spec.event, [])
+        if spec.event not in hooks:
+            groups: list[Any] = []
+            hooks[spec.event] = groups
+        elif isinstance(hooks[spec.event], list):
+            groups = hooks[spec.event]
+        else:
+            logging.warning(f"Claude Code settings hooks[{spec.event!r}] is not a list; skipping")
+            continue
         want_matcher = spec.matcher or ""
 
         ours: dict[str, Any] | None = None
         for group in groups:
+            if not isinstance(group, dict):
+                continue
             if (group.get("matcher") or "") != want_matcher:
                 continue
-            for hook in group.get("hooks", []):
-                if CLAUDE_TMUX_STATE_MARKER in hook.get("command", ""):
+            group_hooks = group.get("hooks", [])
+            if not isinstance(group_hooks, list):
+                continue
+            for hook in group_hooks:
+                if isinstance(hook, dict) and CLAUDE_TMUX_STATE_MARKER in hook.get("command", ""):
                     ours = hook
                     break
             if ours is not None:
@@ -194,7 +214,10 @@ def configure_claude_code(
     `_detect_real_editor()` resolves to, adds a `statusLine` pointing at the
     `claude-status` script, and merges the `claude-tmux-state` window-icon hooks.
     Existing keys (including a custom `statusLine`) and unrelated hooks are
-    preserved.  Malformed JSON files are left untouched.
+    preserved.  Malformed JSON, a non-object top level, or wrong-shaped
+    `env`/`hooks` values are left untouched rather than crashing the bootstrap.
+    On modification the prior file is backed up once to `<name>.ORIGINAL` and the
+    new content is written atomically (temp file + `os.replace`).
     """
     dry_text = "[DRY RUN] " if dry_run else ""
 
@@ -213,6 +236,9 @@ def configure_claude_code(
         except json.JSONDecodeError:
             logging.warning(f"Could not parse {settings_path}, skipping Claude Code configuration")
             return
+        if not isinstance(settings, dict):
+            logging.warning(f"{settings_path} is not a JSON object, skipping Claude Code configuration")
+            return
 
     changed = False
 
@@ -220,7 +246,9 @@ def configure_claude_code(
     desired_editor = "claude-editor"
     desired_real_editor = _detect_real_editor()
 
-    if env.get("EDITOR") != desired_editor or env.get("REAL_EDITOR") != desired_real_editor:
+    if not isinstance(env, dict):
+        logging.warning(f"{dry_text}{settings_path} has a non-object 'env'; leaving editor config untouched")
+    elif env.get("EDITOR") != desired_editor or env.get("REAL_EDITOR") != desired_real_editor:
         env["EDITOR"] = desired_editor
         env["REAL_EDITOR"] = desired_real_editor
         settings["env"] = env
@@ -243,7 +271,17 @@ def configure_claude_code(
         logging.debug(f"{dry_text}Claude Code tmux state-icon hooks already configured")
 
     if changed and not dry_run:
-        settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+        # Back up the user's pre-dotfiles settings once, then write atomically
+        # (temp file + os.replace) so an interrupted or failed write can never
+        # truncate this precious, user-maintained file.
+        if settings_path.exists():
+            backup = Path(str(settings_path) + ".ORIGINAL")
+            if not backup.exists():
+                shutil.copy2(settings_path, backup)
+                logging.info(f"Backed up {settings_path} to {backup}")
+        tmp = settings_path.with_name(settings_path.name + ".tmp")
+        tmp.write_text(json.dumps(settings, indent=2) + "\n")
+        os.replace(tmp, settings_path)
 
 
 def configure_weather_location(

@@ -659,6 +659,70 @@ class TestConfigureClaudeCode(unittest.TestCase):
 
             self.assertEqual(settings_path.read_text(), "{invalid json")
 
+    def test_skips_non_object_top_level(self):
+        # Valid JSON whose top level isn't an object must be left untouched, not crash.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text("[1, 2, 3]")
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            self.assertEqual(settings_path.read_text(), "[1, 2, 3]")
+
+    def test_null_hooks_does_not_crash(self):
+        # "hooks": null is valid JSON but the wrong shape; merge is skipped, other
+        # config still applies, and the run does not raise.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text(json.dumps({"hooks": None}))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            # statusLine/env still get configured; the malformed hooks is left as-is.
+            self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude-status"})
+            self.assertIsNone(settings["hooks"])
+
+    def test_non_list_hook_event_is_skipped(self):
+        # An event whose value isn't a list must be skipped, not crash; other
+        # events still get their hooks merged.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            settings_path.write_text(json.dumps({"hooks": {"Stop": "bogus"}}))
+
+            configure_claude_code(settings_path, dry_run=False)
+
+            settings = json.loads(settings_path.read_text())
+            self.assertEqual(settings["hooks"]["Stop"], "bogus")  # left untouched
+            # a different event still got its tmux hook merged
+            self.assertIn("SessionStart", settings["hooks"])
+
+    def test_backs_up_existing_settings_once(self):
+        # First modification of an existing file captures the pre-dotfiles
+        # original as <name>.ORIGINAL; later modifications never overwrite it.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            original = json.dumps({"env": {"FOO": "bar"}})
+            settings_path.write_text(original)
+            backup = Path(str(settings_path) + ".ORIGINAL")
+
+            configure_claude_code(settings_path, dry_run=False)
+            self.assertTrue(backup.exists())
+            self.assertEqual(backup.read_text(), original)
+
+            # Clobber the live file and re-run: the one-time backup is preserved.
+            settings_path.write_text(json.dumps({"env": {"FOO": "changed"}}))
+            configure_claude_code(settings_path, dry_run=False)
+            self.assertEqual(backup.read_text(), original)
+
+    def test_no_backup_for_new_settings_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / ".claude" / "settings.json"
+            configure_claude_code(settings_path, dry_run=False)
+
+            self.assertTrue(settings_path.exists())
+            self.assertFalse(Path(str(settings_path) + ".ORIGINAL").exists())
+
     def test_dry_run_does_not_write(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / ".claude" / "settings.json"
