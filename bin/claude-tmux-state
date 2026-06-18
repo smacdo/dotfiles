@@ -1,0 +1,67 @@
+#!/bin/sh
+#==============================================================================#
+# Author: Scott MacDonald
+# Purpose: Push Claude Code's per-window state to a tmux user option so the
+#          window tab can render a small state icon (busy / running / waiting
+#          / idle / ...). Driven by Claude Code hooks; reads $TMUX_PANE.
+# Usage:   claude-tmux-state <state>
+#            present     a Claude session started here
+#            busy        generating a response
+#            running     running a shell command
+#            needs-input waiting for you to type
+#            needs-perm  waiting for you to approve a tool
+#            idle        finished the turn / waiting for you
+#            waiting     explicitly blocked on an external event (opt-in)
+#            clear       remove all state (session ended)
+#          No-ops outside tmux. Only the first Claude in a window "owns" the
+#          icon; other panes no-op so they don't fight over it.
+#==============================================================================#
+# vim: set filetype=sh :
+set -e
+set -u
+
+# Only meaningful inside tmux with a known pane.
+[ -n "${TMUX:-}" ] || exit 0
+pane="${TMUX_PANE:-}"
+[ -n "$pane" ] || exit 0
+
+state="${1:-}"
+[ -n "$state" ] || exit 0
+
+# Allowlist of known states. Bad input is a wiring/usage bug, not a hook event
+# (hook commands pass a hardcoded arg), so a clean non-zero is fine here.
+case "$state" in
+    present|busy|running|needs-input|needs-perm|idle|waiting|clear) ;;
+    *)
+        echo "claude-tmux-state: unknown state '$state'" >&2
+        exit 2
+        ;;
+esac
+
+# An owner is stale if its pane no longer exists (Claude crashed / pane closed),
+# in which case the window is up for grabs again.
+pane_alive() {
+    tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qxF "$1"
+}
+
+owner=$(tmux show-option -wqv -t "$pane" @claude_owner 2>/dev/null || true)
+if [ -n "$owner" ] && [ "$owner" != "$pane" ] && ! pane_alive "$owner"; then
+    owner=""
+fi
+
+if [ "$state" = clear ]; then
+    # Only the owner (or an unowned/stale window) releases the icon.
+    [ -z "$owner" ] || [ "$owner" = "$pane" ] || exit 0
+    for opt in @claude_state @claude_since @claude_owner; do
+        tmux set-option -wu -t "$pane" "$opt" 2>/dev/null || true
+    done
+    exit 0
+fi
+
+# A live, different owner wins; otherwise (re)claim the window.
+[ -z "$owner" ] || [ "$owner" = "$pane" ] || exit 0
+
+# Best-effort: a vanished pane between checks must never fail a hook.
+tmux set-option -w -t "$pane" @claude_owner "$pane" 2>/dev/null || true
+tmux set-option -w -t "$pane" @claude_state "$state" 2>/dev/null || true
+tmux set-option -w -t "$pane" @claude_since "$(date +%s)" 2>/dev/null || true

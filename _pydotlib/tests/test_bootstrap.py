@@ -9,7 +9,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from _pydotlib.bootstrap import (
+    CLAUDE_TMUX_STATE_HOOKS,
+    CLAUDE_TMUX_STATE_MARKER,
     _detect_real_editor,
+    _merge_claude_tmux_hooks,
     configure_claude_code,
     configure_vcs_author,
     configure_weather_location,
@@ -586,12 +589,20 @@ class TestConfigureClaudeCode(unittest.TestCase):
     def test_preserves_existing_keys(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
-            settings_path.write_text(json.dumps({"hooks": {"some": "hook"}}))
+            settings_path.write_text(
+                json.dumps({"hooks": {"Stop": [{"hooks": [{"command": "mine.sh"}]}]}})
+            )
 
             configure_claude_code(settings_path, dry_run=False)
 
             settings = json.loads(settings_path.read_text())
-            self.assertEqual(settings["hooks"], {"some": "hook"})
+            # The pre-existing Stop hook survives alongside our merged-in one.
+            stop_cmds = [
+                h["command"]
+                for g in settings["hooks"]["Stop"]
+                for h in g["hooks"]
+            ]
+            self.assertIn("mine.sh", stop_cmds)
             self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
 
     def test_preserves_existing_env_keys(self):
@@ -605,21 +616,16 @@ class TestConfigureClaudeCode(unittest.TestCase):
             self.assertEqual(settings["env"]["FOO"], "bar")
             self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
 
-    def test_noop_when_already_configured(self):
+    def test_second_run_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
-            real_editor = _detect_real_editor()
-            existing = {
-                "env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor},
-                "statusLine": {"type": "command", "command": "claude-status"},
-            }
-            settings_path.write_text(json.dumps(existing))
-            mtime_before = settings_path.stat().st_mtime
-
+            # First run fully configures (editor, statusLine, hooks)...
             configure_claude_code(settings_path, dry_run=False)
+            first = settings_path.read_text()
 
-            mtime_after = settings_path.stat().st_mtime
-            self.assertEqual(mtime_before, mtime_after)
+            # ...a second run must change nothing.
+            configure_claude_code(settings_path, dry_run=False)
+            self.assertEqual(settings_path.read_text(), first)
 
     def test_sets_statusline_when_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -682,6 +688,111 @@ class TestConfigureClaudeCode(unittest.TestCase):
 
             settings = json.loads(settings_path.read_text())
             self.assertEqual(settings["env"]["REAL_EDITOR"], "nano")
+
+
+class TestMergeClaudeTmuxHooks(unittest.TestCase):
+    def test_merges_all_specs_into_empty(self):
+        settings: dict = {}
+        changed = _merge_claude_tmux_hooks(settings)
+        self.assertTrue(changed)
+        commands = [
+            h["command"]
+            for groups in settings["hooks"].values()
+            for g in groups
+            for h in g["hooks"]
+        ]
+        self.assertEqual(len(commands), len(CLAUDE_TMUX_STATE_HOOKS))
+        for spec in CLAUDE_TMUX_STATE_HOOKS:
+            self.assertIn(spec.command, commands)
+
+    def test_second_merge_is_noop(self):
+        settings: dict = {}
+        _merge_claude_tmux_hooks(settings)
+        self.assertFalse(_merge_claude_tmux_hooks(settings))
+
+    def test_preserves_unrelated_hooks(self):
+        settings = {
+            "hooks": {
+                "Stop": [{"hooks": [{"type": "command", "command": "other.sh"}]}],
+                "PostToolUse": [
+                    {
+                        "matcher": "Edit",
+                        "hooks": [{"type": "command", "command": "fmt.sh"}],
+                    }
+                ],
+            }
+        }
+        _merge_claude_tmux_hooks(settings)
+        stop_cmds = [h["command"] for g in settings["hooks"]["Stop"] for h in g["hooks"]]
+        self.assertIn("other.sh", stop_cmds)
+        post_cmds = [
+            h["command"] for g in settings["hooks"]["PostToolUse"] for h in g["hooks"]
+        ]
+        self.assertIn("fmt.sh", post_cmds)
+
+    def test_notification_gets_two_matcher_groups(self):
+        settings: dict = {}
+        _merge_claude_tmux_hooks(settings)
+        matchers = {g.get("matcher") for g in settings["hooks"]["Notification"]}
+        self.assertEqual(matchers, {"idle_prompt", "permission_prompt"})
+
+    def test_matcherless_events_omit_matcher_key(self):
+        settings: dict = {}
+        _merge_claude_tmux_hooks(settings)
+        for group in settings["hooks"]["Stop"]:
+            self.assertNotIn("matcher", group)
+
+    def test_updates_changed_command_in_place(self):
+        settings = {
+            "hooks": {
+                "Stop": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f"old/{CLAUDE_TMUX_STATE_MARKER} idle",
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        changed = _merge_claude_tmux_hooks(settings)
+        self.assertTrue(changed)
+        marker_cmds = [
+            h["command"]
+            for g in settings["hooks"]["Stop"]
+            for h in g["hooks"]
+            if CLAUDE_TMUX_STATE_MARKER in h["command"]
+        ]
+        self.assertEqual(len(marker_cmds), 1)
+        self.assertTrue(marker_cmds[0].startswith("~/.dotfiles/bin/"))
+
+    def test_coexists_with_foreign_same_matcher_group_without_dupe(self):
+        settings = {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"type": "command", "command": "audit.sh"}],
+                    }
+                ]
+            }
+        }
+        _merge_claude_tmux_hooks(settings)
+        _merge_claude_tmux_hooks(settings)
+        bash_marker_cmds = [
+            h["command"]
+            for g in settings["hooks"]["PreToolUse"]
+            if (g.get("matcher") or "") == "Bash"
+            for h in g["hooks"]
+            if CLAUDE_TMUX_STATE_MARKER in h["command"]
+        ]
+        self.assertEqual(len(bash_marker_cmds), 1)
+        all_cmds = [
+            h["command"] for g in settings["hooks"]["PreToolUse"] for h in g["hooks"]
+        ]
+        self.assertIn("audit.sh", all_cmds)
 
 
 class TestConfigureWeatherLocation(unittest.TestCase):

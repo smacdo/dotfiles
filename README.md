@@ -141,6 +141,51 @@ Optional environment variable, set in `~/.config/dotfiles/my_shell_profile.sh`:
 |----------|---------|-------------|
 | `CLAUDE_STATUS_MONOREPOS` | (unset) | Space/comma-separated repo basenames whose deep paths collapse to `~/<repo>/.../<dir>` in the status line (e.g. `export CLAUDE_STATUS_MONOREPOS="monorepo bigrepo"`). |
 
+## Claude Code state icons in tmux
+When you run Claude Code inside tmux, each window tab shows a small colored Nerd
+Font icon for what Claude is doing in *that* window — so a glance across your
+tabs tells you which sessions are working, which finished, and which need you.
+Windows with no Claude session show nothing; an idle session shows a muted grey
+icon so you can still tell it's there.
+
+The glyph carries the category and the color carries the urgency: "working"
+(thinking or running a command) is one icon that shifts cyan → orange as it runs
+long, so you don't have to distinguish thinking from shelling out at a glance.
+
+| Icon state | Glyph | Color | When |
+|------------|-------|-------|------|
+| working | bolt | cyan → orange | thinking or running a command; turns orange once it passes `@CL_SLOW_AFTER` (30s) |
+| needs your input | question | red | Claude finished and is waiting for your next prompt |
+| needs approval | lock | magenta | Claude is blocked on a tool-permission prompt |
+| waiting | clock | blue | opt-in: explicitly blocked on an external event |
+| idle / present | crescent | grey | a Claude session is here but doing nothing |
+| (no session) | — | — | no Claude in this window / session ended |
+
+It's hook-driven — `bin/claude-tmux-state` pushes the state onto a per-window
+tmux user option (`@claude_state`) and the `window-status-format` renders it.
+No polling, no daemon, near-zero idle cost. A crashed/killed Claude can't leave a
+stuck icon for long: a `Stop`/`SessionEnd` clears it, a fresh session reclaims
+the window, and any leftover *transient* (busy/running) icon auto-hides after
+`@CL_STALE_AFTER` (15 min).
+
+### Setup
+1. Reload tmux to pick up the rendering: `tmux source ~/.tmux.conf` (or `prefix + r`).
+2. Install the hooks: `./bootstrap.py` merges the `claude-tmux-state` hooks into
+   `~/.claude/settings.json` idempotently, leaving your other hooks untouched.
+3. Start a *new* Claude session — hook changes only take effect in new sessions.
+
+Requires a Nerd Font (the same one the rest of this status bar uses) and tmux
+3.5a+ (the icon uses `#{e|...}` format math).
+
+### Configuration
+Tweak the `@CL_*` options near the top of the status-bar section in `.tmux.conf`
+(glyphs, colors, and the two timers `@CL_SLOW_AFTER` / `@CL_STALE_AFTER`). Color
+carries more signal than the glyph in a row of tabs, so the defaults lean on it.
+
+The icon is per-*window*, so if you run two Claude sessions in two panes of the
+same window they share one icon: the first one started owns it until it ends (or
+its pane closes), and the second is silent. Use separate windows to see both.
+
 ## Clipboard (ccopy / cpaste)
 `ccopy` copies stdin / a file (`-f`) / command-line arguments to the clipboard;
 `cpaste` writes the clipboard to stdout. They work both locally and over SSH:

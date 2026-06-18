@@ -13,6 +13,7 @@ import subprocess
 import urllib.request
 import urllib.error
 
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,40 @@ from _pydotlib.git import (
 
 VCS_MISSING_NAME = "TODO_SET_USER_NAME"
 VCS_MISSING_EMAIL = "TODO_SET_EMAIL_ADDRESS"
+
+
+@dataclass(frozen=True)
+class HookSpec:
+    """One Claude Code hook we own: an (event, matcher, command) triple."""
+
+    event: str
+    matcher: str | None
+    command: str
+
+
+# Marker that identifies hooks owned by these dotfiles, so the merge only ever
+# adds/updates its own entries and never touches unrelated hooks.
+CLAUDE_TMUX_STATE_MARKER = "claude-tmux-state"
+
+# ~/-prefixed because Claude Code runs command hooks in a minimal non-interactive
+# shell, so bin/ is not on PATH (the shell expands ~).
+_CTS = "~/.dotfiles/bin/claude-tmux-state"
+
+# Hooks that drive bin/claude-tmux-state -> the tmux window state icon. Matchers
+# follow Claude Code semantics: tool name for Pre/PostToolUse, notification type
+# for Notification, session source for SessionStart. present is scoped to a fresh
+# startup so a mid-session compact/resume can't reset an in-progress icon.
+CLAUDE_TMUX_STATE_HOOKS: tuple[HookSpec, ...] = (
+    HookSpec("SessionStart", "startup", f"{_CTS} present"),
+    HookSpec("UserPromptSubmit", None, f"{_CTS} busy"),
+    HookSpec("PreToolUse", "Bash", f"{_CTS} running"),
+    HookSpec("PostToolUse", "Bash", f"{_CTS} busy"),
+    HookSpec("Notification", "idle_prompt", f"{_CTS} needs-input"),
+    HookSpec("Notification", "permission_prompt", f"{_CTS} needs-perm"),
+    HookSpec("Stop", None, f"{_CTS} idle"),
+    HookSpec("StopFailure", None, f"{_CTS} idle"),
+    HookSpec("SessionEnd", None, f"{_CTS} clear"),
+)
 
 
 def configure_vcs_author(
@@ -108,15 +143,58 @@ def _detect_real_editor() -> str:
     return "vi"
 
 
+def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
+    """Idempotently merge the `CLAUDE_TMUX_STATE_HOOKS` into `settings["hooks"]`.
+
+    Only hooks carrying `CLAUDE_TMUX_STATE_MARKER` are added or updated; every
+    other hook (notifications, permission logging, etc.) is left untouched. Each
+    (event, matcher) pair gets its own group, identified across runs by the
+    marker, so re-running never duplicates and a changed command updates in
+    place. Returns True if anything changed.
+    """
+    hooks: dict[str, Any] = settings.setdefault("hooks", {})
+    changed = False
+
+    for spec in CLAUDE_TMUX_STATE_HOOKS:
+        groups: list[dict[str, Any]] = hooks.setdefault(spec.event, [])
+        want_matcher = spec.matcher or ""
+
+        ours: dict[str, Any] | None = None
+        for group in groups:
+            if (group.get("matcher") or "") != want_matcher:
+                continue
+            for hook in group.get("hooks", []):
+                if CLAUDE_TMUX_STATE_MARKER in hook.get("command", ""):
+                    ours = hook
+                    break
+            if ours is not None:
+                break
+
+        if ours is None:
+            new_group: dict[str, Any] = {
+                "hooks": [{"type": "command", "command": spec.command}]
+            }
+            if spec.matcher is not None:
+                new_group["matcher"] = spec.matcher
+            groups.append(new_group)
+            changed = True
+        elif ours.get("command") != spec.command:
+            ours["command"] = spec.command
+            changed = True
+
+    return changed
+
+
 def configure_claude_code(
     settings_path: Path, dry_run: bool
 ) -> None:
     """Ensure Claude Code's `settings.json` is wired up to the dotfiles helpers.
 
     Sets `env.EDITOR` to `claude-editor` and `env.REAL_EDITOR` to whatever
-    `_detect_real_editor()` resolves to, and adds a `statusLine` pointing at
-    the `claude-status` script.  Existing keys (including a custom
-    `statusLine`) are preserved.  Malformed JSON files are left untouched.
+    `_detect_real_editor()` resolves to, adds a `statusLine` pointing at the
+    `claude-status` script, and merges the `claude-tmux-state` window-icon hooks.
+    Existing keys (including a custom `statusLine`) and unrelated hooks are
+    preserved.  Malformed JSON files are left untouched.
     """
     dry_text = "[DRY RUN] " if dry_run else ""
 
@@ -157,6 +235,12 @@ def configure_claude_code(
         changed = True
     else:
         logging.debug(f"{dry_text}Claude Code statusLine already configured")
+
+    if _merge_claude_tmux_hooks(settings):
+        logging.info(f"{dry_text}Merging Claude Code tmux state-icon hooks")
+        changed = True
+    else:
+        logging.debug(f"{dry_text}Claude Code tmux state-icon hooks already configured")
 
     if changed and not dry_run:
         settings_path.write_text(json.dumps(settings, indent=2) + "\n")
