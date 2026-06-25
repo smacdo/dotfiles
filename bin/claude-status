@@ -107,6 +107,28 @@ def fmt_tokens(n: int) -> str:
     return str(n)
 
 
+def _is_empty_context(ctx: dict) -> bool:
+    # Claude Code intermittently hands the status line a fully-zeroed payload —
+    # every token count 0 and used_percentage 0 — both at a /compact boundary and
+    # occasionally mid-session. It's an upstream placeholder, not a real reading;
+    # rendering it verbatim flashes a bogus "0%" (context) and "↓0 ↑0" (usage).
+    # Detect it here so callers can substitute a placeholder / suppress instead.
+    # Require current_usage to be a populated dict so a genuine sub-1% session
+    # (used_percentage rounds to 0 but real tokens exist) still renders rather
+    # than being mistaken for the empty frame.
+    cu = ctx.get("current_usage")
+    if not isinstance(cu, dict):
+        return False
+    live = sum(cu.get(k, 0) or 0 for k in (
+        "input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+    return (
+        not ctx.get("used_percentage")
+        and live == 0
+        and not ctx.get("total_input_tokens")
+        and not ctx.get("total_output_tokens")
+    )
+
+
 def color_rate_pct(pct: float, raw: str) -> str:
     if pct >= 80:
         return bold_red(raw)
@@ -127,6 +149,9 @@ def build_usage_section(data: dict, short: bool) -> str:
                 pct = entry.get("used_percentage", 0)
                 parts.append(color_rate_pct(pct, f"{pct:.0f}%"))
         return "⏱ " + "/".join(parts) if parts else ""
+
+    if _is_empty_context(ctx):
+        return ""
 
     total_in = ctx.get("total_input_tokens", 0) or 0
     total_out = ctx.get("total_output_tokens", 0) or 0
@@ -152,18 +177,31 @@ def build_context_section(data: dict, short: bool) -> str:
     ctx = data.get("context_window") or {}
     used_pct = ctx.get("used_percentage")
     ctx_size = ctx.get("context_window_size", 0) or 0
-    current = ctx.get("current_usage")
 
     if used_pct is None:
         return ""
 
+    if _is_empty_context(ctx):
+        # During /compact the context_window counts go to zero/null and stay
+        # there until the next API call (the next user turn) repopulates them.
+        # Claude Code does re-render after compaction, but with no real number to
+        # show yet — and a refresh timer (statusLine.refreshInterval) wouldn't
+        # help, since the data itself is absent until that turn. Returning ""
+        # leaves the slot blank (looks broken); a quiet placeholder shows the
+        # line is alive and rebuilding, then snaps to the real % on the next turn.
+        return dim("◑ …")
+
     colored_pct = color_context_pct(float(used_pct), f"{used_pct:.0f}%")
-    if short or not current:
+    if short or not ctx_size:
         return f"◑ {colored_pct}"
 
-    input_toks = current.get("input_tokens", 0) or 0
-    cache_read = current.get("cache_read_input_tokens", 0) or 0
-    bracket = dim(f"[{fmt_tokens(input_toks + cache_read)}/{fmt_tokens(ctx_size)}]")
+    # Derive the token count from the (authoritative) percentage so the bracket
+    # always agrees with it. Reconstructing it from current_usage's input/cache
+    # fields undercounts whenever a cache *write* dominates the turn (large
+    # cache_creation_input_tokens, small cache_read), which made the bracket read
+    # far below the percentage right after a cache refresh.
+    used_toks = round(float(used_pct) / 100 * ctx_size)
+    bracket = dim(f"[{fmt_tokens(used_toks)}/{fmt_tokens(ctx_size)}]")
     return f"◑ {colored_pct} {bracket}"
 
 

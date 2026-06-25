@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import re
 import tempfile
 import unittest
 from importlib.machinery import SourceFileLoader
@@ -23,6 +24,22 @@ def _load_claude_status():
 
 
 cs = _load_claude_status()
+
+
+# The transient all-zero payload Claude Code occasionally emits (seen both at a
+# /compact boundary and mid-session). Rendering it flashes a bogus "0%"/"↓0 ↑0".
+EMPTY_CTX = {
+    "used_percentage": 0,
+    "context_window_size": 1_000_000,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "current_usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+    },
+}
 
 
 class BuildDurationSectionTests(unittest.TestCase):
@@ -84,6 +101,17 @@ class BuildUsageSectionTests(unittest.TestCase):
         self.assertTrue(result.startswith("⏱"))
         self.assertNotIn("$", result)
 
+    def test_all_zero_frame_is_suppressed(self):
+        # The same empty frame that zeroes context also zeroes the token totals;
+        # suppress "↓0 ↑0" so the fix doesn't leave a half-cleaned line.
+        self.assertEqual(cs.build_usage_section({"context_window": EMPTY_CTX}, short=False), "")
+
+    def test_fresh_session_zero_totals_without_current_usage_still_renders(self):
+        # Zero totals without a populated current_usage is a fresh session, not the
+        # empty frame — it should still render rather than disappear.
+        data = {"context_window": {"total_input_tokens": 0, "total_output_tokens": 0}}
+        self.assertEqual(cs.build_usage_section(data, short=False), "↓0 ↑0")
+
 
 class FmtTokensTests(unittest.TestCase):
     def test_under_one_thousand(self):
@@ -105,6 +133,73 @@ class FmtTokensTests(unittest.TestCase):
         self.assertEqual(cs.fmt_tokens(1_234_567), "1.23m")
         self.assertEqual(cs.fmt_tokens(12_500_000), "12.5m")
         self.assertEqual(cs.fmt_tokens(125_000_000), "125m")
+
+
+class BuildContextSectionTests(unittest.TestCase):
+    @staticmethod
+    def _plain(s: str) -> str:
+        return re.sub(r"\033\[[0-9;]*m", "", s)
+
+    def test_missing_used_percentage_returns_empty(self):
+        self.assertEqual(cs.build_context_section({"context_window": {}}, short=False), "")
+
+    def test_short_mode_shows_only_percentage(self):
+        data = {"context_window": {"used_percentage": 60, "context_window_size": 1_000_000}}
+        self.assertEqual(self._plain(cs.build_context_section(data, short=True)), "◑ 60%")
+
+    def test_no_window_size_shows_only_percentage(self):
+        data = {"context_window": {"used_percentage": 60}}
+        self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 60%")
+
+    def test_bracket_is_derived_from_percentage(self):
+        data = {"context_window": {"used_percentage": 60, "context_window_size": 1_000_000}}
+        self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 60% [600k/1.00m]")
+
+    def test_bracket_ignores_misleading_current_usage(self):
+        # Regression: the bracket must track the percentage, not a tiny
+        # input+cache_read sum left small by a cache-creation-heavy turn.
+        data = {
+            "context_window": {
+                "used_percentage": 47,
+                "context_window_size": 1_000_000,
+                "current_usage": {"input_tokens": 14000, "cache_read_input_tokens": 0},
+            }
+        }
+        self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 47% [470k/1.00m]")
+
+    def test_all_zero_frame_shows_placeholder(self):
+        # The transient empty payload must not render "◑ 0%". It shows a quiet
+        # placeholder instead of blank so the slot doesn't look broken in the
+        # idle gap after /compact (Claude Code re-renders only on the next turn).
+        self.assertEqual(self._plain(cs.build_context_section({"context_window": EMPTY_CTX}, short=False)), "◑ …")
+
+    def test_all_zero_frame_shows_placeholder_in_short_mode(self):
+        self.assertEqual(self._plain(cs.build_context_section({"context_window": EMPTY_CTX}, short=True)), "◑ …")
+
+    def test_placeholder_is_dimmed(self):
+        # The placeholder is low-emphasis so it reads as "pending", not a value.
+        out = cs.build_context_section({"context_window": EMPTY_CTX}, short=False)
+        self.assertTrue(out.startswith(cs.DIM))
+        self.assertTrue(out.endswith(cs.RESET))
+
+    def test_zero_percent_without_current_usage_still_renders(self):
+        # A present-but-0 percentage lacking current_usage detail is NOT the empty
+        # frame (the real ones always carry a populated all-zero current_usage), so
+        # it must still render rather than vanish.
+        data = {"context_window": {"used_percentage": 0, "context_window_size": 1_000_000}}
+        self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 0% [0/1.00m]")
+
+    def test_zero_percent_with_real_tokens_still_renders(self):
+        # A genuine sub-1% session (rounds to 0%) with live tokens must not be
+        # mistaken for the empty frame.
+        data = {
+            "context_window": {
+                "used_percentage": 0,
+                "context_window_size": 1_000_000,
+                "current_usage": {"input_tokens": 1500, "cache_read_input_tokens": 0},
+            }
+        }
+        self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 0% [0/1.00m]")
 
 
 class ParseDiffstatTests(unittest.TestCase):

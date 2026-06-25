@@ -14,6 +14,10 @@ Entry format:
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
 
+## 2026-06-25
+- **Fixed** `bin/claude-status` showing a context percentage and token bracket that disagreed (e.g. `◑ 47% [2k/1.00m]`). The bracket was rebuilt from `current_usage`'s input + cache-read tokens, which collapses right after a cache write; it now derives from the authoritative `used_percentage`, so the two always agree. No action needed.
+- **Fixed** `bin/claude-status` flashing a bogus `◑ 0%` / `↓0 ↑0` while Claude Code feeds the status line an all-zero payload during `/compact`. Token usage is now suppressed and the context slot shows a quiet `◑ …` placeholder until the rebuilt percentage arrives on your next turn. No action needed.
+
 ## 2026-06-18
 - **Fixed** tmux window tabs rendering with inverted soft-divider caps and swapped colors whenever a window had a pending bell — most visibly when a Claude Code session rang the terminal bell on going idle — clearing only when you focused that window. tmux's default `window-status-bell-style` (and `window-status-activity-style`) is `reverse`, which inverts this status bar's per-tab colors; both are now set to `default`. No action needed beyond reloading tmux.
 - **Fixed** truecolor never reaching the terminal under Ghostty. The old `terminal-overrides ",xterm-256color:Tc"` targeted `xterm-256color`, but the Ghostty client's TERM is `xterm-ghostty`, so tmux advertised no RGB capability and quantized colors to 256. Replaced with `terminal-features ",xterm*:RGB"`, matched against the real client TERM. Re-attach tmux (detach + `tmux attach`) or restart the server to pick it up.
