@@ -158,15 +158,23 @@ def main() -> None:
     args_parser.add_argument(
         "inputs",
         nargs="*",
-        type=argparse.FileType("rb"),
-        default=[sys.stdin.buffer],
+        default=["-"],
         help="Input file paths or '-' for stdin",
     )
 
     args = args_parser.parse_args()
 
+    # Resolve inputs after parsing (argparse.FileType is deprecated); "-" = stdin.
+    # Typed Any because the readers are heterogeneous (stdin.buffer is BinaryIO,
+    # opened paths are BufferedReader) and the consumers accept either; this is
+    # the same erased typing FileType used to provide.
+    inputs: list[typing.Any] = [
+        sys.stdin.buffer if path == "-" else open(path, "rb")
+        for path in args.inputs
+    ]
+
     # Perform the user requested action (convert or explain) on input files.
-    for input_reader in args.inputs:
+    for input_reader in inputs:
         if args.detect:
             print(detect(input_reader))
         else:

@@ -456,9 +456,7 @@ def load_sudoku_file(
 def main():
     parser = argparse.ArgumentParser(description="A simple Sudoku puzzle solver")
 
-    parser.add_argument(
-        "-i", "--input", type=argparse.FileType("r"), required=True, help="sudoku file"
-    )
+    parser.add_argument("-i", "--input", required=True, help="sudoku file")
     parser.add_argument(
         "-m",
         "--multi",
@@ -480,9 +478,11 @@ def main():
     prevalidation_error_count = 0
     solver_error_count = 0
 
-    for index, sudoku in enumerate(
-        load_sudoku_file(parser.parse_args().input, multi_puzzle=args.multi)
-    ):
+    # Open after parsing (argparse.FileType is deprecated); read fully then close.
+    with open(args.input) as input_file:
+        sudokus = load_sudoku_file(input_file, multi_puzzle=args.multi)
+
+    for index, sudoku in enumerate(sudokus):
         # Validate sudoku input prior to solving it.
         try:
             sudoku.validate()
