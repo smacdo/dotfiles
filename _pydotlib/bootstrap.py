@@ -50,12 +50,21 @@ _CTS = "~/.dotfiles/bin/claude-tmux-state"
 # follow Claude Code semantics: tool name for Pre/PostToolUse, notification type
 # for Notification, session source for SessionStart. present is scoped to a fresh
 # startup so a mid-session compact/resume can't reset an in-progress icon.
+# needs-input is driven by the AskUserQuestion tool -- PreToolUse sets it (Claude
+# is genuinely asking you something), PostToolUse clears it back to busy when you
+# answer. It is deliberately NOT driven by Notification idle_prompt, which fires
+# ~60s after *every* idle turn (even while a background workflow is still running)
+# and so falsely flagged any walked-away session as needing input. (A subagent's
+# own AskUserQuestion fires the parent's PreToolUse too, but the paired PostToolUse
+# self-clears it, so it only flashes briefly.) See
+# docs/claude-code-hooks-and-statusline.md.
 CLAUDE_TMUX_STATE_HOOKS: tuple[HookSpec, ...] = (
     HookSpec("SessionStart", "startup", f"{_CTS} present"),
     HookSpec("UserPromptSubmit", None, f"{_CTS} busy"),
     HookSpec("PreToolUse", "Bash", f"{_CTS} running"),
+    HookSpec("PreToolUse", "AskUserQuestion", f"{_CTS} needs-input"),
     HookSpec("PostToolUse", "Bash", f"{_CTS} busy"),
-    HookSpec("Notification", "idle_prompt", f"{_CTS} needs-input"),
+    HookSpec("PostToolUse", "AskUserQuestion", f"{_CTS} busy"),
     HookSpec("Notification", "permission_prompt", f"{_CTS} needs-perm"),
     HookSpec("Stop", None, f"{_CTS} idle"),
     HookSpec("StopFailure", None, f"{_CTS} idle"),
@@ -150,7 +159,9 @@ def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
     other hook (notifications, permission logging, etc.) is left untouched. Each
     (event, matcher) pair gets its own group, identified across runs by the
     marker, so re-running never duplicates and a changed command updates in
-    place. Returns True if anything changed.
+    place. A marker hook whose (event, matcher) is no longer in the spec list is
+    pruned (and its emptied group dropped), so removing a mapping reconciles an
+    existing install. Returns True if anything changed.
     """
     if "hooks" not in settings:
         hooks: dict[str, Any] = {}
@@ -201,6 +212,39 @@ def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
         elif ours.get("command") != spec.command:
             ours["command"] = spec.command
             changed = True
+
+    # Prune marker-owned hooks whose (event, matcher) is no longer in the spec
+    # list (e.g. a mapping we removed), so re-running bootstrap reconciles an
+    # existing install instead of leaving an orphan behind. Foreign hooks are
+    # never touched; a group emptied of its marker hook is dropped.
+    wanted = {(spec.event, spec.matcher or "") for spec in CLAUDE_TMUX_STATE_HOOKS}
+    for event in list(hooks.keys()):
+        if not isinstance(hooks[event], list):
+            continue
+        prune_groups: list[Any] = hooks[event]
+        for group in list(prune_groups):
+            if not isinstance(group, dict):
+                continue
+            if (event, group.get("matcher") or "") in wanted:
+                continue
+            group_hooks = group.get("hooks", [])
+            if not isinstance(group_hooks, list):
+                continue
+            kept = [
+                hook
+                for hook in group_hooks
+                if not (
+                    isinstance(hook, dict)
+                    and CLAUDE_TMUX_STATE_MARKER in hook.get("command", "")
+                )
+            ]
+            if len(kept) == len(group_hooks):
+                continue
+            changed = True
+            if kept:
+                group["hooks"] = kept
+            else:
+                prune_groups.remove(group)
 
     return changed
 

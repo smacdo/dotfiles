@@ -155,7 +155,7 @@ long, so you don't have to distinguish thinking from shelling out at a glance.
 | Icon state | Glyph | Color | When |
 |------------|-------|-------|------|
 | working | bolt | cyan → orange | thinking or running a command; turns orange once it passes `@CL_SLOW_AFTER` (30s) |
-| needs your input | question | red | Claude finished and is waiting for your next prompt |
+| needs your input | question | red | Claude is asking you a question (an `AskUserQuestion` prompt) and is waiting on your answer |
 | needs approval | lock | magenta | Claude is blocked on a tool-permission prompt |
 | waiting | clock | blue | opt-in: explicitly blocked on an external event |
 | idle / present | crescent | grey | a Claude session is here but doing nothing |

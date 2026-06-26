@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from _pydotlib.bootstrap import (
     CLAUDE_TMUX_STATE_HOOKS,
     CLAUDE_TMUX_STATE_MARKER,
+    _CTS,
     _detect_real_editor,
     _merge_claude_tmux_hooks,
     configure_claude_code,
@@ -794,11 +795,36 @@ class TestMergeClaudeTmuxHooks(unittest.TestCase):
         ]
         self.assertIn("fmt.sh", post_cmds)
 
-    def test_notification_gets_two_matcher_groups(self):
+    def test_notification_gets_only_permission_matcher_group(self):
+        # idle_prompt no longer maps to a state; permission_prompt is the lone
+        # Notification matcher left.
         settings: dict = {}
         _merge_claude_tmux_hooks(settings)
         matchers = {g.get("matcher") for g in settings["hooks"]["Notification"]}
-        self.assertEqual(matchers, {"idle_prompt", "permission_prompt"})
+        self.assertEqual(matchers, {"permission_prompt"})
+
+    def test_ask_user_question_drives_needs_input(self):
+        # needs-input is driven by the AskUserQuestion tool, not idle_prompt:
+        # PreToolUse sets it and PostToolUse clears it back to busy.
+        settings: dict = {}
+        _merge_claude_tmux_hooks(settings)
+
+        def cmds(event, matcher):
+            return [
+                h["command"]
+                for g in settings["hooks"][event]
+                if (g.get("matcher") or "") == matcher
+                for h in g["hooks"]
+            ]
+
+        self.assertTrue(
+            any(c.endswith("needs-input") for c in cmds("PreToolUse", "AskUserQuestion"))
+        )
+        self.assertTrue(
+            any(c.endswith("busy") for c in cmds("PostToolUse", "AskUserQuestion"))
+        )
+        notif_matchers = {g.get("matcher") for g in settings["hooks"]["Notification"]}
+        self.assertNotIn("idle_prompt", notif_matchers)
 
     def test_matcherless_events_omit_matcher_key(self):
         settings: dict = {}
@@ -831,6 +857,98 @@ class TestMergeClaudeTmuxHooks(unittest.TestCase):
         ]
         self.assertEqual(len(marker_cmds), 1)
         self.assertTrue(marker_cmds[0].startswith("~/.dotfiles/bin/"))
+
+    def test_prunes_orphaned_marker_hook(self):
+        # An existing install with a now-removed mapping (the old
+        # idle_prompt -> needs-input) must have that marker hook pruned on
+        # re-merge, leaving no stale producer behind, then settle to a no-op.
+        settings = {
+            "hooks": {
+                "Notification": [
+                    {
+                        "matcher": "idle_prompt",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f"old/{CLAUDE_TMUX_STATE_MARKER} needs-input",
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+        changed = _merge_claude_tmux_hooks(settings)
+        self.assertTrue(changed)
+        notif_matchers = {g.get("matcher") for g in settings["hooks"]["Notification"]}
+        self.assertNotIn("idle_prompt", notif_matchers)
+        self.assertFalse(_merge_claude_tmux_hooks(settings))
+
+    def test_prune_keeps_foreign_hook_in_orphaned_group(self):
+        # Only the marker hook is pruned from an orphaned (event, matcher); a
+        # foreign hook sharing that group is preserved.
+        settings = {
+            "hooks": {
+                "Notification": [
+                    {
+                        "matcher": "idle_prompt",
+                        "hooks": [
+                            {"type": "command", "command": "foreign.sh"},
+                            {
+                                "type": "command",
+                                "command": f"old/{CLAUDE_TMUX_STATE_MARKER} needs-input",
+                            },
+                        ],
+                    }
+                ]
+            }
+        }
+        _merge_claude_tmux_hooks(settings)
+        idle_groups = [
+            g
+            for g in settings["hooks"]["Notification"]
+            if g.get("matcher") == "idle_prompt"
+        ]
+        self.assertEqual(len(idle_groups), 1)
+        self.assertEqual(
+            [h["command"] for h in idle_groups[0]["hooks"]], ["foreign.sh"]
+        )
+
+    def test_full_upgrade_from_old_install_reconciles(self):
+        # Headline path: a complete pre-change install (idle_prompt -> needs-input,
+        # no AskUserQuestion groups) re-merges to BOTH add the AskUserQuestion
+        # groups and prune idle_prompt in one pass, then settles to a no-op.
+        def cmd(state):
+            return {"hooks": [{"type": "command", "command": f"{_CTS} {state}"}]}
+
+        def cmd_m(matcher, state):
+            group = cmd(state)
+            group["matcher"] = matcher
+            return group
+
+        settings = {
+            "hooks": {
+                "SessionStart": [cmd_m("startup", "present")],
+                "UserPromptSubmit": [cmd("busy")],
+                "PreToolUse": [cmd_m("Bash", "running")],
+                "PostToolUse": [cmd_m("Bash", "busy")],
+                "Notification": [
+                    cmd_m("idle_prompt", "needs-input"),
+                    cmd_m("permission_prompt", "needs-perm"),
+                ],
+                "Stop": [cmd("idle")],
+                "StopFailure": [cmd("idle")],
+                "SessionEnd": [cmd("clear")],
+            }
+        }
+        self.assertTrue(_merge_claude_tmux_hooks(settings))
+
+        def matchers(event):
+            return {g.get("matcher") for g in settings["hooks"][event]}
+
+        self.assertEqual(matchers("Notification"), {"permission_prompt"})
+        self.assertEqual(matchers("PreToolUse"), {"Bash", "AskUserQuestion"})
+        self.assertEqual(matchers("PostToolUse"), {"Bash", "AskUserQuestion"})
+        self.assertFalse(_merge_claude_tmux_hooks(settings))
 
     def test_coexists_with_foreign_same_matcher_group_without_dupe(self):
         settings = {

@@ -15,6 +15,11 @@ hooks (`~/.claude/settings.json`), `bootstrap.py` for reproducible hook install.
 
 ---
 
+> **See also:** [`claude-code-hooks-and-statusline.md`](claude-code-hooks-and-statusline.md)
+> — the observed Claude Code hook lifecycle + status-line behavior this feature
+> relies on (event firing order, `background_tasks` at `Stop`, `idle_prompt`
+> semantics, subagent/orchestration events). Captured 2026-06-25.
+
 ## Why this design (investigation summary)
 
 Chosen after a 3-agent investigation (empirical tmux testing + doc-grounded hook
