@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # vim: set ft=python
 from enum import Enum
-from pathlib import Path
 
 import argparse
-import io
+import os
+import shutil
+import subprocess
 import sys
-import typing
+import tempfile
 import unittest
-
-# TODO: Tests
 
 DOS_LINE_ENDING = b"\r\n"
 UNIX_LINE_ENDING = b"\n"
@@ -18,7 +17,7 @@ UNIX_LINE_ENDING = b"\n"
 class UnsupportedLineEnding(Exception):
     def __init__(self, to_ending: "LineEnding"):
         super().__init__(
-            f"The conversion could not be performed because the requested line ending {to_ending} is not supported",
+            f"The requested line ending '{to_ending.value}' is not a conversion target",
         )
 
 
@@ -28,8 +27,11 @@ class UnknownLineEndingName(Exception):
 
 
 class CannotConvertAutoLineEnding(Exception):
-    def __init__(self, to_ending: "LineEnding"):
-        super().__init__(f"Cannot convert from mixed line ending to {to_ending}")
+    def __init__(self, ending: "LineEnding"):
+        super().__init__(
+            f"Cannot auto-convert from {ending.value} line endings; "
+            "pass an explicit dos|unix target",
+        )
 
 
 class LineEnding(Enum):
@@ -38,160 +40,351 @@ class LineEnding(Enum):
     mixed = "mixed"
     invalid = "invalid"
 
-    def opposite(self):
-        assert self != self.invalid
-
-        if self == self.dos:
-            return self.unix
-        elif self == self.unix:
-            return self.dos
-        else:
-            raise CannotConvertAutoLineEnding(self)
+    def opposite(self) -> "LineEnding":
+        if self is LineEnding.dos:
+            return LineEnding.unix
+        if self is LineEnding.unix:
+            return LineEnding.dos
+        raise CannotConvertAutoLineEnding(self)
 
     @staticmethod
     def parse(s: str) -> "LineEnding":
-        """Parses a string as a line ending name, and returns the corresponding LineEnding enum value."""
+        """Parse a line ending name ('dos'/'unix') into a LineEnding."""
         if s == "dos":
             return LineEnding.dos
-        elif s == "unix":
+        if s == "unix":
             return LineEnding.unix
-        else:
-            raise UnknownLineEndingName(s)
+        raise UnknownLineEndingName(s)
 
 
-def detect_line(line: bytes) -> LineEnding:
-    """Returns the line ending for then given line."""
-    if line.endswith(DOS_LINE_ENDING):
+def detect(buffer: bytes) -> LineEnding:
+    """Detect the dominant line ending used in a byte buffer."""
+    dos = buffer.count(DOS_LINE_ENDING)
+    unix = buffer.count(UNIX_LINE_ENDING) - dos  # lone \n, not part of \r\n
+    if dos and unix:
+        return LineEnding.mixed
+    if dos:
         return LineEnding.dos
-    elif line.endswith(UNIX_LINE_ENDING):
+    if unix:
         return LineEnding.unix
-    else:
-        return LineEnding.invalid
-
-
-def detect(file: io.BufferedReader | Path) -> LineEnding | None:
-    """Detects the line end for the given file."""
-    if isinstance(file, Path):
-        file = open(file, "rb")
-
-    mode = None
-
-    for line in file:
-        line_mode = detect_line(line)
-        mode = line_mode if mode is None or mode == line_mode else LineEnding.mixed
-
-    return mode
+    return LineEnding.invalid
 
 
 def convert(buffer: bytes, to_ending: LineEnding) -> bytes:
+    """Return buffer with all line endings converted to to_ending."""
+    normalized = buffer.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
+    if to_ending is LineEnding.unix:
+        return normalized
+    if to_ending is LineEnding.dos:
+        return normalized.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
+    raise UnsupportedLineEnding(to_ending)
+
+
+def write_in_place(path: str, data: bytes) -> None:
+    """Atomically replace path's contents with data, preserving permissions.
+
+    Writes a sibling temp file then os.replace()s it in, so a failed or
+    interrupted write never truncates the original. Symlinks are resolved so
+    the link is kept and its target updated, matching a plain rewrite.
     """
-    Converts the given buffer to the requested line ending.
-
-    Args:
-        buffer: The buffer to convert.
-        to_ending: The line ending to convert to.
-
-    Returns:
-        A new buffer with the line endings converted to `to_ending`.
-    """
-    if to_ending == LineEnding.dos:
-        return buffer.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
-    elif to_ending == LineEnding.unix:
-        return buffer.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
-    else:
-        raise UnsupportedLineEnding(to_ending)
-
-
-def perform_convert(
-    input_file: io.BufferedReader | Path,
-    output_file: typing.TextIO | io.BufferedWriter | Path,
-    to_ending: LineEnding,
-) -> None:
-    # Load the file to memory.
-    if isinstance(input_file, Path):
-        input_file = open(input_file, "rb")
-
-    file_contents = input_file.read()
-
-    # Convert the in-memory file buffer to the requested line ending.
-    if to_ending == LineEnding.dos:
-        file_contents = file_contents.replace(UNIX_LINE_ENDING, DOS_LINE_ENDING)
-    else:
-        file_contents = file_contents.replace(DOS_LINE_ENDING, UNIX_LINE_ENDING)
-
-    # Write the converted buffer to disk.
-    if isinstance(output_file, Path):
-        with open(output_file, "wb") as file:
-            file.write(file_contents)
-    elif isinstance(output_file, io.BufferedWriter):
-        output_file.write(file_contents)
-    else:
-        output_file.write(str(file_contents))
+    target = os.path.realpath(path)
+    directory = os.path.dirname(target) or "."
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".newline-")
+    try:
+        with os.fdopen(fd, "wb") as tmp_file:
+            tmp_file.write(data)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        shutil.copymode(target, tmp)
+        os.replace(tmp, target)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 # ==============================================================================#
-# main                                                                         #
+# main                                                                          #
 # ==============================================================================#
 def main() -> None:
-    # Argument parsing
-    #  - Read stdin or one or more input files.
-    #  - Write stdout or one or more output files.
     args_parser = argparse.ArgumentParser(
         description="convert between dos and unix newlines"
     )
-
     group = args_parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         "-c",
         "--convert",
         choices=["dos", "unix", "auto"],
-        default="auto",
-        help="Line ending to convert to",
+        help="Line ending to convert to ('auto' flips to the opposite)",
     )
     group.add_argument(
         "-d",
         "--detect",
         action="store_true",
-        help="Report the type of line endings used in file",
+        help="Report the line endings used in each input",
     )
-
     args_parser.add_argument(
         "inputs",
         nargs="*",
         default=["-"],
-        help="Input file paths or '-' for stdin",
+        help="Input file paths, or '-' for stdin",
     )
-
     args = args_parser.parse_args()
 
-    # Resolve inputs after parsing (argparse.FileType is deprecated); "-" = stdin.
-    # Typed Any because the readers are heterogeneous (stdin.buffer is BinaryIO,
-    # opened paths are BufferedReader) and the consumers accept either; this is
-    # the same erased typing FileType used to provide.
-    inputs: list[typing.Any] = [
-        sys.stdin.buffer if path == "-" else open(path, "rb")
-        for path in args.inputs
-    ]
+    show_names = len(args.inputs) > 1
+    exit_code = 0
 
-    # Perform the user requested action (convert or explain) on input files.
-    for input_reader in inputs:
-        if args.detect:
-            print(detect(input_reader))
-        else:
+    for path in args.inputs:
+        try:
+            # Read fully up front so an in-place convert never truncates first.
+            if path == "-":
+                data = sys.stdin.buffer.read()
+            else:
+                with open(path, "rb") as input_file:
+                    data = input_file.read()
+
+            if args.detect:
+                ending = detect(data)
+                print(f"{path}: {ending.value}" if show_names else ending.value)
+                continue
+
             if args.convert == "auto":
-                from_ending = detect(input_reader)
-
-                if from_ending is not None:
-                    to_ending = from_ending.opposite()
+                detected = detect(data)
+                if detected is LineEnding.mixed:
+                    print(
+                        f"{path}: mixed line endings; pass -c dos|unix",
+                        file=sys.stderr,
+                    )
+                    exit_code = 1
+                    continue
+                to_ending = (
+                    None if detected is LineEnding.invalid else detected.opposite()
+                )
             else:
                 to_ending = LineEnding.parse(args.convert)
 
-            if input_reader == sys.stdin.buffer:
-                print("hello there")
-                perform_convert(input_reader, sys.stdout, to_ending)
-            else:
-                with open(f"{input_reader.name}", "wb") as output_file:
-                    perform_convert(input_reader, output_file, to_ending)
+            converted = data if to_ending is None else convert(data, to_ending)
+
+            if path == "-":
+                sys.stdout.buffer.write(converted)
+            elif converted != data:
+                write_in_place(path, converted)
+        except OSError as error:
+            print(f"{path}: {error.strerror or error}", file=sys.stderr)
+            exit_code = 1
+
+    if exit_code:
+        sys.exit(exit_code)
+
+
+# ==============================================================================#
+# unit tests                                                                    #
+# ==============================================================================#
+_SCRIPT = os.path.abspath(__file__)
+
+
+def _run(*cli_args: str, stdin: bytes | None = None) -> subprocess.CompletedProcess:
+    """Run this script as a subprocess with binary stdin/stdout capture."""
+    return subprocess.run(
+        [sys.executable, _SCRIPT, *cli_args],
+        input=stdin,
+        capture_output=True,
+    )
+
+
+class DetectTests(unittest.TestCase):
+    def test_unix(self):
+        self.assertIs(detect(b"a\nb\n"), LineEnding.unix)
+
+    def test_dos(self):
+        self.assertIs(detect(b"a\r\nb\r\n"), LineEnding.dos)
+
+    def test_mixed(self):
+        self.assertIs(detect(b"a\r\nb\n"), LineEnding.mixed)
+
+    def test_empty(self):
+        self.assertIs(detect(b""), LineEnding.invalid)
+
+    def test_no_trailing_newline(self):
+        self.assertIs(detect(b"abc"), LineEnding.invalid)
+
+    def test_lone_cr_is_invalid(self):
+        # Classic-Mac CR endings are not a supported target; report invalid.
+        self.assertIs(detect(b"a\rb\r"), LineEnding.invalid)
+
+
+class ConvertTests(unittest.TestCase):
+    def test_unix_to_dos(self):
+        self.assertEqual(convert(b"a\nb\n", LineEnding.dos), b"a\r\nb\r\n")
+
+    def test_dos_to_unix(self):
+        self.assertEqual(convert(b"a\r\nb\r\n", LineEnding.unix), b"a\nb\n")
+
+    def test_dos_to_dos_idempotent(self):
+        self.assertEqual(convert(b"a\r\nb\r\n", LineEnding.dos), b"a\r\nb\r\n")
+
+    def test_unix_to_unix_idempotent(self):
+        self.assertEqual(convert(b"a\nb\n", LineEnding.unix), b"a\nb\n")
+
+    def test_mixed_to_unix(self):
+        self.assertEqual(convert(b"a\r\nb\n", LineEnding.unix), b"a\nb\n")
+
+    def test_mixed_to_dos(self):
+        self.assertEqual(convert(b"a\r\nb\n", LineEnding.dos), b"a\r\nb\r\n")
+
+    def test_unsupported_target_raises(self):
+        with self.assertRaises(UnsupportedLineEnding):
+            convert(b"a\n", LineEnding.mixed)
+
+
+class OppositeTests(unittest.TestCase):
+    def test_flip(self):
+        self.assertIs(LineEnding.dos.opposite(), LineEnding.unix)
+        self.assertIs(LineEnding.unix.opposite(), LineEnding.dos)
+
+    def test_mixed_raises(self):
+        with self.assertRaises(CannotConvertAutoLineEnding):
+            LineEnding.mixed.opposite()
+
+    def test_invalid_raises(self):
+        with self.assertRaises(CannotConvertAutoLineEnding):
+            LineEnding.invalid.opposite()
+
+
+class InPlaceConvertTests(unittest.TestCase):
+    def test_dos_to_unix(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\r\nb\r\n")
+            self.assertEqual(_run("-c", "unix", path).returncode, 0)
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"a\nb\n")
+
+    def test_unix_to_dos(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\nb\n")
+            self.assertEqual(_run("-c", "dos", path).returncode, 0)
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"a\r\nb\r\n")
+
+    def test_auto_flips(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\r\nb\r\n")
+            self.assertEqual(_run("-c", "auto", path).returncode, 0)
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"a\nb\n")
+
+    def test_preserves_mode(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\r\n")
+            os.chmod(path, 0o640)
+            _run("-c", "unix", path)
+            self.assertEqual(os.stat(path).st_mode & 0o777, 0o640)
+
+    def test_no_op_skips_write(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\nb\n")  # already unix
+            before = os.stat(path).st_mtime_ns
+            self.assertEqual(_run("-c", "unix", path).returncode, 0)
+            self.assertEqual(os.stat(path).st_mtime_ns, before)
+
+    def test_writes_through_symlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            target = os.path.join(d, "real")
+            link = os.path.join(d, "link")
+            with open(target, "wb") as f:
+                f.write(b"a\r\n")
+            os.symlink(target, link)
+            _run("-c", "unix", link)
+            self.assertTrue(os.path.islink(link))
+            self.assertEqual(os.readlink(link), target)
+            with open(target, "rb") as f:
+                self.assertEqual(f.read(), b"a\n")
+
+
+class StdinTests(unittest.TestCase):
+    def test_stdin_to_stdout_unix(self):
+        result = _run("-c", "unix", stdin=b"a\r\nb\r\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"a\nb\n")
+
+    def test_stdin_to_stdout_dos(self):
+        result = _run("-c", "dos", stdin=b"a\nb\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"a\r\nb\r\n")
+
+
+class MixedTests(unittest.TestCase):
+    def test_auto_mixed_errors_and_preserves_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\r\nb\n")
+            result = _run("-c", "auto", path)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(b"mixed", result.stderr)
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), b"a\r\nb\n")
+
+    def test_multi_file_partial_success(self):
+        with tempfile.TemporaryDirectory() as d:
+            good = os.path.join(d, "good")
+            mixed = os.path.join(d, "mixed")
+            with open(good, "wb") as f:
+                f.write(b"a\r\n")
+            with open(mixed, "wb") as f:
+                f.write(b"a\r\nb\n")
+            result = _run("-c", "auto", good, mixed)
+            self.assertEqual(result.returncode, 1)
+            with open(good, "rb") as f:
+                self.assertEqual(f.read(), b"a\n")  # converted
+            with open(mixed, "rb") as f:
+                self.assertEqual(f.read(), b"a\r\nb\n")  # left alone
+
+
+class BadPathTests(unittest.TestCase):
+    def test_missing_file_reports_and_continues(self):
+        with tempfile.TemporaryDirectory() as d:
+            good = os.path.join(d, "good")
+            with open(good, "wb") as f:
+                f.write(b"a\r\n")
+            missing = os.path.join(d, "nope")
+            result = _run("-c", "unix", missing, good)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(b"nope", result.stderr)
+            with open(good, "rb") as f:
+                self.assertEqual(f.read(), b"a\n")  # later file still processed
+
+
+class DetectOutputTests(unittest.TestCase):
+    def test_single_file_bare(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "f")
+            with open(path, "wb") as f:
+                f.write(b"a\nb\n")
+            self.assertEqual(_run("-d", path).stdout, b"unix\n")
+
+    def test_multi_file_prefixed(self):
+        with tempfile.TemporaryDirectory() as d:
+            unix_path = os.path.join(d, "u")
+            dos_path = os.path.join(d, "x")
+            with open(unix_path, "wb") as f:
+                f.write(b"a\n")
+            with open(dos_path, "wb") as f:
+                f.write(b"a\r\n")
+            expected = f"{unix_path}: unix\n{dos_path}: dos\n".encode()
+            self.assertEqual(_run("-d", unix_path, dos_path).stdout, expected)
 
 
 if __name__ == "__main__":
@@ -200,11 +393,3 @@ if __name__ == "__main__":
         unittest.main()
     else:
         main()
-
-
-# ==============================================================================#
-# unit tests                                                                   #
-# ==============================================================================#
-class DetectLineEndingTests(unittest.TestCase):
-    def test_dos(self):
-        pass
