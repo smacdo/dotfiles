@@ -37,7 +37,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - [x] Add script to automate dotfile updating, syncing
 - [x] Support podman instead of docker (auto-detect, --runtime flag)
 - ~~Finish post init scripts~~
-- Discover and run python unit tests in bin/ scripts
+- [x] Discover and run python unit tests in bin/ scripts (`run_tests.py` auto-discovers `--run-tests` self-test hooks; convention documented in CLAUDE.md)
 - run_pydotlib_tests: Search for pydotlib modules without having to hardcode the names.
 - ColoredLogFormatter: figure out how to test the actual ANSI escape codes are emitted (or not). Today's test only checks that level/message round-trip — color output is coupled to the import-time `Colors` singleton, which depends on the `should_use_colors()` cache.
 - [x] Print container runtime output when a test run fails

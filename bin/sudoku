@@ -5,6 +5,7 @@ A simple Sudoku puzzle solver.
 
 import argparse
 import logging
+import sys
 import unittest
 from io import TextIOWrapper
 from typing import Generator
@@ -569,4 +570,8 @@ class SudokuTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    main()
+    if "--run-tests" in sys.argv:
+        sys.argv.remove("--run-tests")
+        unittest.main()
+    else:
+        main()

@@ -59,7 +59,7 @@ python3 run_tests.py
 ## Workflow
 
 - **Always run `python3 lint_all.py` after finishing a change and before every commit.** Do not commit if lint fails. (`lint_all.py` discovers files itself — no need to track which paths it covers.)
-- Run `python3 run_tests.py` after changes to `bootstrap.py` or `_pydotlib/`.
+- Run `python3 run_tests.py` after changes to `bootstrap.py`, `_pydotlib/`, or a `bin/` script with a `--run-tests` self-test.
 - On macOS, include `--native` to run host-level smoke tests: `python3 run_tests.py --native`. This exercises macOS-specific shell init, platform detection, and symlink verification against your live setup.
 - If your environment routes external HTTP through a forward proxy, set `HTTP_PROXY` and `HTTPS_PROXY` in a per-machine override (e.g., `~/.config/dotfiles/my_shell_profile.sh`) before running `lint_all.py` or `bootstrap.py`. `uv` and `pip` honor those env vars; without them, package fetches will fail with DNS errors.
 
@@ -136,6 +136,13 @@ Naming and form:
 - **Kebab-case** filenames (`next-meeting`, not `next_meeting` or `nextMeeting`).
 - **Always `chmod +x`** entrypoints — directly executable from `$PATH`. Modules under
   `_pydotlib/` stay non-executable.
+
+Self-tests: a self-contained Python `bin/` script exposes its unit tests via a
+`--run-tests` hook in its `__main__` block (`sys.argv.remove("--run-tests"); unittest.main()`),
+with the `TestCase` classes in the same file. `run_tests.py` auto-discovers any `bin/`
+script containing that marker and runs its suite in a subprocess — no hardcoded list, no
+registration. (Module-backed scripts test the `_pydotlib/<name>.py` module the normal way,
+via `_pydotlib/tests/test_<name>.py`.)
 
 ### Integration test policy
 

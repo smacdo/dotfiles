@@ -3,7 +3,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from run_tests import detect_runtime, discover_flavors
+from run_tests import (
+    detect_runtime,
+    discover_bin_test_scripts,
+    discover_flavors,
+)
 
 
 class DetectRuntimeTests(unittest.TestCase):
@@ -75,3 +79,57 @@ class DiscoverFlavorsTests(unittest.TestCase):
             root = Path(tmpdir)
             self._make_repo(root, ["Dockerfile.alpine", "Dockerfile.bak"])
             self.assertEqual(discover_flavors(root), ["alpine", "bak"])
+
+
+class DiscoverBinTestScriptsTests(unittest.TestCase):
+    def _make_bin(self, root: Path, files: dict[str, str]) -> None:
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        for name, content in files.items():
+            (bin_dir / name).write_text(content)
+
+    def test_finds_python_script_with_marker(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(
+                root,
+                {
+                    "withtests": '#!/usr/bin/env python3\nif "--run-tests" in sys.argv:\n    pass\n',
+                    "notests": "#!/usr/bin/env python3\nprint('hi')\n",
+                },
+            )
+            found = [p.name for p in discover_bin_test_scripts(root)]
+            self.assertEqual(found, ["withtests"])
+
+    def test_ignores_non_python_shebang(self):
+        # A shell script that only mentions the marker in a comment is skipped.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(
+                root, {"shscript": "#!/bin/sh\n# --run-tests unsupported\necho hi\n"}
+            )
+            self.assertEqual(discover_bin_test_scripts(root), [])
+
+    def test_skips_subdirectories(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(root, {})
+            (root / "bin" / "__pycache__").mkdir()
+            self.assertEqual(discover_bin_test_scripts(root), [])
+
+    def test_returns_empty_when_bin_dir_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self.assertEqual(discover_bin_test_scripts(Path(tmpdir)), [])
+
+    def test_results_are_sorted(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(
+                root,
+                {
+                    "bbb": '#!/usr/bin/env python3\n"--run-tests"\n',
+                    "aaa": '#!/usr/bin/env python3\n"--run-tests"\n',
+                },
+            )
+            found = [p.name for p in discover_bin_test_scripts(root)]
+            self.assertEqual(found, ["aaa", "bbb"])

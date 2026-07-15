@@ -5,6 +5,7 @@ This script performs testing for the dotfiles repository.
 
 import argparse
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -426,6 +427,71 @@ def run_pydotlib_tests(verbose: bool = False) -> bool:
     return result.wasSuccessful()
 
 
+def discover_bin_test_scripts(repo_root: Path) -> list[Path]:
+    """Return bin/ Python scripts that expose a `--run-tests` self-test hook.
+
+    Discovered by content, not a hardcoded list: a testable script has a
+    python shebang and contains the `--run-tests` marker (see the `bin/`
+    self-test convention in CLAUDE.md).
+    """
+    scripts: list[Path] = []
+    bin_dir = repo_root / "bin"
+    if not bin_dir.is_dir():
+        return scripts
+    for entry in sorted(bin_dir.iterdir()):
+        if not entry.is_file():
+            continue
+        try:
+            text = entry.read_text()
+        except (UnicodeDecodeError, PermissionError):
+            continue
+        first_line = text.split("\n", 1)[0]
+        if "python" in first_line and "--run-tests" in text:
+            scripts.append(entry)
+    return scripts
+
+
+def run_bin_script_tests(repo_root: Path, verbose: bool = False) -> bool:
+    """Run each testable bin/ script's `--run-tests` suite in a subprocess.
+
+    Subprocess isolation keeps a script's import-time side effects (e.g.
+    logging.basicConfig) and any import failure from polluting or crashing
+    this runner.
+    """
+    scripts = discover_bin_test_scripts(repo_root)
+    if not scripts:
+        logging.info("no bin/ scripts expose --run-tests; skipping")
+        return True
+
+    logging.info(f"running self-tests for {len(scripts)} bin/ script(s)")
+    all_passed = True
+    for script in scripts:
+        cmd = [sys.executable, str(script), "--run-tests"]
+        if verbose:
+            cmd.append("-v")
+        # In verbose mode stream the script's own unittest output; otherwise
+        # capture it and surface only on failure (matches the container path).
+        result = subprocess.run(
+            cmd, capture_output=not verbose, text=True, check=False
+        )
+        if result.returncode == 0:
+            # unittest writes its "Ran N tests" summary to stderr.
+            match = re.search(r"Ran (\d+) test", result.stderr or "")
+            count = ""
+            if match:
+                n = match.group(1)
+                count = f" ({n} test{'' if n == '1' else 's'})"
+            logging.info(f"  ✓ {script.name}{count}")
+        else:
+            _log_subprocess_failure(
+                f"  ✗ {script.name} self-tests failed (exit {result.returncode})",
+                result.stdout,
+                result.stderr,
+            )
+            all_passed = False
+    return all_passed
+
+
 def main() -> int:
     args_parser = argparse.ArgumentParser()
     args_parser.add_argument(
@@ -486,6 +552,10 @@ def main() -> int:
 
         if not run_pydotlib_tests(verbose=args.verbose):
             logging.critical("pydotlib unit tests failed - aborting")
+            return 1
+
+        if not run_bin_script_tests(repo_root, verbose=args.verbose):
+            logging.critical("bin/ script self-tests failed - aborting")
             return 1
 
     if run_docker:
