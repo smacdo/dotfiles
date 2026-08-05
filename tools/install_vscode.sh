@@ -28,6 +28,7 @@ RULER_COLUMNS='[80, 100]'
 
 EXTENSIONS=(
     "anthropic.claude-code"         # Claude Code AI assistant
+    "openai.chatgpt"                # Codex coding agent
     "vadimcn.vscode-lldb"           # CodeLLDB — native debugger (Rust, C, C++)
     "ms-azuretools.vscode-docker"   # Docker support
     "ms-python.python"              # Python language support

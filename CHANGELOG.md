@@ -1,7 +1,7 @@
 # Changelog
 
 User-visible changes to dotfiles. Reverse-chronological. See
-`CLAUDE.md` "Migration / backwards-compat policy" for the format and the
+`AGENTS.md` "Migration / backwards-compat policy" for the format and the
 philosophy ("bootstrap adds and overwrites-with-backup; never deletes or
 moves user data — cleanup is opt-in").
 
@@ -13,6 +13,9 @@ Entry format:
 - **Added** new/path. No action needed.
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
+
+## 2026-08-05
+- **Added** shared coding-agent instructions in `AGENTS.md`; `CLAUDE.md` now imports that canonical file so Codex and Claude Code follow the same repository rules. The VS Code installer now installs both agents' extensions. No action needed unless you want Codex in VS Code; then re-run `sudo ./tools/install_vscode.sh` on a supported Linux host.
 
 ## 2026-06-25
 - **Fixed** `bin/claude-status` showing a context percentage and token bracket that disagreed (e.g. `◑ 47% [2k/1.00m]`). The bracket was rebuilt from `current_usage`'s input + cache-read tokens, which collapses right after a cache write; it now derives from the authoritative `used_percentage`, so the two always agree. No action needed.

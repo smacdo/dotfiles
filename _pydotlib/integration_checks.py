@@ -234,7 +234,7 @@ def check_tmux_config(conf_path: str, socket: str = "dotfiles_ci_test") -> Check
 
 # `/home/testuser` is the container user's home — set by every Dockerfile's
 # `useradd -m testuser` and matched by the runner's bind mount of the repo at
-# `/home/testuser/.dotfiles`. Keep these three in sync (see CLAUDE.md
+# `/home/testuser/.dotfiles`. Keep these three in sync (see AGENTS.md
 # "Integration test policy").
 _HOME = "/home/testuser"
 _DOTFILES = f"{_HOME}/.dotfiles"

@@ -15,9 +15,9 @@
   - check if expected env vars are set
   - etc
   - Check for MacOS Python SSL misconfiguration
-- After landing the vim → XDG migration, teach bootstrap to detect known-stale paths (e.g. `~/.dotfiles/.vim/autoload/plug.vim`, `~/.dotfiles/.vim/plugged/`) and log a one-line warning naming the new location + suggesting `bin/dotfiles-cleanup`. See CLAUDE.md "Migration / backwards-compat policy".
+- After landing the vim → XDG migration, teach bootstrap to detect known-stale paths (e.g. `~/.dotfiles/.vim/autoload/plug.vim`, `~/.dotfiles/.vim/plugged/`) and log a one-line warning naming the new location + suggesting `bin/dotfiles-cleanup`. See AGENTS.md "Migration / backwards-compat policy".
 - Symlink-write hygiene: `~/.vim`, `~/.zsh`, and `~/.local/share/nvim/site/plugin` are directory symlinks into the repo, so any subpath write under them lands in `~/.dotfiles/`. Audit candidates: vim/nvim runtime artifacts (netrw history, swap, undo) that default to `~/.vim/`; if any escape into the repo, configure them to write to `$XDG_STATE_HOME/vim/` instead. Same caution applies to `~/.zsh/` and the nvim plugin dir if anything ever starts writing there.
-- `bin/dotfiles-cleanup`: opt-in script that removes orphaned files left over from past migrations. Each migration adds a stanza that prompts before removing. Pairs with the "bootstrap never deletes" rule in CLAUDE.md.
+- `bin/dotfiles-cleanup`: opt-in script that removes orphaned files left over from past migrations. Each migration adds a stanza that prompts before removing. Pairs with the "bootstrap never deletes" rule in AGENTS.md.
 - Offline install: `bundled/` directory (gitignored, populated by `bin/export-dotfiles`) carrying pre-downloaded artifacts (`plug.vim`, `powerlevel10k`, vim plugins). Bootstrap checks `bundled/<name>` before falling back to network. Add `--offline` flag to force-prefer bundled. Pairs with the existing "Export dotfiles as a tarball/zip" item under Misc.
 
 ### MacOS Python SSL Misconfiguration
@@ -37,7 +37,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - [x] Add script to automate dotfile updating, syncing
 - [x] Support podman instead of docker (auto-detect, --runtime flag)
 - ~~Finish post init scripts~~
-- [x] Discover and run python unit tests in bin/ scripts (`run_tests.py` auto-discovers `--run-tests` self-test hooks; convention documented in CLAUDE.md)
+- [x] Discover and run python unit tests in bin/ scripts (`run_tests.py` auto-discovers `--run-tests` self-test hooks; convention documented in AGENTS.md)
 - run_pydotlib_tests: Search for pydotlib modules without having to hardcode the names.
 - ColoredLogFormatter: figure out how to test the actual ANSI escape codes are emitted (or not). Today's test only checks that level/message round-trip — color output is coupled to the import-time `Colors` singleton, which depends on the `should_use_colors()` cache.
 - [x] Print container runtime output when a test run fails
@@ -52,7 +52,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - Integration test: meaningful vim/nvim init validation. Today's `vim -e -s -c q` and `nvim --headless -c q` are crash-only — both silently swallow init errors in Ex/headless mode (verified: a `.vimrc` containing `call ThisFunctionDoesNotExist()` still exits 0 with no output). Real detection works via `vim -u NONE -es -c 'try | source ~/.vimrc | catch | cq | endtry' -c q`, but our real `init.vim`'s vim path errors when plugins aren't installed. Need either (a) wire `:PlugInstall` into the test fixture so plugin-dependent code paths can be exercised, or (b) split `init.vim` so the no-plugin path is independently testable.
 - [x] Idempotency: container tests now re-run bootstrap a second time and assert rc=0 (`run_tests.py:run_container_test`). Catches "symlink-already-exists", "download overwrites valid state", "interactive prompt fires on re-run".
 - Idempotency, stricter: after the second bootstrap run, also assert no fresh writes happened (e.g., diff the FS state pre/post second run, or check bootstrap's stdout for "creating/downloading" markers). The exit-code check catches crashes but not silent re-work.
-- Upgrade-path tests under `tests/docker/upgrade_from_v<N>/`: pre-populate the prior-layout state, run bootstrap, assert clean completion + new artifacts exist in their new homes. See CLAUDE.md "Migration / backwards-compat policy".
+- Upgrade-path tests under `tests/docker/upgrade_from_v<N>/`: pre-populate the prior-layout state, run bootstrap, assert clean completion + new artifacts exist in their new homes. See AGENTS.md "Migration / backwards-compat policy".
 - Dry-run test: run bootstrap with --dry-run; assert no symlinks/files were created.
 - Backup-behavior test: pre-create ~/.bashrc with custom content; bootstrap must preserve original in .bashrc.ORIGINAL.
 - Per-machine override test: write `~/.config/dotfiles/my_shell_profile.sh` exporting a var; `bash -lc 'echo $VAR'` should print it.
@@ -92,13 +92,13 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 # CI workflow improvements
 
 - Container runtime decay coverage: add a SINGLE extra integration job pinned to the non-default runtime (e.g. `--runtime docker` while auto-detect prefers podman). Catches "we silently regressed to runtime-X-only" without doubling CI cost. Don't full-matrix runtime×distro — overkill for what's basically a regression-detection problem.
-- Secret scanning: add `gitleaks-action` (or equivalent) on every PR. Enforces the confidentiality clause in CLAUDE.md. Should be one-line addition to the workflow.
+- Secret scanning: add `gitleaks-action` (or equivalent) on every PR. Enforces the confidentiality clause in AGENTS.md. Should be one-line addition to the workflow.
 - Cache `uv` install: `actions/cache` on `~/.cache/uv`. Saves ~20s/run, basically free.
 - Markdown link checker (e.g. `lychee-action`) on `README.md`, `CHANGELOG.md`, `TODO.md`. Catches link/file rot.
 - Performance budget: emit unit-test runtime + image build time as job summary. Visibility-only, no fail threshold. Defer until something starts feeling slow.
 - Coverage report: `coverage.py` run + summary. Visibility-only, no threshold. Helps spot under-tested modules.
 - macOS partial-bootstrap test: GHA `macos-latest` runs only lint+unit today. Real macOS code paths (`is_osx`, `pmset`, `pbcopy/pbpaste`, sysctl parsing) have zero coverage. Approach: run `python3 bootstrap.py --dry-run` on the macOS runner to exercise platform-detected orchestration without modifying the runner's `$HOME`. Requires bootstrap's `--dry-run` to be trustworthy (already is for symlinks/dirs; verify for downloads/clones too). Bonus: `-h` smoke-test on every `bin/` script.
-- CHANGELOG enforcement (deferred — needs design): a CI check that fails if a PR touches `bootstrap.py` / `_pydotlib/bootstrap.py` substantively without adding a `CHANGELOG.md` line. Problem: not every change is user-visible (lint fix, internal refactor, comment-only). Options: (a) require manual opt-in/out via PR-description tag like `[no-changelog]`; (b) heuristic on which files changed (brittle); (c) skip automation, rely on CLAUDE.md policy + reviewer discipline. (c) is fine for a solo repo; revisit if oversight happens.
+- CHANGELOG enforcement (deferred — needs design): a CI check that fails if a PR touches `bootstrap.py` / `_pydotlib/bootstrap.py` substantively without adding a `CHANGELOG.md` line. Problem: not every change is user-visible (lint fix, internal refactor, comment-only). Options: (a) require manual opt-in/out via PR-description tag like `[no-changelog]`; (b) heuristic on which files changed (brittle); (c) skip automation, rely on AGENTS.md policy + reviewer discipline. (c) is fine for a solo repo; revisit if oversight happens.
 - Python version matrix (deferred — likely not needed): could matrix-test 3.10/3.11/3.12/3.13 on the unit job. Counterpoint: the docker integration job already exercises whatever Python ships on debian/fedora/ubuntu (currently 3.11–3.13), which covers the "does it actually run on my machines" question more honestly than a synthetic matrix. Skip unless we adopt new-version-only syntax.
 
 # Tools (`tools/`)

@@ -110,7 +110,7 @@ building.
 - **Doctor / `--check` is over-built (YAGNI)** for a 2-verb tool. Ship only the targeted
   hot-path warning in v1 (tmux `set-clipboard off` / `Ms` missing); defer the full doctor; move
   static advisory hints (iTerm2 toggle, Terminal.app) to README troubleshooting; drop `--doctor`
-  alias. If kept, name its result type distinctly (e.g. `ClipboardCheck`) — CLAUDE.md's
+  alias. If kept, name its result type distinctly (e.g. `ClipboardCheck`) — AGENTS.md's
   integration-test isolation policy forbids importing `integration_checks.CheckResult`.
 - **Public surface bloat.** The public surface is `main(verb, argv) -> int`; `detect`/`copy`/
   `paste`/`diagnose` are impl details tested because pure, not API. `CopyResult` is questionable

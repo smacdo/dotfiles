@@ -261,7 +261,7 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         # exists, can't create", "download tries to overwrite valid state",
         # and "interactive prompt fires on re-run" bugs. CLI args still apply
         # on the second run, so configure_vcs_author won't re-prompt.
-        # Per CLAUDE.md "Migration / backwards-compat policy".
+        # Per AGENTS.md "Migration / backwards-compat policy".
         if not run_exec(
             runtime,
             container_name,
@@ -432,7 +432,7 @@ def discover_bin_test_scripts(repo_root: Path) -> list[Path]:
 
     Discovered by content, not a hardcoded list: a testable script has a
     python shebang and contains the `--run-tests` marker (see the `bin/`
-    self-test convention in CLAUDE.md).
+    self-test convention in AGENTS.md).
     """
     scripts: list[Path] = []
     bin_dir = repo_root / "bin"

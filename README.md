@@ -73,6 +73,15 @@ sudo ./tools/install_vscode.sh    # VS Code (Debian/Ubuntu, Fedora/RHEL/CentOS)
 Don't forget to tell (neo)vim to install plugins the first time you start it up
 by running `:PlugInstall`.
 
+## Coding agents
+
+Repository-wide guidance for coding agents lives in `AGENTS.md`. Codex loads it
+directly; Claude Code loads the same instructions through the import in
+`CLAUDE.md`. Keep shared rules in `AGENTS.md` so the two agents cannot drift.
+
+Tool-specific user configuration remains separate: Claude Code uses
+`~/.claude/settings.json`, while Codex uses `~/.codex/config.toml`.
+
 # Manual Configuration Notes
 These notes are here because I haven't fully automated all my machine
 configuration yet. Maybe I'll do that someday.

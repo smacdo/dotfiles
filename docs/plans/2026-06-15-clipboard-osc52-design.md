@@ -43,7 +43,7 @@ dependency.
 | D4 | **No `_pydotlib` dependency; minimal stderr `warn()`/`print()`** | *(Revised — earlier premise was wrong.)* `_pydotlib/cli.py` has no logging setup (only `ColoredLogFormatter` + prompts); `weather-status` rolls its own `logging.basicConfig`. A clipboard tool's output is raw bytes + one stderr line — colored `asctime/name/level` records are wrong here. |
 | D5 | **Diagnostics: quiet hot path + one targeted warning (full doctor deferred)** | An OSC 52 copy is fire-and-forget (no ack), so we can't detect *success* — only inspect config that would silently drop the sequence. A 6-category `--check` doctor is over-built for two verbs; ship the warning, defer the rest. |
 | D6 | **Hidden, non-executable module; only `ccopy`/`cpaste` on `$PATH`** | The impl shouldn't be runnable/tab-completed by accident. The CLI scripts are executable; the module is a normal importable `.py`, off `$PATH`. (Symlinks rejected: exec'ing a symlink requires the *target* to be executable + on `$PATH`.) |
-| D7 | **Weaken the `bin/` portability policy** (done 2026-06-15) | `bin/` scripts ship with the repo and may depend on `_pydotlib`; manual extraction is the escape hatch. See `CLAUDE.md`. (clipboard happens not to need `_pydotlib` per D4, but the structure — module + wrappers — is the policy's module-backed shape.) |
+| D7 | **Weaken the `bin/` portability policy** (done 2026-06-15) | `bin/` scripts ship with the repo and may depend on `_pydotlib`; manual extraction is the escape hatch. See `AGENTS.md`. (clipboard happens not to need `_pydotlib` per D4, but the structure — module + wrappers — is the policy's module-backed shape.) |
 
 ---
 
