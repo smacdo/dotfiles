@@ -7,9 +7,15 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
-import subprocess
 import sys
+
+_root = os.environ.get("S_DOTFILE_ROOT") or str(
+    pathlib.Path(__file__).resolve().parent.parent
+)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 RESET = "\033[0m"
 DIM = "\033[2m"
@@ -205,109 +211,10 @@ def build_context_section(data: dict, short: bool) -> str:
     return f"◑ {colored_pct} {bracket}"
 
 
-GIT = ["git", "-c", "core.hooksPath=/dev/null"]
-_MAIN_NAMES = ("main", "master")
-
-
-def _run_cmd(argv: list[str], cwd: str) -> str | None:
-    try:
-        r = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=2)
-        return r.stdout.strip() if r.returncode == 0 else None
-    except Exception:
-        return None
-
-
-def _detect_vcs(cwd: str) -> str | None:
-    # Walk up to the first repo marker. Filesystem checks only — no subprocess.
-    # .git can be a dir (normal repo) or a file (worktree). Sapling marks its
-    # root with .sl or .hg (it reads both); either is driven via the `sl` CLI.
-    path = os.path.abspath(cwd)
-    while True:
-        if os.path.exists(os.path.join(path, ".git")):
-            return "git"
-        if os.path.exists(os.path.join(path, ".sl")) or os.path.exists(os.path.join(path, ".hg")):
-            return "sl"
-        parent = os.path.dirname(path)
-        if parent == path:
-            return None
-        path = parent
-
-
-def _parse_diffstat(summary: str) -> str:
-    # "N files changed, X insertions(+), Y deletions(-)" -> "+X -Y" (git & sl share this).
-    added = removed = 0
-    for part in summary.split(","):
-        part = part.strip()
-        if "insertion" in part:
-            added = int(part.split()[0])
-        elif "deletion" in part:
-            removed = int(part.split()[0])
-    parts: list[str] = []
-    if added:
-        parts.append(f"+{added}")
-    if removed:
-        parts.append(f"-{removed}")
-    return " ".join(parts)
-
-
-def _parse_sl_label(log_out: str) -> str:
-    # Template output is "{bookmarks}\n{phase}\n{node|short}". Prefer a non-main
-    # bookmark; fall back to the short hash only for local (draft) commits.
-    lines = log_out.split("\n")
-    bookmarks = lines[0].split() if lines else []
-    phase = lines[1] if len(lines) > 1 else ""
-    short = lines[2] if len(lines) > 2 else ""
-    for bookmark in bookmarks:
-        if bookmark not in _MAIN_NAMES:
-            return bookmark
-    if phase == "draft" and short:
-        return short
-    return ""
-
-
-def _git_label(cwd: str) -> str:
-    branch = _run_cmd(GIT + ["branch", "--show-current"], cwd)
-    return branch if branch and branch not in _MAIN_NAMES else ""
-
-
-def _git_stat(cwd: str) -> str:
-    out = _run_cmd(GIT + ["diff", "--no-color", "--shortstat", "HEAD"], cwd)
-    return _parse_diffstat(out) if out else ""
-
-
-def _sl_label(cwd: str) -> str:
-    out = _run_cmd(["sl", "log", "-r", ".", "-T", "{bookmarks}\n{phase}\n{node|short}"], cwd)
-    return _parse_sl_label(out) if out else ""
-
-
-def _sl_stat(cwd: str) -> str:
-    out = _run_cmd(["sl", "diff", "--stat"], cwd)
-    if not out:
-        return ""
-    # --stat prints per-file lines then a "N files changed, ..." summary; take that.
-    summary = next((ln for ln in reversed(out.split("\n")) if "changed" in ln), "")
-    return _parse_diffstat(summary)
-
-
 def _monorepos() -> tuple[str, ...]:
     # Repo basenames whose deep paths get collapsed. Kept out of the tracked repo
     # (these may be internal codenames) — supplied per-machine via this env var.
     return tuple(os.environ.get("CLAUDE_STATUS_MONOREPOS", "").replace(",", " ").split())
-
-
-def _shorten_monorepo_path(display_dir: str, repos: tuple[str, ...]) -> str:
-    # "~/repo2/a/b/c/d" -> "~/repo2/.../c/d" when repo2's basename is configured
-    # and the path runs more than 3 levels deep. Trailing digits (repo2) are a
-    # multi-checkout suffix and don't affect the basename match.
-    if not repos or not display_dir.startswith("~/"):
-        return display_dir
-    parts = display_dir[2:].split("/")
-    if parts[0].rstrip("0123456789") not in repos:
-        return display_dir
-    tail = parts[1:]
-    if len(tail) <= 3:
-        return display_dir
-    return f"~/{parts[0]}/.../" + "/".join(tail[-2:])
 
 
 def build_dir_branch_section(data: dict) -> str:
@@ -316,24 +223,14 @@ def build_dir_branch_section(data: dict) -> str:
     if not cwd:
         return ""
 
-    home = os.path.expanduser("~")
-    display_dir = "~" + cwd[len(home):] if cwd.startswith(home) else cwd
-    display_dir = _shorten_monorepo_path(display_dir, _monorepos())
-    result = f"⌂ {display_dir}"
+    from _pydotlib import agent_status
 
-    vcs = _detect_vcs(cwd)
-    if vcs == "git":
-        label = _git_label(cwd)
-    elif vcs == "sl":
-        label = _sl_label(cwd)
-    else:
-        label = ""
-
-    if label:
-        result += f" ⎇ {label}"
-        stat = _git_stat(cwd) if vcs == "git" else _sl_stat(cwd)
-        if stat:
-            result += f" {stat}"
+    status = agent_status.collect_directory_status(cwd, monorepos=_monorepos())
+    result = f"⌂ {status.display_path}"
+    if status.display_revision:
+        result += f" ⎇ {status.display_revision}"
+        if status.diffstat:
+            result += f" {status.diffstat}"
 
     return result
 

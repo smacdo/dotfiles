@@ -16,6 +16,8 @@ Entry format:
 
 ## 2026-08-05
 - **Added** shared coding-agent instructions in `AGENTS.md`; `CLAUDE.md` now imports that canonical file so Codex and Claude Code follow the same repository rules. The VS Code installer now installs both agents' extensions. No action needed unless you want Codex in VS Code; then re-run `sudo ./tools/install_vscode.sh` on a supported Linux host.
+- **Fixed** coding-agent status paths abbreviating a sibling directory whose name merely began with the home-directory path. Home is now replaced with `~` only at a path boundary. No action needed.
+- **Fixed** `bin/claude-status` showing a Sapling phase name as the revision when the current commit had no bookmark. It now shows the short hash for an unbookmarked draft commit and no revision for an unbookmarked public commit. No action needed.
 
 ## 2026-06-25
 - **Fixed** `bin/claude-status` showing a context percentage and token bracket that disagreed (e.g. `◑ 47% [2k/1.00m]`). The bracket was rebuilt from `current_usage`'s input + cache-read tokens, which collapses right after a cache write; it now derives from the authoritative `used_percentage`, so the two always agree. No action needed.

@@ -1,17 +1,19 @@
 import importlib.util
+import json
 import os
 import re
+import subprocess
 import tempfile
 import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from unittest.mock import patch
 
+from _pydotlib import agent_status
+
 # bin/claude-status has no .py extension and a hyphen, so it can't be imported by
-# name. Load it from its path instead — the test depends on the bin script, not
-# the other way around, so the script stays standalone (bin/ portability policy).
-# An explicit SourceFileLoader is required because spec_from_file_location can't
-# infer a loader from a suffix-less filename.
+# name. An explicit SourceFileLoader is required because spec_from_file_location
+# can't infer a loader from a suffix-less filename.
 _SCRIPT = Path(__file__).resolve().parents[2] / "bin" / "claude-status"
 
 
@@ -40,6 +42,31 @@ EMPTY_CTX = {
         "cache_read_input_tokens": 0,
     },
 }
+
+
+class EntrypointTests(unittest.TestCase):
+    def test_runs_outside_repo_without_pythonpath(self):
+        env = os.environ.copy()
+        env.pop("PYTHONPATH", None)
+        env.pop("S_DOTFILE_ROOT", None)
+        env.pop("CLAUDE_STATUS_MONOREPOS", None)
+        env["COLUMNS"] = "120"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env["HOME"] = os.path.join(temp_dir, "home")
+            result = subprocess.run(
+                [str(_SCRIPT)],
+                cwd=temp_dir,
+                env=env,
+                input=json.dumps({"workspace": {"current_dir": temp_dir}}),
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=5,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.strip().endswith(f"⌂ {temp_dir}"), result.stdout)
 
 
 class BuildDurationSectionTests(unittest.TestCase):
@@ -202,118 +229,47 @@ class BuildContextSectionTests(unittest.TestCase):
         self.assertEqual(self._plain(cs.build_context_section(data, short=False)), "◑ 0% [0/1.00m]")
 
 
-class ParseDiffstatTests(unittest.TestCase):
-    def test_insertions_and_deletions(self):
-        self.assertEqual(cs._parse_diffstat("3 files changed, 12 insertions(+), 4 deletions(-)"), "+12 -4")
-
-    def test_only_insertions(self):
-        self.assertEqual(cs._parse_diffstat("1 file changed, 7 insertions(+)"), "+7")
-
-    def test_only_deletions(self):
-        self.assertEqual(cs._parse_diffstat("1 file changed, 2 deletions(-)"), "-2")
-
-    def test_no_line_changes(self):
-        self.assertEqual(cs._parse_diffstat("1 file changed"), "")
-
-    def test_empty(self):
-        self.assertEqual(cs._parse_diffstat(""), "")
-
-
-class ParseSlLabelTests(unittest.TestCase):
-    def test_bookmark_wins(self):
-        self.assertEqual(cs._parse_sl_label("feature-x\ndraft\nabc123def456"), "feature-x")
-
-    def test_skips_main_bookmark(self):
-        self.assertEqual(cs._parse_sl_label("main feature-y\ndraft\nabc123"), "feature-y")
-
-    def test_main_only_bookmark_is_blank(self):
-        self.assertEqual(cs._parse_sl_label("main\npublic\nabc123"), "")
-
-    def test_draft_without_bookmark_uses_short_hash(self):
-        self.assertEqual(cs._parse_sl_label("\ndraft\nabc123def456"), "abc123def456")
-
-    def test_public_without_bookmark_is_blank(self):
-        self.assertEqual(cs._parse_sl_label("\npublic\nabc123"), "")
-
-    def test_empty(self):
-        self.assertEqual(cs._parse_sl_label(""), "")
-
-
-class DetectVcsTests(unittest.TestCase):
-    def test_git_marker_dir(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.mkdir(os.path.join(d, ".git"))
-            self.assertEqual(cs._detect_vcs(d), "git")
-
-    def test_git_marker_file(self):
-        # git worktrees use a .git *file*, not a directory
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, ".git"), "w") as f:
-                f.write("gitdir: /elsewhere\n")
-            self.assertEqual(cs._detect_vcs(d), "git")
-
-    def test_sl_marker(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.mkdir(os.path.join(d, ".sl"))
-            self.assertEqual(cs._detect_vcs(d), "sl")
-
-    def test_hg_marker_is_sapling(self):
-        # Sapling marks its root with .hg on many installs; driven via `sl`.
-        with tempfile.TemporaryDirectory() as d:
-            os.mkdir(os.path.join(d, ".hg"))
-            self.assertEqual(cs._detect_vcs(d), "sl")
-
-    def test_walks_up_to_ancestor_marker(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.mkdir(os.path.join(d, ".git"))
-            sub = os.path.join(d, "a", "b")
-            os.makedirs(sub)
-            self.assertEqual(cs._detect_vcs(sub), "git")
-
-
 class BuildDirBranchSectionTests(unittest.TestCase):
     def test_no_cwd_returns_empty(self):
         self.assertEqual(cs.build_dir_branch_section({}), "")
 
-    @patch.object(cs, "_detect_vcs", return_value=None)
-    def test_home_substitution_no_repo(self, _):
-        home = os.path.expanduser("~")
-        data = {"workspace": {"current_dir": home + "/projects/foo"}}
-        self.assertEqual(cs.build_dir_branch_section(data), "⌂ ~/projects/foo")
-
-    @patch.object(cs, "_git_stat", return_value="+5 -1")
-    @patch.object(cs, "_git_label", return_value="feature-x")
-    @patch.object(cs, "_detect_vcs", return_value="git")
-    def test_git_branch_and_stat(self, *_):
+    @patch.object(agent_status, "collect_directory_status")
+    def test_branch_and_stat(self, collect):
+        collect.return_value = agent_status.DirectoryStatus(
+            display_path="/some/repo",
+            vcs_kind="git",
+            display_revision="feature-x",
+            diffstat="+5 -1",
+        )
         data = {"workspace": {"current_dir": "/some/repo"}}
-        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ feature-x +5 -1")
+        with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": ""}):
+            self.assertEqual(
+                cs.build_dir_branch_section(data),
+                "⌂ /some/repo ⎇ feature-x +5 -1",
+            )
+        collect.assert_called_once_with("/some/repo", monorepos=())
 
-    @patch.object(cs, "_sl_stat", return_value="+9")
-    @patch.object(cs, "_sl_label", return_value="bookmark-z")
-    @patch.object(cs, "_detect_vcs", return_value="sl")
-    def test_sapling_bookmark_and_stat(self, *_):
+    @patch.object(agent_status, "collect_directory_status")
+    def test_no_revision_omits_vcs_decoration(self, collect):
+        collect.return_value = agent_status.DirectoryStatus(
+            display_path="/some/repo",
+            vcs_kind="git",
+        )
         data = {"workspace": {"current_dir": "/some/repo"}}
-        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ bookmark-z +9")
+        with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": ""}):
+            self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo")
+        collect.assert_called_once_with("/some/repo", monorepos=())
 
-    @patch.object(cs, "_git_label", return_value="")
-    @patch.object(cs, "_detect_vcs", return_value="git")
-    def test_main_branch_no_decoration(self, *_):
-        data = {"workspace": {"current_dir": "/some/repo"}}
-        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo")
-
-    @patch.object(cs, "_git_stat", return_value="")
-    @patch.object(cs, "_git_label", return_value="feature-x")
-    @patch.object(cs, "_detect_vcs", return_value="git")
-    def test_branch_without_changes_omits_stat(self, *_):
-        data = {"workspace": {"current_dir": "/some/repo"}}
-        self.assertEqual(cs.build_dir_branch_section(data), "⌂ /some/repo ⎇ feature-x")
-
-    @patch.object(cs, "_detect_vcs", return_value=None)
-    def test_monorepo_path_collapsed_in_output(self, _):
-        home = os.path.expanduser("~")
-        data = {"workspace": {"current_dir": home + "/bigrepo/a/b/c/d"}}
+    @patch.object(agent_status, "collect_directory_status")
+    def test_passes_monorepo_configuration(self, collect):
+        collect.return_value = agent_status.DirectoryStatus(display_path="~/bigrepo/.../c/d")
+        data = {"workspace": {"current_dir": "/home/me/bigrepo/a/b/c/d"}}
         with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": "bigrepo"}):
             self.assertEqual(cs.build_dir_branch_section(data), "⌂ ~/bigrepo/.../c/d")
+        collect.assert_called_once_with(
+            "/home/me/bigrepo/a/b/c/d",
+            monorepos=("bigrepo",),
+        )
 
 
 class MonoreposEnvTests(unittest.TestCase):
@@ -324,31 +280,6 @@ class MonoreposEnvTests(unittest.TestCase):
     def test_space_and_comma_separated(self):
         with patch.dict(os.environ, {"CLAUDE_STATUS_MONOREPOS": "alpha, beta  gamma,delta"}):
             self.assertEqual(cs._monorepos(), ("alpha", "beta", "gamma", "delta"))
-
-
-class ShortenMonorepoPathTests(unittest.TestCase):
-    REPOS = ("bigrepo", "src")
-
-    def test_no_repos_configured_is_noop(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c/d", ()), "~/bigrepo/a/b/c/d")
-
-    def test_not_under_home_is_noop(self):
-        self.assertEqual(cs._shorten_monorepo_path("/etc/a/b/c/d", self.REPOS), "/etc/a/b/c/d")
-
-    def test_unlisted_repo_is_noop(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/other/a/b/c/d", self.REPOS), "~/other/a/b/c/d")
-
-    def test_deep_path_collapses(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c/d", self.REPOS), "~/bigrepo/.../c/d")
-
-    def test_digit_suffix_matches_basename(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo2/a/b/c/d", self.REPOS), "~/bigrepo2/.../c/d")
-
-    def test_shallow_path_is_noop(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo/a/b/c", self.REPOS), "~/bigrepo/a/b/c")
-
-    def test_repo_root_is_noop(self):
-        self.assertEqual(cs._shorten_monorepo_path("~/bigrepo", self.REPOS), "~/bigrepo")
 
 
 if __name__ == "__main__":
