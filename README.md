@@ -35,7 +35,7 @@ push dotfile updates from. Original instructions were copied from the [GitHub
 official documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 
 ```
-curl https://raw.githubusercontent.com/smacdo/dotfiles/master/bin/generate-ssh-key.sh | sh -s
+curl -fsSL https://raw.githubusercontent.com/smacdo/dotfiles/master/bin/generate-ssh-key | sh -s
 ```
 
 ## Setup
