@@ -15,6 +15,7 @@ Entry format:
 ```
 
 ## 2026-08-05
+- **Removed** machine-specific Git HTTP configuration from the tracked `.gitconfig`. Store any required private settings in the existing `~/.my_gitconfig` override.
 - **Added** shared coding-agent instructions in `AGENTS.md`; `CLAUDE.md` now imports that canonical file so Codex and Claude Code follow the same repository rules. The VS Code installer now installs both agents' extensions. No action needed unless you want Codex in VS Code; then re-run `sudo ./tools/install_vscode.sh` on a supported Linux host.
 - **Fixed** coding-agent status paths abbreviating a sibling directory whose name merely began with the home-directory path. Home is now replaced with `~` only at a path boundary. No action needed.
 - **Fixed** `bin/claude-status` showing a Sapling phase name as the revision when the current commit had no bookmark. It now shows the short hash for an unbookmarked draft commit and no revision for an unbookmarked public commit. No action needed.
