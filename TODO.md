@@ -32,6 +32,7 @@ problem is the python installed via homebrew or standalone doesn't use the syste
 - Print out a summary of the files with failing lints at the end.
 - Lint `run_tests.py`
 - Expand lint scope to include `tools/` shell scripts (currently only `shell_profile/`, root configs, and `bin/` are linted).
+- Ruff policy upgrade: replace the legacy `E4,E7,E9,F` selection in `ruff.toml` with Ruff 0.16's expanded defaults, then fix the resulting diagnostics in deliberate rule-family batches. Review semantic findings such as timezone handling and broad exception catches manually rather than applying a blanket autofix.
 
 ## Testing
 - [x] Add script to automate dotfile updating, syncing

@@ -15,6 +15,7 @@ Entry format:
 ```
 
 ## 2026-08-05
+- **Fixed** lint behavior changing when Ruff or ty publishes a new release. Their versions are now pinned, and the repository explicitly owns its Ruff rule set. No action needed.
 - **Removed** machine-specific Git HTTP configuration from the tracked `.gitconfig`. Store any required private settings in the existing `~/.my_gitconfig` override.
 - **Added** bootstrap setup for Codex's native status line in `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`). Existing custom status lines and unrelated settings are preserved; an existing config is backed up once before modification. Re-run `./bootstrap.py` to enable it.
 - **Fixed** coding-agent config updates preserving existing file permissions and cleaning up temporary files after a failed replacement. No action needed.

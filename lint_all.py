@@ -22,6 +22,19 @@ DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
 END_OF_CONFIG_SENTINEL = "### end of config - there should be no lines below this one! ###"
 END_OF_CONFIG_FILES = [".bashrc", ".zshrc"]
 
+# Keep CI and local linting on the same tool releases. The repository's
+# ruff.toml separately owns the enabled-rule policy so an upstream default
+# change cannot silently expand or shrink it again.
+UVX_TOOL_PACKAGES = {
+    "ty": "ty==0.0.67",
+    "ruff": "ruff==0.16.1",
+}
+
+
+def uvx_tool_command(tool: str, *args: str) -> list[str]:
+    """Build a uvx command for one of the repository's pinned lint tools."""
+    return ["uvx", "--from", UVX_TOOL_PACKAGES[tool], tool, *args]
+
 
 ################################################################################
 # Lint a list of shell scripts, and return a list of files that failed a linter
@@ -57,7 +70,9 @@ def lint_sh_files(file_paths: list[str], shell: str | None = None) -> list[str]:
 # TODO: documentation
 def typecheck_py_file(file_path: str) -> tuple[bool, str]:
     result = subprocess.run(
-        ["uvx", "ty", "check", "--no-progress", "--color", "always", file_path],
+        uvx_tool_command(
+            "ty", "check", "--no-progress", "--color", "always", file_path
+        ),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -74,7 +89,7 @@ def ruff_lint_py_file(file_path: str, auto_fix=False) -> tuple[bool, str]:
     custom_env["FORCE_COLOR"] = "1"
 
     result = subprocess.run(
-        ["uvx", "ruff", "check", fix_arg, file_path],
+        uvx_tool_command("ruff", "check", fix_arg, file_path),
         env=custom_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -91,7 +106,7 @@ def ruff_lint_py_file(file_path: str, auto_fix=False) -> tuple[bool, str]:
 ################################################################################
 def preflight_uvx_tool(tool: str) -> tuple[bool, str]:
     result = subprocess.run(
-        ["uvx", tool, "--version"],
+        uvx_tool_command(tool, "--version"),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -103,8 +118,7 @@ def preflight_uvx_tool(tool: str) -> tuple[bool, str]:
 # Lint a list of python files, and return a list of the files that failed a
 # linter check.
 #
-# This function assumes that `mypy` and `ruff` are installed, otherwise a sub-
-# process exception will be raised.
+# This function assumes the uvx tool preflight has already succeeded.
 ################################################################################
 def lint_py_files(file_paths: list[str]) -> list[str]:
     # Make sure Python linter tools are available.
@@ -261,7 +275,7 @@ def main() -> int:
     failed_py_files: list[str] = []
     py_lint_skipped = False
 
-    for tool in ("ty", "ruff"):
+    for tool in UVX_TOOL_PACKAGES:
         ok, output = preflight_uvx_tool(tool)
         if not ok:
             py_lint_skipped = True

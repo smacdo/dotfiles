@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 import unittest
 from unittest.mock import patch
 
@@ -17,23 +16,23 @@ class TestShouldUseColors(unittest.TestCase):
         # expected behavior.
         should_use_colors.cache_clear()
 
-    @patch.dict(os.environ, {"NO_COLOR": "1"})
+    @patch.dict(os.environ, {"NO_COLOR": "1"}, clear=True)
     def test_returns_false_when_no_color_env_set(self):
         self.assertFalse(should_use_colors())
 
-    @patch.dict(os.environ, {"CLICOLOR": "0"})
+    @patch.dict(os.environ, {"CLICOLOR": "0"}, clear=True)
     def test_returns_false_when_clicolor__env_zero(self):
         self.assertFalse(should_use_colors())
 
-    @patch.dict(os.environ, {"CLICOLOR": "1"})
+    @patch.dict(os.environ, {"CLICOLOR": "1"}, clear=True)
     def test_returns_true_when_clicolor__env_one(self):
         self.assertTrue(should_use_colors())
 
-    @patch.dict(os.environ, {"CLICOLOR_FORCE": "1"})
+    @patch.dict(os.environ, {"CLICOLOR_FORCE": "1"}, clear=True)
     def test_returns_true_when_clicolor_force_env(self):
         self.assertTrue(should_use_colors())
 
-    @patch.dict(os.environ, {"FORCE_COLOR": "1"})
+    @patch.dict(os.environ, {"FORCE_COLOR": "1"}, clear=True)
     def test_returns_true_when_force_color_env(self):
         self.assertTrue(should_use_colors())
 
@@ -66,7 +65,7 @@ class TestShouldUseColors(unittest.TestCase):
     ):
         self.assertFalse(should_use_colors())
 
-    @patch.dict(os.environ, {"NO_COLOR": "1", "CLICOLOR": "1"})
+    @patch.dict(os.environ, {"NO_COLOR": "1", "CLICOLOR": "1"}, clear=True)
     def test_no_color_takes_precedence(self):
         # NO_COLOR should override CLICOLOR
         self.assertFalse(should_use_colors())
