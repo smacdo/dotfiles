@@ -107,15 +107,11 @@ configuration yet. Maybe I'll do that someday.
 
 ## Meeting Reminders (next-meeting)
 The `next-meeting` script shows upcoming Google Calendar meetings in the tmux
-status bar and optionally in the Claude Code status line. It supports two
-calendar backends: `gcal` (google_mux, preferred on devservers) and `gcalcli`
-(for personal machines). The script auto-detects which is available.
+status bar. On personal machines it uses the public `gcalcli` integration when
+available.
 
 ### Setup
-On devservers (`gcal` / google_mux): already installed. Restart tmux.
-
-On personal machines, this feature is optional. If you want meeting reminders,
-install and authenticate `gcalcli`:
+This feature is optional. To use it, install and authenticate `gcalcli`:
 
 1. Install: `pip install gcalcli` or `brew install gcalcli`
 2. Authenticate: `gcalcli init`
