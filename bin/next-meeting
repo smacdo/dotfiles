@@ -16,8 +16,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import unittest
 
 from typing import NamedTuple
+from unittest.mock import patch
 
 
 class Config(NamedTuple):
@@ -36,6 +38,12 @@ class Config(NamedTuple):
 class FetchResult(NamedTuple):
     meetings: list[dict] | None
     error: str | None
+
+
+PROVIDER_ENV = "NEXT_MEETING_PROVIDER"
+PROVIDER_SCHEMA_VERSION = 1
+PROVIDER_TIMEOUT_SECONDS = 15
+PROVIDER_RESPONSE_STATUSES = {"accepted", "declined", "tentative", "needs-action"}
 
 
 def env_int(name, default):
@@ -101,64 +109,103 @@ def format_command_error(name, result):
     return f"{name} exited with status {result.returncode}"
 
 
-def fetch_meetings_gcal():
-    try:
-        result = subprocess.run(
-            ["gcal", "list", "--json", "--days", "1", "-q"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-    except FileNotFoundError:
-        return FetchResult(None, "gcal not found")
-    except subprocess.TimeoutExpired:
-        return FetchResult(None, "gcal timed out")
+def configured_provider_path():
+    value = os.environ.get(PROVIDER_ENV, "").strip()
+    return os.path.expanduser(value) if value else None
 
-    if result.returncode != 0:
-        return FetchResult(None, format_command_error("gcal", result))
+
+def parse_provider_timestamp(value):
+    if not isinstance(value, str):
+        return None
+
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
 
     try:
-        data = json.loads(result.stdout)
-        items = data.get("data", {}).get("data", {}).get("items", [])
-    except (json.JSONDecodeError, AttributeError):
-        return FetchResult(None, "gcal returned invalid JSON")
+        timestamp = datetime.datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
-    now = datetime.datetime.now().astimezone()
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        return None
+
+    return timestamp
+
+
+def subject_has_control_characters(subject):
+    return any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in subject)
+
+
+def invalid_provider_output(detail):
+    return FetchResult(None, f"calendar provider returned invalid output ({detail})")
+
+
+def parse_provider_output(output, now=None):
+    """Validate and normalize version 1 provider JSON into internal meetings."""
+
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return invalid_provider_output("invalid JSON")
+
+    if not isinstance(payload, dict):
+        return invalid_provider_output("root must be an object")
+    version = payload.get("version")
+    if (
+        not isinstance(version, int)
+        or isinstance(version, bool)
+        or version != PROVIDER_SCHEMA_VERSION
+    ):
+        return invalid_provider_output(f"version must be {PROVIDER_SCHEMA_VERSION}")
+
+    items = payload.get("meetings")
+    if not isinstance(items, list):
+        return invalid_provider_output("meetings must be a list")
+
+    if now is None:
+        now = datetime.datetime.now().astimezone()
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("provider comparison time must be timezone-aware")
+
     meetings = []
-    for item in items:
-        subject = item.get("summary", "").strip()
-        start_raw = item.get("start", {})
-        end_raw = item.get("end", {})
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            return invalid_provider_output(f"meeting {index} must be an object")
 
-        if "date" in start_raw and "dateTime" not in start_raw:
-            continue
+        subject = item.get("subject")
+        if (
+            not isinstance(subject, str)
+            or not subject.strip()
+            or subject_has_control_characters(subject)
+        ):
+            return invalid_provider_output(f"meeting {index} has an invalid subject")
 
-        start_str = start_raw.get("dateTime")
-        end_str = end_raw.get("dateTime")
-        if not start_str or not end_str:
-            continue
+        start = parse_provider_timestamp(item.get("start"))
+        end = parse_provider_timestamp(item.get("end"))
+        if start is None or end is None:
+            return invalid_provider_output(
+                f"meeting {index} timestamps must include timezone offsets"
+            )
+        if end <= start:
+            return invalid_provider_output(f"meeting {index} must end after it starts")
 
-        try:
-            start = datetime.datetime.fromisoformat(start_str)
-            end = datetime.datetime.fromisoformat(end_str)
-        except ValueError:
-            continue
+        response_status = item.get("response_status", "accepted")
+        if (
+            not isinstance(response_status, str)
+            or response_status not in PROVIDER_RESPONSE_STATUSES
+        ):
+            return invalid_provider_output(
+                f"meeting {index} has an invalid response_status"
+            )
 
         if (end - start).total_seconds() > 4 * 3600:
             continue
-
-        if end < now:
+        if end <= now:
             continue
-
-        response_status = "accepted"
-        for attendee in item.get("attendees", []):
-            if attendee.get("self"):
-                response_status = attendee.get("responseStatus", "accepted")
-                break
 
         meetings.append(
             {
-                "subject": subject,
+                "subject": subject.strip(),
                 "start": start.astimezone().replace(tzinfo=None).strftime(
                     "%Y-%m-%d %H:%M"
                 ),
@@ -170,6 +217,31 @@ def fetch_meetings_gcal():
         )
 
     return FetchResult(meetings, None)
+
+
+def fetch_meetings_provider(provider_path, run=subprocess.run, now=None):
+    provider_path = os.path.expanduser(provider_path)
+    if not os.path.isabs(provider_path):
+        return FetchResult(None, "calendar provider path must be absolute")
+
+    try:
+        result = run(
+            [provider_path],
+            capture_output=True,
+            text=True,
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return FetchResult(None, "calendar provider timed out")
+    except OSError:
+        return FetchResult(None, "calendar provider could not be executed")
+
+    if result.returncode != 0:
+        return FetchResult(
+            None, f"calendar provider exited with status {result.returncode}"
+        )
+
+    return parse_provider_output(result.stdout, now=now)
 
 
 def fetch_meetings_gcalcli():
@@ -241,15 +313,9 @@ def fetch_meetings_gcalcli():
     return FetchResult(meetings, None)
 
 
-def fetch_meetings():
-    fetchers = []
-    if shutil.which("gcal"):
-        fetchers.append(fetch_meetings_gcal)
-    if shutil.which("gcalcli"):
-        fetchers.append(fetch_meetings_gcalcli)
-
+def fetch_first(fetchers):
     if not fetchers:
-        return FetchResult(None, "no calendar CLI found")
+        return FetchResult(None, "no calendar provider found")
 
     errors = []
     for fetcher in fetchers:
@@ -259,6 +325,19 @@ def fetch_meetings():
         errors.append(result.error)
 
     return FetchResult(None, "; ".join(errors))
+
+
+def fetch_meetings():
+    fetchers = []
+    provider_path = configured_provider_path()
+    if provider_path:
+        fetchers.append(
+            lambda provider_path=provider_path: fetch_meetings_provider(provider_path)
+        )
+    if shutil.which("gcalcli"):
+        fetchers.append(fetch_meetings_gcalcli)
+
+    return fetch_first(fetchers)
 
 
 def read_cache():
@@ -626,9 +705,10 @@ def main():
 
     if result.error and not meetings:
         print(f"Error: {result.error}", file=sys.stderr)
-        if result.error == "no calendar CLI found":
+        if result.error == "no calendar provider found":
             print(
-                "Install gcal (google_mux) or gcalcli (pip install gcalcli)",
+                f"Set {PROVIDER_ENV} to an absolute executable path or install "
+                "gcalcli (pip install gcalcli)",
                 file=sys.stderr,
             )
         return 1
@@ -637,5 +717,280 @@ def main():
     return 0
 
 
+class ProviderOutputTests(unittest.TestCase):
+    NOW = datetime.datetime(2030, 1, 1, 9, 0, tzinfo=datetime.timezone.utc)
+
+    def meeting(self, **overrides):
+        meeting = {
+            "subject": "Team sync",
+            "start": "2030-01-01T10:00:00+00:00",
+            "end": "2030-01-01T10:30:00+00:00",
+        }
+        meeting.update(overrides)
+        return meeting
+
+    def payload(self, meetings):
+        return json.dumps({"version": PROVIDER_SCHEMA_VERSION, "meetings": meetings})
+
+    def test_valid_output_is_normalized_and_defaults_to_accepted(self):
+        result = parse_provider_output(self.payload([self.meeting()]), now=self.NOW)
+
+        expected_start = (
+            datetime.datetime.fromisoformat("2030-01-01T10:00:00+00:00")
+            .astimezone()
+            .strftime("%Y-%m-%d %H:%M")
+        )
+        self.assertEqual(result.error, None)
+        self.assertEqual(
+            result.meetings,
+            [
+                {
+                    "subject": "Team sync",
+                    "start": expected_start,
+                    "end": (
+                        datetime.datetime.fromisoformat("2030-01-01T10:30:00+00:00")
+                        .astimezone()
+                        .strftime("%Y-%m-%d %H:%M")
+                    ),
+                    "response_status": "accepted",
+                }
+            ],
+        )
+
+    def test_explicit_allowed_response_statuses_are_preserved(self):
+        for response_status in (
+            "accepted",
+            "declined",
+            "tentative",
+            "needs-action",
+        ):
+            with self.subTest(response_status=response_status):
+                result = parse_provider_output(
+                    self.payload([self.meeting(response_status=response_status)]),
+                    now=self.NOW,
+                )
+
+                self.assertEqual(result.error, None)
+                self.assertEqual(
+                    result.meetings[0]["response_status"], response_status
+                )
+
+    def test_invalid_payloads_are_rejected_without_partial_results(self):
+        invalid_payloads = {
+            "malformed JSON": "{",
+            "non-object root": json.dumps([]),
+            "missing version": json.dumps({"meetings": []}),
+            "wrong version": json.dumps({"version": 2, "meetings": []}),
+            "boolean version": json.dumps({"version": True, "meetings": []}),
+            "floating version": json.dumps({"version": 1.0, "meetings": []}),
+            "missing meetings": json.dumps({"version": 1}),
+            "meetings not a list": json.dumps({"version": 1, "meetings": {}}),
+            "meeting not an object": self.payload(["meeting"]),
+            "missing subject": self.payload([self.meeting(subject=None)]),
+            "control character": self.payload([self.meeting(subject="Team\nSync")]),
+            "naive timestamp": self.payload(
+                [self.meeting(start="2030-01-01T10:00:00")]
+            ),
+            "end before start": self.payload(
+                [self.meeting(end="2030-01-01T09:30:00+00:00")]
+            ),
+            "end equals start": self.payload(
+                [self.meeting(end="2030-01-01T10:00:00+00:00")]
+            ),
+            "unknown response": self.payload(
+                [self.meeting(response_status="unknown")]
+            ),
+            "response wrong type": self.payload([self.meeting(response_status=[])]),
+            "invalid meeting after valid meeting": self.payload(
+                [self.meeting(), self.meeting(subject=None)]
+            ),
+        }
+
+        for name, output in invalid_payloads.items():
+            with self.subTest(name=name):
+                result = parse_provider_output(output, now=self.NOW)
+                self.assertIsNone(result.meetings)
+                self.assertIn("invalid output", result.error)
+
+    def test_ended_and_overlong_meetings_are_filtered(self):
+        output = self.payload(
+            [
+                self.meeting(
+                    subject="Ended",
+                    start="2030-01-01T08:00:00+00:00",
+                    end="2030-01-01T08:30:00+00:00",
+                ),
+                self.meeting(
+                    subject="Overlong",
+                    start="2030-01-01T10:00:00+00:00",
+                    end="2030-01-01T15:00:01+00:00",
+                ),
+                self.meeting(subject="Kept"),
+            ]
+        )
+
+        result = parse_provider_output(output, now=self.NOW)
+
+        self.assertEqual(result.error, None)
+        self.assertEqual([meeting["subject"] for meeting in result.meetings], ["Kept"])
+
+
+class ProviderExecutionTests(unittest.TestCase):
+    NOW = ProviderOutputTests.NOW
+
+    def test_provider_is_invoked_as_one_absolute_path_without_a_shell(self):
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs))
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"version": 1, "meetings": []}),
+                stderr="",
+            )
+
+        result = fetch_meetings_provider("/tmp/calendar-provider", run=run, now=self.NOW)
+
+        self.assertEqual(result, FetchResult([], None))
+        self.assertEqual(
+            calls,
+            [
+                (
+                    ["/tmp/calendar-provider"],
+                    {
+                        "capture_output": True,
+                        "text": True,
+                        "timeout": PROVIDER_TIMEOUT_SECONDS,
+                    },
+                )
+            ],
+        )
+
+    def test_relative_provider_path_is_rejected_without_execution(self):
+        def unexpected_run(*_args, **_kwargs):
+            self.fail("relative provider path should not be executed")
+
+        result = fetch_meetings_provider("provider", run=unexpected_run, now=self.NOW)
+
+        self.assertIsNone(result.meetings)
+        self.assertIn("absolute", result.error)
+
+    def test_process_errors_return_failures_without_exposing_process_output(self):
+        process_errors = {
+            "missing": (
+                FileNotFoundError(),
+                "calendar provider could not be executed",
+            ),
+            "not executable": (
+                PermissionError(),
+                "calendar provider could not be executed",
+            ),
+            "timeout": (
+                subprocess.TimeoutExpired(["provider"], 15),
+                "calendar provider timed out",
+            ),
+        }
+        for name, (error, expected_error) in process_errors.items():
+            with self.subTest(name=name):
+
+                def failing_run(*_args, error=error, **_kwargs):
+                    raise error
+
+                result = fetch_meetings_provider(
+                    "/tmp/calendar-provider", run=failing_run, now=self.NOW
+                )
+                self.assertEqual(result, FetchResult(None, expected_error))
+
+        result = fetch_meetings_provider(
+            "/tmp/calendar-provider",
+            run=lambda *_args, **_kwargs: subprocess.CompletedProcess(
+                [], 7, stdout="private meeting", stderr="private diagnostic"
+            ),
+            now=self.NOW,
+        )
+        self.assertEqual(result.error, "calendar provider exited with status 7")
+
+
+class ProviderFallbackTests(unittest.TestCase):
+    def test_successful_empty_provider_result_is_authoritative(self):
+        def unexpected_fallback():
+            self.fail("a successful empty result must not fall back")
+
+        result = fetch_first([lambda: FetchResult([], None), unexpected_fallback])
+
+        self.assertEqual(result, FetchResult([], None))
+
+    def test_provider_failure_falls_back_and_errors_stay_ordered(self):
+        fallback_result = FetchResult([{"subject": "Fallback"}], None)
+        result = fetch_first(
+            [lambda: FetchResult(None, "provider failed"), lambda: fallback_result]
+        )
+        self.assertEqual(result, fallback_result)
+
+        result = fetch_first(
+            [
+                lambda: FetchResult(None, "provider failed"),
+                lambda: FetchResult(None, "gcalcli failed"),
+            ]
+        )
+        self.assertEqual(result.error, "provider failed; gcalcli failed")
+
+    def test_configured_provider_failure_falls_back_to_gcalcli(self):
+        module = sys.modules[__name__]
+        calls = []
+
+        def provider_fetch(path):
+            calls.append(("provider", path))
+            return FetchResult(None, "provider failed")
+
+        def gcalcli_fetch():
+            calls.append(("gcalcli", None))
+            return FetchResult([{"subject": "Fallback"}], None)
+
+        with (
+            patch.dict(os.environ, {PROVIDER_ENV: "/tmp/calendar-provider"}),
+            patch.object(module, "fetch_meetings_provider", side_effect=provider_fetch),
+            patch.object(module, "fetch_meetings_gcalcli", side_effect=gcalcli_fetch),
+            patch.object(shutil, "which", return_value="/tmp/gcalcli"),
+        ):
+            result = fetch_meetings()
+
+        self.assertEqual(result, FetchResult([{"subject": "Fallback"}], None))
+        self.assertEqual(
+            calls,
+            [("provider", "/tmp/calendar-provider"), ("gcalcli", None)],
+        )
+
+    def test_gcalcli_is_used_without_a_configured_provider(self):
+        module = sys.modules[__name__]
+        gcalcli_result = FetchResult([{"subject": "gcalcli"}], None)
+
+        with (
+            patch.dict(os.environ, {PROVIDER_ENV: ""}),
+            patch.object(
+                module, "fetch_meetings_gcalcli", return_value=gcalcli_result
+            ) as gcalcli_fetch,
+            patch.object(shutil, "which", return_value="/tmp/gcalcli"),
+        ):
+            result = fetch_meetings()
+
+        self.assertEqual(result, gcalcli_result)
+        gcalcli_fetch.assert_called_once_with()
+
+    def test_no_sources_returns_actionable_error(self):
+        with (
+            patch.dict(os.environ, {PROVIDER_ENV: ""}),
+            patch.object(shutil, "which", return_value=None),
+        ):
+            result = fetch_meetings()
+
+        self.assertEqual(result, FetchResult(None, "no calendar provider found"))
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    if "--run-tests" in sys.argv:
+        sys.argv.remove("--run-tests")
+        unittest.main()
+    else:
+        sys.exit(main())

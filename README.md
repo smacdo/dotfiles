@@ -122,7 +122,7 @@ This feature is optional. To use it, install and authenticate `gcalcli`:
 Run `next-meeting` with no arguments for a quick list of today's meetings.
 
 ### Configuration
-All settings are optional environment variables, set in
+Common settings are optional environment variables, set in
 `~/.config/dotfiles/my_shell_profile.sh`:
 
 | Variable | Default | Description |
@@ -132,6 +132,32 @@ All settings are optional environment variables, set in
 | `NEXT_MEETING_CRITICAL` | 2 | Red critical threshold (minutes) |
 | `NEXT_MEETING_CACHE_TTL` | 120 | Seconds between calendar refreshes |
 | `NEXT_MEETING_ALERT_AT` | 5,0 | Fire tmux alerts at these minute marks |
+| `NEXT_MEETING_PROVIDER` | (unset) | Absolute path to an optional external calendar provider executable |
+
+### External calendar provider
+
+For a calendar source other than `gcalcli`, set `NEXT_MEETING_PROVIDER` to an
+absolute executable path. The executable is trusted local code, receives no
+arguments, and must print versioned JSON on stdout:
+
+```json
+{
+  "version": 1,
+  "meetings": [
+    {
+      "subject": "Project sync",
+      "start": "2026-08-05T10:00:00-07:00",
+      "end": "2026-08-05T10:30:00-07:00",
+      "response_status": "accepted"
+    }
+  ]
+}
+```
+
+Timestamps must include timezone offsets. `response_status` is optional and may
+be `accepted`, `declined`, `tentative`, or `needs-action`. If the provider
+fails, times out, or returns invalid data, `next-meeting` falls back to
+`gcalcli` when available. A valid empty `meetings` list is authoritative.
 
 ## Claude Code status line
 `bin/claude-status` renders the Claude Code status line — model + effort, token

@@ -15,6 +15,7 @@ Entry format:
 ```
 
 ## 2026-08-05
+- **Changed** `bin/next-meeting` alternate calendar sources to use the source-neutral `NEXT_MEETING_PROVIDER` JSON interface. Built-in `gcalcli` support is unchanged; users of another source must configure a private adapter executable.
 - **Fixed** lint behavior changing when Ruff or ty publishes a new release. Their versions are now pinned, and the repository explicitly owns its Ruff rule set. No action needed.
 - **Removed** machine-specific Git HTTP configuration from the tracked `.gitconfig`. Store any required private settings in the existing `~/.my_gitconfig` override.
 - **Added** bootstrap setup for Codex's native status line in `$CODEX_HOME/config.toml` (default `~/.codex/config.toml`). Existing custom status lines and unrelated settings are preserved; an existing config is backed up once before modification. Re-run `./bootstrap.py` to enable it.
