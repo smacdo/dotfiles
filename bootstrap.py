@@ -6,16 +6,15 @@ Author: Scott MacDonald <root@smacdo.com>
 This script will configure the dotfiles repo for the current user to use.
 """
 
-import os
-import sys
-
-from pathlib import Path
-
 import argparse
 import logging
+import os
+import sys
+from pathlib import Path
 
 from _pydotlib.bootstrap import (
     configure_claude_code,
+    configure_codex,
     configure_vcs_author,
     configure_weather_location,
     create_dirs,
@@ -23,6 +22,7 @@ from _pydotlib.bootstrap import (
     find_dotfiles_root,
     git_clone_repos,
     initialize_vim_plugin_manager,
+    resolve_codex_config_path,
     safe_symlink,
 )
 from _pydotlib.cli import ColoredLogFormatter
@@ -166,6 +166,13 @@ def main() -> int:
     )
     configure_claude_code(
         settings_path=home_dir / ".claude" / "settings.json",
+        dry_run=args.dry_run,
+    )
+    configure_codex(
+        config_path=resolve_codex_config_path(
+            home_dir,
+            os.environ.get("CODEX_HOME"),
+        ),
         dry_run=args.dry_run,
     )
 

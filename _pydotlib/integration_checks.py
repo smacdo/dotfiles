@@ -344,6 +344,11 @@ BOOTSTRAP_CHECKS: list[Check] = [
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
     # ... and the file propagates to $WEATHER_LOCATION via shell init.
     check_command_output_matches(["bash", "-lc", "echo $WEATHER_LOCATION"], "Seattle"),
+    # A fresh bootstrap configures Codex's native status line.
+    check_file_contains(
+        f"{_HOME}/.codex/config.toml",
+        'status_line = ["model-with-reasoning"',
+    ),
     # Catch-all: bash login shell loads silently. DOTFILE_CI_TEST_MODE=1
     # bypasses .bashrc's "skip if not interactive" early-return so we actually
     # exercise the full .bash_profile → .bashrc → env.sh → xdg.sh chain.

@@ -2,21 +2,25 @@
 Utility functions for the bootstrap.py program.
 """
 
+import copy
 import functools
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import ssl
+import stat
 import subprocess
-import urllib.request
+import tempfile
 import urllib.error
-
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
 from _pydotlib.cli import confirm, input_field
 from _pydotlib.colors import Colors
 from _pydotlib.git import (
@@ -24,9 +28,33 @@ from _pydotlib.git import (
     update_git_config_file,
 )
 
-
 VCS_MISSING_NAME = "TODO_SET_USER_NAME"
 VCS_MISSING_EMAIL = "TODO_SET_EMAIL_ADDRESS"
+
+# Closest native Codex equivalent to the useful, portable parts of
+# bin/claude-status. Existing user choices are always preserved.
+CODEX_STATUS_LINE: tuple[str, ...] = (
+    "model-with-reasoning",
+    "context-remaining",
+    "used-tokens",
+    "five-hour-limit",
+    "weekly-limit",
+    "current-dir",
+    "git-branch",
+)
+
+_TUI_TABLE_HEADER_RE = re.compile(
+    r"(?m)^[ \t]*\[[ \t]*(?:tui|'tui'|\"tui\")[ \t]*\]"
+    r"[ \t]*(?:#[^\r\n]*)?(?:\r?\n|$)"
+)
+
+
+class _ConfigMergeError(ValueError):
+    """A config is valid but cannot be edited without risking user content."""
+
+
+class _ConfigWriteError(RuntimeError):
+    """A config cannot be replaced without risking a user-owned file."""
 
 
 @dataclass(frozen=True)
@@ -152,6 +180,142 @@ def _detect_real_editor() -> str:
     return "vi"
 
 
+def _write_config_text(
+    path: Path,
+    content: str,
+    *,
+    expected_content: str | None,
+    dry_run: bool,
+    description: str,
+) -> bool:
+    """Safely replace a generated config while preserving the original once.
+
+    Returns whether the requested content differs from the live file. Writes use
+    a unique same-directory temporary file so ``os.replace`` stays atomic. An
+    existing file's permission bits are retained, and any temporary file is
+    removed if writing or replacement fails.
+    """
+    def read_live_file() -> str | None:
+        if path.is_symlink():
+            raise _ConfigWriteError(f"{path} is a symlink")
+        try:
+            return path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        except (OSError, UnicodeError) as exc:
+            raise _ConfigWriteError(f"could not read {path}: {exc}") from exc
+
+    current = read_live_file()
+    if current == content:
+        return False
+    if current != expected_content:
+        raise _ConfigWriteError(f"{path} changed while its update was being prepared")
+
+    dry_text = "[DRY RUN] " if dry_run else ""
+    if dry_run:
+        logging.info(f"{dry_text}Would update {description} at {path}")
+        return True
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(content)
+
+        current = read_live_file()
+        if current != expected_content:
+            raise _ConfigWriteError(f"{path} changed while its update was being written")
+
+        original_mode: int | None = None
+        if path.exists():
+            original_mode = stat.S_IMODE(path.stat().st_mode)
+            backup = Path(str(path) + ".ORIGINAL")
+            if not backup.exists():
+                shutil.copy2(path, backup)
+                logging.info(f"Backed up {path} to {backup}")
+
+        if original_mode is not None:
+            temp_path.chmod(original_mode)
+
+        if read_live_file() != expected_content:
+            raise _ConfigWriteError(f"{path} changed before it could be replaced")
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError as exc:
+                logging.warning(f"Could not clean up temporary config {temp_path}: {exc}")
+
+    return True
+
+
+def _merge_codex_config(config_text: str) -> tuple[str, bool]:
+    """Add the native Codex status line without reserializing user TOML."""
+    try:
+        import tomllib
+    except ModuleNotFoundError as exc:
+        raise _ConfigMergeError("Codex config updates require Python 3.11 or newer") from exc
+
+    try:
+        config = tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError as exc:
+        raise _ConfigMergeError("invalid TOML") from exc
+
+    tui = config.get("tui")
+    if tui is not None and not isinstance(tui, dict):
+        raise _ConfigMergeError("'tui' is not a table")
+    if isinstance(tui, dict) and "status_line" in tui:
+        return config_text, False
+
+    newline = "\r\n" if "\r\n" in config_text else "\n"
+    status_line = f"status_line = {json.dumps(list(CODEX_STATUS_LINE))}{newline}"
+
+    expected = copy.deepcopy(config)
+    expected_tui = expected.setdefault("tui", {})
+    expected_tui["status_line"] = list(CODEX_STATUS_LINE)
+
+    if tui is None:
+        prefix = config_text
+        if prefix and not prefix.endswith(("\n", "\r")):
+            prefix += newline
+        if prefix and not prefix.endswith(newline * 2):
+            prefix += newline
+        candidates = [f"{prefix}[tui]{newline}{status_line}"]
+    else:
+        candidates = []
+        for table_header in _TUI_TABLE_HEADER_RE.finditer(config_text):
+            insert_at = table_header.end()
+            prefix = config_text[:insert_at]
+            if not prefix.endswith(("\n", "\r")):
+                prefix += newline
+            candidates.append(f"{prefix}{status_line}{config_text[insert_at:]}")
+
+        # A root dotted key safely extends an implicit `tui` table created by
+        # `tui.other = ...` or `[tui.child]`. It cannot extend an inline table;
+        # semantic validation below rejects that form without touching it.
+        candidates.append(f"tui.{status_line}{config_text}")
+
+    for candidate in candidates:
+        try:
+            parsed_candidate = tomllib.loads(candidate)
+        except tomllib.TOMLDecodeError:
+            continue
+        if parsed_candidate == expected:
+            return candidate, True
+
+    raise _ConfigMergeError("'tui' uses an unsupported TOML form")
+
+
 def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
     """Idempotently merge the `CLAUDE_TMUX_STATE_HOOKS` into `settings["hooks"]`.
 
@@ -249,9 +413,7 @@ def _merge_claude_tmux_hooks(settings: dict[str, Any]) -> bool:
     return changed
 
 
-def configure_claude_code(
-    settings_path: Path, dry_run: bool
-) -> None:
+def configure_claude_code(settings_path: Path, dry_run: bool) -> None:
     """Ensure Claude Code's `settings.json` is wired up to the dotfiles helpers.
 
     Sets `env.EDITOR` to `claude-editor` and `env.REAL_EDITOR` to whatever
@@ -260,25 +422,22 @@ def configure_claude_code(
     Existing keys (including a custom `statusLine`) and unrelated hooks are
     preserved.  Malformed JSON, a non-object top level, or wrong-shaped
     `env`/`hooks` values are left untouched rather than crashing the bootstrap.
-    On modification the prior file is backed up once to `<name>.ORIGINAL` and the
-    new content is written atomically (temp file + `os.replace`).
+    On modification the shared config writer backs up the prior file once and
+    atomically replaces it without changing its permission bits.
     """
     dry_text = "[DRY RUN] " if dry_run else ""
 
-    settings_dir = settings_path.parent
-    if not settings_dir.exists():
-        if dry_run:
-            logging.info(f"{dry_text}Would create dir {settings_dir}")
-        else:
-            settings_dir.mkdir(parents=True, exist_ok=True)
-            logging.info(f"Created dir {settings_dir}")
-
+    original_text: str | None = None
     settings: dict[str, Any] = {}
     if settings_path.exists():
         try:
-            settings = json.loads(settings_path.read_text())
-        except json.JSONDecodeError:
-            logging.warning(f"Could not parse {settings_path}, skipping Claude Code configuration")
+            original_text = settings_path.read_text(encoding="utf-8")
+            settings = json.loads(original_text)
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            logging.warning(
+                f"Could not read or parse {settings_path}, "
+                f"skipping Claude Code configuration: {exc}"
+            )
             return
         if not isinstance(settings, dict):
             logging.warning(f"{settings_path} is not a JSON object, skipping Claude Code configuration")
@@ -314,18 +473,56 @@ def configure_claude_code(
     else:
         logging.debug(f"{dry_text}Claude Code tmux state-icon hooks already configured")
 
-    if changed and not dry_run:
-        # Back up the user's pre-dotfiles settings once, then write atomically
-        # (temp file + os.replace) so an interrupted or failed write can never
-        # truncate this precious, user-maintained file.
-        if settings_path.exists():
-            backup = Path(str(settings_path) + ".ORIGINAL")
-            if not backup.exists():
-                shutil.copy2(settings_path, backup)
-                logging.info(f"Backed up {settings_path} to {backup}")
-        tmp = settings_path.with_name(settings_path.name + ".tmp")
-        tmp.write_text(json.dumps(settings, indent=2) + "\n")
-        os.replace(tmp, settings_path)
+    if changed:
+        try:
+            _write_config_text(
+                settings_path,
+                json.dumps(settings, indent=2) + "\n",
+                expected_content=original_text,
+                dry_run=dry_run,
+                description="Claude Code settings",
+            )
+        except (OSError, _ConfigWriteError) as exc:
+            logging.warning(f"Could not safely update {settings_path}: {exc}")
+
+
+def configure_codex(config_path: Path, dry_run: bool) -> None:
+    """Add the native Codex status line while preserving user-owned TOML."""
+    try:
+        original_text = (
+            config_path.read_text(encoding="utf-8") if config_path.exists() else None
+        )
+    except (OSError, UnicodeError) as exc:
+        logging.warning(f"Could not read {config_path}, skipping Codex configuration: {exc}")
+        return
+    try:
+        updated_text, changed = _merge_codex_config(original_text or "")
+    except _ConfigMergeError as exc:
+        logging.warning(f"Could not safely update {config_path}: {exc}")
+        return
+
+    if not changed:
+        logging.debug("Codex status line already configured")
+        return
+
+    dry_text = "[DRY RUN] " if dry_run else ""
+    logging.info(f"{dry_text}Setting Codex native status line")
+    try:
+        _write_config_text(
+            config_path,
+            updated_text,
+            expected_content=original_text,
+            dry_run=dry_run,
+            description="Codex configuration",
+        )
+    except (OSError, _ConfigWriteError) as exc:
+        logging.warning(f"Could not safely update {config_path}: {exc}")
+
+
+def resolve_codex_config_path(home_dir: Path, codex_home: str | None) -> Path:
+    """Return Codex's config path, honoring an explicit ``CODEX_HOME``."""
+    config_dir = Path(codex_home) if codex_home else home_dir / ".codex"
+    return config_dir / "config.toml"
 
 
 def configure_weather_location(

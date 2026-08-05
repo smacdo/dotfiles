@@ -1,31 +1,49 @@
+import importlib
 import json
 import os
 import ssl
 import subprocess
+import sys
 import tempfile
 import unittest
 import urllib.error
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+tomllib: Any
+try:
+    tomllib = importlib.import_module("tomllib")
+except ModuleNotFoundError:
+    tomllib = None
+
+TOMLLIB_AVAILABLE = tomllib is not None
+
 from _pydotlib.bootstrap import (
+    _CTS,
     CLAUDE_TMUX_STATE_HOOKS,
     CLAUDE_TMUX_STATE_MARKER,
-    _CTS,
+    CODEX_STATUS_LINE,
+    _ConfigMergeError,
+    _ConfigWriteError,
     _detect_real_editor,
     _merge_claude_tmux_hooks,
+    _merge_codex_config,
+    _write_config_text,
     configure_claude_code,
+    configure_codex,
     configure_vcs_author,
     configure_weather_location,
     create_backup_filename,
     create_dirs,
     download_file,
     download_files,
+    find_dotfiles_root,
     git_clone,
     git_clone_repos,
-    find_dotfiles_root,
     initialize_vim_plugin_manager,
     is_dotfiles_root,
+    resolve_codex_config_path,
     safe_symlink,
 )
 
@@ -576,15 +594,566 @@ class TestInitializeVimPluginManager(unittest.TestCase):
         mock_check_call.assert_not_called()
 
 
+class TestWriteConfigText(unittest.TestCase):
+    def test_creates_private_file_without_backup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "nested" / "settings.json"
+
+            changed = _write_config_text(
+                path,
+                "new\n",
+                expected_content=None,
+                dry_run=False,
+                description="test settings",
+            )
+
+            self.assertTrue(changed)
+            self.assertEqual(path.read_text(), "new\n")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(Path(str(path) + ".ORIGINAL").exists())
+            self.assertEqual(
+                {entry.name for entry in path.parent.iterdir()},
+                {"settings.json"},
+            )
+
+    def test_existing_file_keeps_mode_and_one_time_backup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("original\n")
+            path.chmod(0o640)
+
+            _write_config_text(
+                path,
+                "first update\n",
+                expected_content="original\n",
+                dry_run=False,
+                description="test settings",
+            )
+            _write_config_text(
+                path,
+                "second update\n",
+                expected_content="first update\n",
+                dry_run=False,
+                description="test settings",
+            )
+
+            self.assertEqual(path.read_text(), "second update\n")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(
+                Path(str(path) + ".ORIGINAL").read_text(),
+                "original\n",
+            )
+            self.assertEqual(
+                {entry.name for entry in path.parent.iterdir()},
+                {"settings.json", "settings.json.ORIGINAL"},
+            )
+
+    def test_unchanged_file_does_not_touch_filesystem(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("same\n")
+            before = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+
+            with (
+                patch("_pydotlib.bootstrap.os.replace") as replace,
+                patch("_pydotlib.bootstrap.shutil.copy2") as copy2,
+            ):
+                changed = _write_config_text(
+                    path,
+                    "same\n",
+                    expected_content="same\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            self.assertFalse(changed)
+            replace.assert_not_called()
+            copy2.assert_not_called()
+            after = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+            self.assertEqual(after, before)
+
+    def test_dry_run_leaves_missing_tree_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            path = root / "nested" / "settings.json"
+
+            changed = _write_config_text(
+                path,
+                "new\n",
+                expected_content=None,
+                dry_run=True,
+                description="test settings",
+            )
+
+            self.assertTrue(changed)
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_replace_failure_preserves_live_file_and_cleans_temp(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("original\n")
+
+            before_entries = {entry.name for entry in path.parent.iterdir()}
+            with (
+                patch(
+                    "_pydotlib.bootstrap.os.replace",
+                    side_effect=OSError("replace failed"),
+                ) as replace,
+                self.assertRaisesRegex(OSError, "replace failed"),
+            ):
+                _write_config_text(
+                    path,
+                    "updated\n",
+                    expected_content="original\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            self.assertEqual(path.read_text(), "original\n")
+            self.assertEqual(
+                Path(str(path) + ".ORIGINAL").read_text(),
+                "original\n",
+            )
+            temp_path = Path(replace.call_args.args[0])
+            self.assertFalse(temp_path.exists())
+            self.assertEqual(
+                {entry.name for entry in path.parent.iterdir()} - before_entries,
+                {"settings.json.ORIGINAL"},
+            )
+
+    def test_cleanup_failure_does_not_mask_replace_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("original\n")
+
+            with (
+                patch(
+                    "_pydotlib.bootstrap.os.replace",
+                    side_effect=OSError("primary replace failure"),
+                ),
+                patch.object(
+                    Path,
+                    "unlink",
+                    side_effect=OSError("secondary cleanup failure"),
+                ),
+                self.assertLogs(level="WARNING") as logs,
+                self.assertRaisesRegex(OSError, "primary replace failure"),
+            ):
+                _write_config_text(
+                    path,
+                    "updated\n",
+                    expected_content="original\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            self.assertTrue(any("secondary cleanup failure" in line for line in logs.output))
+            self.assertEqual(path.read_text(), "original\n")
+
+    def test_stale_expected_content_is_not_overwritten_or_backed_up(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("concurrent update\n")
+            before = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+
+            with (
+                patch("_pydotlib.bootstrap.os.replace") as replace,
+                self.assertRaisesRegex(_ConfigWriteError, "changed"),
+            ):
+                _write_config_text(
+                    path,
+                    "generated update\n",
+                    expected_content="stale original\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            replace.assert_not_called()
+            after = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+            self.assertEqual(after, before)
+
+    def test_change_during_temp_write_is_not_overwritten_or_backed_up(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "settings.json"
+            path.write_text("original\n")
+            before = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+
+            with (
+                patch.object(
+                    Path,
+                    "read_text",
+                    side_effect=["original\n", "concurrent update\n"],
+                ) as read_text,
+                patch("_pydotlib.bootstrap.os.replace") as replace,
+                self.assertRaisesRegex(_ConfigWriteError, "being written"),
+            ):
+                _write_config_text(
+                    path,
+                    "generated update\n",
+                    expected_content="original\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            self.assertEqual(read_text.call_count, 2)
+            replace.assert_not_called()
+            after = {entry.name: entry.read_bytes() for entry in path.parent.iterdir()}
+            self.assertEqual(after, before)
+
+    def test_symlink_is_preserved_and_target_is_not_changed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            target = root / "owned-elsewhere.toml"
+            target.write_text("original\n")
+            path = root / "config.toml"
+            path.symlink_to(target)
+
+            with self.assertRaisesRegex(_ConfigWriteError, "symlink"):
+                _write_config_text(
+                    path,
+                    "updated\n",
+                    expected_content="original\n",
+                    dry_run=False,
+                    description="test settings",
+                )
+
+            self.assertTrue(path.is_symlink())
+            self.assertEqual(target.read_text(), "original\n")
+            self.assertFalse(Path(str(path) + ".ORIGINAL").exists())
+
+
+@unittest.skipUnless(TOMLLIB_AVAILABLE, "tomllib requires Python 3.11")
+class TestMergeCodexConfig(unittest.TestCase):
+    def test_empty_config_adds_valid_tui_table(self):
+        updated, changed = _merge_codex_config("")
+
+        self.assertTrue(changed)
+        self.assertEqual(
+            tomllib.loads(updated),
+            {"tui": {"status_line": list(CODEX_STATUS_LINE)}},
+        )
+
+    def test_inserts_into_existing_tui_without_reformatting(self):
+        source = (
+            "# Keep this Unicode comment: café\n"
+            'model = "example"\n'
+            "\n"
+            "[tui]\n"
+            'alternate_screen = "auto"\n'
+            "\n"
+            "[projects.\"/tmp/example\"]\n"
+            'trust_level = "trusted"\n'
+        )
+
+        updated, changed = _merge_codex_config(source)
+
+        inserted = f"status_line = {json.dumps(list(CODEX_STATUS_LINE))}\n"
+        self.assertTrue(changed)
+        self.assertEqual(updated.replace(inserted, "", 1), source)
+        parsed = tomllib.loads(updated)
+        self.assertEqual(parsed["tui"]["status_line"], list(CODEX_STATUS_LINE))
+        self.assertEqual(parsed["model"], "example")
+        self.assertEqual(
+            parsed["projects"]["/tmp/example"]["trust_level"],
+            "trusted",
+        )
+
+    def test_new_tui_table_is_not_nested_under_last_project(self):
+        source = (
+            "[projects.\"/tmp/example\"]\n"
+            'trust_level = "trusted"\n'
+        )
+        inserted = (
+            f"\n[tui]\nstatus_line = {json.dumps(list(CODEX_STATUS_LINE))}\n"
+        )
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertTrue(changed)
+        self.assertEqual(updated.replace(inserted, "", 1), source)
+        self.assertEqual(
+            tomllib.loads(updated),
+            {
+                "projects": {"/tmp/example": {"trust_level": "trusted"}},
+                "tui": {"status_line": list(CODEX_STATUS_LINE)},
+            },
+        )
+
+    def test_extends_root_dotted_tui_key_without_reformatting(self):
+        source = (
+            'tui.alternate_screen = "auto"\n'
+            'model = "example"\n'
+        )
+        inserted = f"tui.status_line = {json.dumps(list(CODEX_STATUS_LINE))}\n"
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertTrue(changed)
+        self.assertEqual(updated.removeprefix(inserted), source)
+        self.assertEqual(
+            tomllib.loads(updated),
+            {
+                "tui": {
+                    "status_line": list(CODEX_STATUS_LINE),
+                    "alternate_screen": "auto",
+                },
+                "model": "example",
+            },
+        )
+
+    def test_extends_implicit_tui_parent_despite_fake_header_in_string(self):
+        source = (
+            'message = """\n'
+            "[tui]\n"
+            'not_a_real_table = true\n"""\n'
+            "[tui.keymap]\n"
+            'binding = "ctrl-a"\n'
+        )
+        inserted = f"tui.status_line = {json.dumps(list(CODEX_STATUS_LINE))}\n"
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertTrue(changed)
+        self.assertEqual(updated.removeprefix(inserted), source)
+        parsed = tomllib.loads(updated)
+        self.assertEqual(parsed["message"], "[tui]\nnot_a_real_table = true\n")
+        self.assertEqual(parsed["tui"]["keymap"], {"binding": "ctrl-a"})
+        self.assertEqual(parsed["tui"]["status_line"], list(CODEX_STATUS_LINE))
+
+    def test_uses_real_tui_header_after_fake_header_in_string(self):
+        source = (
+            'message = """\n'
+            "[tui]\n"
+            'not_a_real_table = true\n"""\n'
+            "[tui]\n"
+            'alternate_screen = "auto"\n'
+        )
+        inserted = f"status_line = {json.dumps(list(CODEX_STATUS_LINE))}\n"
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertTrue(changed)
+        self.assertEqual(updated.replace(inserted, "", 1), source)
+        parsed = tomllib.loads(updated)
+        self.assertEqual(parsed["message"], "[tui]\nnot_a_real_table = true\n")
+        self.assertEqual(parsed["tui"]["alternate_screen"], "auto")
+        self.assertEqual(parsed["tui"]["status_line"], list(CODEX_STATUS_LINE))
+
+    def test_preserves_crlf_line_endings(self):
+        source = "[tui]\r\nalternate_screen = \"auto\"\r\n"
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertTrue(changed)
+        self.assertNotIn("\n", updated.replace("\r\n", ""))
+        self.assertEqual(
+            tomllib.loads(updated)["tui"]["status_line"],
+            list(CODEX_STATUS_LINE),
+        )
+
+    def test_existing_table_status_line_is_exact_noop(self):
+        source = '[tui]\nstatus_line = ["model"]\n'
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertFalse(changed)
+        self.assertEqual(updated, source)
+
+    def test_existing_dotted_status_line_is_exact_noop(self):
+        source = (
+            'tui.status_line = ["model"]\n'
+            "\n"
+            "[projects.\"/tmp/example\"]\n"
+            'trust_level = "trusted"\n'
+        )
+
+        updated, changed = _merge_codex_config(source)
+
+        self.assertFalse(changed)
+        self.assertEqual(updated, source)
+
+    def test_second_merge_is_byte_identical_noop(self):
+        first, changed = _merge_codex_config('model = "example"\n')
+        second, changed_again = _merge_codex_config(first)
+
+        self.assertTrue(changed)
+        self.assertFalse(changed_again)
+        self.assertEqual(second, first)
+
+    def test_rejects_scalar_tui(self):
+        with self.assertRaisesRegex(_ConfigMergeError, "not a table"):
+            _merge_codex_config('tui = "custom"\n')
+
+    def test_rejects_unsupported_inline_tui(self):
+        with self.assertRaisesRegex(_ConfigMergeError, "unsupported TOML form"):
+            _merge_codex_config('tui = { alternate_screen = "auto" }\n')
+
+    def test_rejects_malformed_toml(self):
+        with self.assertRaisesRegex(_ConfigMergeError, "invalid TOML"):
+            _merge_codex_config("[tui\n")
+
+
+class TestResolveCodexConfigPath(unittest.TestCase):
+    def test_defaults_to_dot_codex_under_home(self):
+        self.assertEqual(
+            resolve_codex_config_path(Path("/home/example"), None),
+            Path("/home/example/.codex/config.toml"),
+        )
+
+    def test_honors_custom_codex_home(self):
+        self.assertEqual(
+            resolve_codex_config_path(
+                Path("/home/example"),
+                "/tmp/custom-codex-home",
+            ),
+            Path("/tmp/custom-codex-home/config.toml"),
+        )
+
+    def test_empty_codex_home_uses_default(self):
+        self.assertEqual(
+            resolve_codex_config_path(Path("/home/example"), ""),
+            Path("/home/example/.codex/config.toml"),
+        )
+
+
+class TestConfigureCodexWithoutTomllib(unittest.TestCase):
+    def test_missing_tomllib_leaves_existing_config_untouched(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = 'model = "example"\n'
+            config_path.write_text(original)
+
+            with (
+                patch.dict(sys.modules, {"tomllib": None}),
+                self.assertLogs(level="WARNING") as logs,
+            ):
+                configure_codex(config_path, dry_run=False)
+
+            self.assertTrue(any("Python 3.11" in line for line in logs.output))
+            self.assertEqual(config_path.read_text(), original)
+            self.assertFalse(Path(str(config_path) + ".ORIGINAL").exists())
+
+
+@unittest.skipUnless(TOMLLIB_AVAILABLE, "tomllib requires Python 3.11")
+class TestConfigureCodex(unittest.TestCase):
+    def test_creates_config_from_scratch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / ".codex" / "config.toml"
+
+            configure_codex(config_path, dry_run=False)
+
+            config = tomllib.loads(config_path.read_text())
+            self.assertEqual(config["tui"]["status_line"], list(CODEX_STATUS_LINE))
+            self.assertFalse(Path(str(config_path) + ".ORIGINAL").exists())
+
+    def test_existing_config_is_backed_up_and_preserved(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = '# user comment\nmodel = "example"\n'
+            config_path.write_text(original)
+
+            configure_codex(config_path, dry_run=False)
+
+            self.assertEqual(Path(str(config_path) + ".ORIGINAL").read_text(), original)
+            config = tomllib.loads(config_path.read_text())
+            self.assertEqual(config["model"], "example")
+            self.assertEqual(config["tui"]["status_line"], list(CODEX_STATUS_LINE))
+
+    def test_custom_status_line_is_not_rewritten_or_backed_up(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = '[tui]\nstatus_line = ["model"]\n'
+            config_path.write_text(original)
+
+            with patch("_pydotlib.bootstrap._write_config_text") as write:
+                configure_codex(config_path, dry_run=False)
+
+            write.assert_not_called()
+            self.assertEqual(config_path.read_text(), original)
+            self.assertFalse(Path(str(config_path) + ".ORIGINAL").exists())
+
+    def test_malformed_config_is_untouched_without_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = "[tui\n"
+            config_path.write_text(original)
+            before_entries = {entry.name for entry in config_path.parent.iterdir()}
+
+            configure_codex(config_path, dry_run=False)
+
+            self.assertEqual(config_path.read_text(), original)
+            self.assertEqual(
+                {entry.name for entry in config_path.parent.iterdir()},
+                before_entries,
+            )
+
+    def test_invalid_utf8_config_is_untouched_without_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = b"model = \xff\n"
+            config_path.write_bytes(original)
+            before_entries = {entry.name for entry in config_path.parent.iterdir()}
+
+            with self.assertLogs(level="WARNING") as logs:
+                configure_codex(config_path, dry_run=False)
+
+            self.assertTrue(any("Could not read" in line for line in logs.output))
+            self.assertEqual(config_path.read_bytes(), original)
+            self.assertEqual(
+                {entry.name for entry in config_path.parent.iterdir()},
+                before_entries,
+            )
+
+    def test_dry_run_leaves_existing_tree_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            original = 'model = "example"\n'
+            config_path.write_text(original)
+            before = {entry.name: entry.read_bytes() for entry in config_path.parent.iterdir()}
+
+            configure_codex(config_path, dry_run=True)
+
+            after = {entry.name: entry.read_bytes() for entry in config_path.parent.iterdir()}
+            self.assertEqual(after, before)
+
+    def test_second_run_does_not_reach_writer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.toml"
+            configure_codex(config_path, dry_run=False)
+
+            with patch("_pydotlib.bootstrap._write_config_text") as write:
+                configure_codex(config_path, dry_run=False)
+
+            write.assert_not_called()
+
+    def test_symlinked_config_and_target_are_untouched(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            target = root / "managed-elsewhere.toml"
+            original = 'model = "example"\n'
+            target.write_text(original)
+            config_path = root / "config.toml"
+            config_path.symlink_to(target)
+
+            with self.assertLogs(level="WARNING") as logs:
+                configure_codex(config_path, dry_run=False)
+
+            self.assertTrue(any("symlink" in line for line in logs.output))
+            self.assertTrue(config_path.is_symlink())
+            self.assertEqual(target.read_text(), original)
+            self.assertFalse(Path(str(config_path) + ".ORIGINAL").exists())
+
+
 class TestConfigureClaudeCode(unittest.TestCase):
-    def test_creates_settings_from_scratch(self):
+    @patch("_pydotlib.bootstrap._detect_real_editor", return_value="test-editor")
+    def test_creates_settings_from_scratch(self, _detect_editor):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / ".claude" / "settings.json"
             configure_claude_code(settings_path, dry_run=False)
 
             settings = json.loads(settings_path.read_text())
             self.assertEqual(settings["env"]["EDITOR"], "claude-editor")
-            self.assertIn(settings["env"]["REAL_EDITOR"], ("nvim", "vim", "vi"))
+            self.assertEqual(settings["env"]["REAL_EDITOR"], "test-editor")
             self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude-status"})
 
     def test_preserves_existing_keys(self):
@@ -624,8 +1193,11 @@ class TestConfigureClaudeCode(unittest.TestCase):
             configure_claude_code(settings_path, dry_run=False)
             first = settings_path.read_text()
 
-            # ...a second run must change nothing.
-            configure_claude_code(settings_path, dry_run=False)
+            # ...a second run must not even reach the filesystem writer.
+            with patch("_pydotlib.bootstrap._write_config_text") as write:
+                configure_claude_code(settings_path, dry_run=False)
+
+            write.assert_not_called()
             self.assertEqual(settings_path.read_text(), first)
 
     def test_sets_statusline_when_missing(self):
@@ -659,6 +1231,23 @@ class TestConfigureClaudeCode(unittest.TestCase):
             configure_claude_code(settings_path, dry_run=False)
 
             self.assertEqual(settings_path.read_text(), "{invalid json")
+
+    def test_skips_invalid_utf8(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_path = Path(tmpdir) / "settings.json"
+            original = b'{"value": "\xff"}'
+            settings_path.write_bytes(original)
+            before_entries = {entry.name for entry in settings_path.parent.iterdir()}
+
+            with self.assertLogs(level="WARNING") as logs:
+                configure_claude_code(settings_path, dry_run=False)
+
+            self.assertTrue(any("Could not read or parse" in line for line in logs.output))
+            self.assertEqual(settings_path.read_bytes(), original)
+            self.assertEqual(
+                {entry.name for entry in settings_path.parent.iterdir()},
+                before_entries,
+            )
 
     def test_skips_non_object_top_level(self):
         # Valid JSON whose top level isn't an object must be left untouched, not crash.
@@ -737,12 +1326,12 @@ class TestConfigureClaudeCode(unittest.TestCase):
             real_editor = _detect_real_editor()
             existing = {"env": {"EDITOR": "claude-editor", "REAL_EDITOR": real_editor}}
             settings_path.write_text(json.dumps(existing))
-            mtime_before = settings_path.stat().st_mtime
+            before = {entry.name: entry.read_bytes() for entry in settings_path.parent.iterdir()}
 
             configure_claude_code(settings_path, dry_run=True)
 
-            mtime_after = settings_path.stat().st_mtime
-            self.assertEqual(mtime_before, mtime_after)
+            after = {entry.name: entry.read_bytes() for entry in settings_path.parent.iterdir()}
+            self.assertEqual(after, before)
 
     @patch("shutil.which", return_value=None)
     @patch.dict(os.environ, {"EDITOR": "nano"})
