@@ -264,7 +264,10 @@ def main() -> int:
     )
 
     if len(failed_sh_files) > 0:
-        logging.warning(f"{len(failed_sh_files)} shell scripts failed linter checks")
+        has_fatal_lints = True
+        logging.error(
+            f"{len(failed_sh_files)} shell scripts failed required linter checks"
+        )
 
     # Lint python scripts.
     # TODO: Apply auto fixes if --fix is passed.

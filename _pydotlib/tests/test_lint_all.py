@@ -81,6 +81,22 @@ class PinnedToolCommandTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
     @patch("lint_all.logging")
+    @patch("lint_all.preflight_uvx_tool", return_value=(True, ""))
+    @patch("lint_all.lint_py_files", return_value=[])
+    @patch("lint_all.lint_sh_files", side_effect=[["shell/example"], []])
+    @patch("lint_all.find_shell_scripts", return_value=[])
+    @patch("sys.argv", ["lint_all.py"])
+    def test_shell_lint_failures_are_fatal(
+        self, _find_scripts, _lint_sh_files, _lint_py_files, _preflight, logging
+    ):
+        self.assertEqual(lint_all.main(), 1)
+
+        logging.error.assert_called_once_with(
+            "1 shell scripts failed required linter checks"
+        )
+        logging.warning.assert_called_once_with("fatal linter issues found")
+
+    @patch("lint_all.logging")
     @patch("lint_all.preflight_uvx_tool", return_value=(False, "unavailable"))
     @patch("lint_all.lint_sh_files", return_value=[])
     @patch("lint_all.find_shell_scripts")
