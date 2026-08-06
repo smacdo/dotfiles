@@ -318,8 +318,14 @@ def main() -> int:
     # TODO: Auto-format files if --format is passed. Apply formatting to any file for which there
     #       are no linting errors, even if other files failed.
 
+    failed_files = sorted(set(failed_sh_files + failed_py_files))
+    if failed_files:
+        logging.info("files with lint failures:")
+        for file_path in failed_files:
+            logging.info(f"  {file_path}")
+
     # Report if all tests passed or not.
-    if not has_fatal_lints and len(failed_sh_files) + len(failed_py_files) == 0:
+    if not has_fatal_lints and not failed_files:
         logging.info("all lint checks passed!")
     else:
         is_fatal_text = "fatal" if has_fatal_lints else "non-fatal"

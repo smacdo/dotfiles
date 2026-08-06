@@ -82,6 +82,32 @@ class PinnedToolCommandTests(unittest.TestCase):
 class MainTests(unittest.TestCase):
     @patch("lint_all.logging")
     @patch("lint_all.preflight_uvx_tool", return_value=(True, ""))
+    @patch(
+        "lint_all.lint_py_files",
+        side_effect=[["shared/example"], ["a/example"]],
+    )
+    @patch(
+        "lint_all.lint_sh_files",
+        side_effect=[["z/example", "shared/example"], []],
+    )
+    @patch("lint_all.find_shell_scripts", return_value=[])
+    @patch("sys.argv", ["lint_all.py"])
+    def test_failed_files_are_summarized_once_in_sorted_order(
+        self, _find_scripts, _lint_sh_files, _lint_py_files, _preflight, logging
+    ):
+        lint_all.main()
+
+        logging.info.assert_has_calls(
+            [
+                call("files with lint failures:"),
+                call("  a/example"),
+                call("  shared/example"),
+                call("  z/example"),
+            ]
+        )
+
+    @patch("lint_all.logging")
+    @patch("lint_all.preflight_uvx_tool", return_value=(True, ""))
     @patch("lint_all.lint_py_files", return_value=[])
     @patch("lint_all.lint_sh_files", side_effect=[["shell/example"], []])
     @patch("lint_all.find_shell_scripts", return_value=[])
