@@ -1,6 +1,6 @@
 import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import lint_all
 
@@ -77,6 +77,21 @@ class PinnedToolCommandTests(unittest.TestCase):
                 "--version",
             ],
         )
+
+
+class MainTests(unittest.TestCase):
+    @patch("lint_all.logging")
+    @patch("lint_all.preflight_uvx_tool", return_value=(False, "unavailable"))
+    @patch("lint_all.lint_sh_files", return_value=[])
+    @patch("lint_all.find_shell_scripts", return_value=[])
+    @patch("sys.argv", ["lint_all.py"])
+    def test_skipped_python_lint_is_not_reported_as_success(
+        self, _find_scripts, _lint_sh_files, _preflight, logging
+    ):
+        self.assertEqual(lint_all.main(), 1)
+
+        self.assertNotIn(call("all lint checks passed!"), logging.info.call_args_list)
+        logging.warning.assert_called_once_with("fatal linter issues found")
 
 
 if __name__ == "__main__":
