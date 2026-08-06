@@ -260,6 +260,7 @@ def main() -> int:
         BASH_CONFIG_FILES
         + DOTFILES_SH_SCRIPTS
         + find_shell_scripts("bin", SH_EXTS, SH_SHEBANGS)
+        + find_shell_scripts("tools", SH_EXTS, SH_SHEBANGS)
     )
 
     if len(failed_sh_files) > 0:

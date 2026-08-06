@@ -83,6 +83,23 @@ class MainTests(unittest.TestCase):
     @patch("lint_all.logging")
     @patch("lint_all.preflight_uvx_tool", return_value=(False, "unavailable"))
     @patch("lint_all.lint_sh_files", return_value=[])
+    @patch("lint_all.find_shell_scripts")
+    @patch("sys.argv", ["lint_all.py"])
+    def test_tools_shell_scripts_are_linted(
+        self, find_scripts, lint_sh_files, _preflight, _logging
+    ):
+        find_scripts.side_effect = lambda directory, _extensions, _shebangs: [
+            f"{directory}/script"
+        ]
+
+        lint_all.main()
+
+        shell_files = lint_sh_files.call_args_list[1].args[0]
+        self.assertIn("tools/script", shell_files)
+
+    @patch("lint_all.logging")
+    @patch("lint_all.preflight_uvx_tool", return_value=(False, "unavailable"))
+    @patch("lint_all.lint_sh_files", return_value=[])
     @patch("lint_all.find_shell_scripts", return_value=[])
     @patch("sys.argv", ["lint_all.py"])
     def test_skipped_python_lint_is_not_reported_as_success(
