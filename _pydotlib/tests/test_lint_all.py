@@ -93,6 +93,27 @@ class MainTests(unittest.TestCase):
         self.assertNotIn(call("all lint checks passed!"), logging.info.call_args_list)
         logging.warning.assert_called_once_with("fatal linter issues found")
 
+    @patch("lint_all.logging")
+    @patch("lint_all.preflight_uvx_tool", return_value=(True, ""))
+    @patch("lint_all.lint_py_files", side_effect=[[], ["bin/example"]])
+    @patch("lint_all.lint_sh_files", return_value=[])
+    @patch("sys.argv", ["lint_all.py"])
+    def test_python_bin_lint_failures_are_fatal(
+        self, _lint_sh_files, _lint_py_files, _preflight, logging
+    ):
+        def find_scripts(base_path, extensions, _shebangs):
+            if base_path == "bin" and extensions == lint_all.PY_EXTS:
+                return ["bin/example"]
+            return []
+
+        with patch("lint_all.find_shell_scripts", side_effect=find_scripts):
+            self.assertEqual(lint_all.main(), 1)
+
+        logging.error.assert_called_once_with(
+            "1 python bin scripts failed required linter checks"
+        )
+        logging.warning.assert_called_once_with("fatal linter issues found")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -300,11 +300,15 @@ def main() -> int:
                 f"{len(failed_py_files)} core python scripts failed required linter checks"
             )
 
-        failed_py_files += lint_py_files(find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS))
+        failed_bin_py_files = lint_py_files(
+            find_shell_scripts("bin", PY_EXTS, PY_SHEBANGS)
+        )
+        failed_py_files += failed_bin_py_files
 
-        if len(failed_py_files) > 0:
-            logging.warning(
-                f"{len(failed_py_files)} python bin scripts failed linter checks"
+        if len(failed_bin_py_files) > 0:
+            has_fatal_lints = True
+            logging.error(
+                f"{len(failed_bin_py_files)} python bin scripts failed required linter checks"
             )
 
     # TODO: Auto-format files if --format is passed. Apply formatting to any file for which there
