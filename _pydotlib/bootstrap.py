@@ -776,27 +776,43 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
         logging.info(f"[DRY RUN] Would download {url} to {dest}")
         return True
 
-    try:
-        with urllib.request.urlopen(
-            url, context=ssl.create_default_context(), timeout=10
-        ) as response:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(response.read())
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{dest.name}.", suffix=".tmp", dir=dest.parent
+    )
+    os.close(fd)
+    temp_path = Path(temp_name)
 
+    try:
+        try:
+            with urllib.request.urlopen(
+                url, context=ssl.create_default_context(), timeout=10
+            ) as response:
+                temp_path.write_bytes(response.read())
+
+            os.replace(temp_path, dest)
             logging.info(f"Downloaded {url} to {dest}")
             return True
-    except (ssl.SSLError, urllib.error.URLError) as e:
-        logging.info(
-            f"downloading with urllib failed, will try curl instead. (exception: {e})"
-        )
+        except (ssl.SSLError, urllib.error.URLError) as e:
+            logging.info(
+                f"downloading with urllib failed, will try curl instead. (exception: {e})"
+            )
 
         try:
             subprocess.run(
-                ["curl", "-fLo", str(dest), "--create-dirs", "--connect-timeout", "10", url],
+                [
+                    "curl",
+                    "-fLo",
+                    str(temp_path),
+                    "--connect-timeout",
+                    "10",
+                    url,
+                ],
                 capture_output=True,
                 check=True,
             )
 
+            os.replace(temp_path, dest)
             logging.info(f"Downloaded {url} to {dest} with curl")
             return True
         except subprocess.CalledProcessError as curl_error:
@@ -806,6 +822,8 @@ def download_file(url: str, dest: Path, dry_run: bool) -> bool:
         except FileNotFoundError:
             logging.exception("`curl` was not found. Please install it")
             return False
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 @functools.cache

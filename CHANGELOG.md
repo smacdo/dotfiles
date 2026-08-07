@@ -14,6 +14,9 @@ Entry format:
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
 
+## 2026-08-06
+- **Fixed** bootstrap downloads replacing destination files before the download completed. Downloads now use a temporary sibling and atomically replace the destination only after success; failed downloads leave existing files unchanged.
+
 ## 2026-08-05
 - **Changed** `bin/next-meeting` alternate calendar sources to use the source-neutral `NEXT_MEETING_PROVIDER` JSON interface. Built-in `gcalcli` support is unchanged; users of another source must configure a private adapter executable.
 - **Fixed** lint behavior changing when Ruff or ty publishes a new release. Their versions are now pinned, and the repository explicitly owns its Ruff rule set. No action needed.

@@ -386,15 +386,20 @@ class TestDownloadFile(unittest.TestCase):
     @patch("subprocess.run")
     @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
     def test_falls_back_to_curl_on_urllib_error(self, _, mock_run):
-        mock_run.return_value = MagicMock(returncode=0)
+        def curl_run(command, **_kwargs):
+            Path(command[2]).write_bytes(b"payload")
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = curl_run
         with tempfile.TemporaryDirectory() as tmpdir:
             dest = Path(tmpdir) / "out"
             self.assertTrue(download_file("https://example.com/x", dest, dry_run=False))
+            self.assertEqual(dest.read_bytes(), b"payload")
             mock_run.assert_called_once()
             args = mock_run.call_args[0][0]
             self.assertEqual(args[0], "curl")
             self.assertIn("https://example.com/x", args)
-            self.assertIn(str(dest), args)
+            self.assertNotIn(str(dest), args)
 
     @patch("subprocess.run")
     @patch("urllib.request.urlopen", side_effect=ssl.SSLError("bad cert"))
@@ -408,12 +413,19 @@ class TestDownloadFile(unittest.TestCase):
     @patch("subprocess.run")
     @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
     def test_returns_false_when_curl_fails(self, _, mock_run):
-        mock_run.side_effect = subprocess.CalledProcessError(
-            22, ["curl"], stderr=b"server returned 404"
-        )
+        def curl_run(command, **_kwargs):
+            Path(command[2]).write_bytes(b"partial")
+            raise subprocess.CalledProcessError(
+                22, command, stderr=b"server returned 404"
+            )
+
+        mock_run.side_effect = curl_run
         with tempfile.TemporaryDirectory() as tmpdir:
             dest = Path(tmpdir) / "out"
+            dest.write_bytes(b"original")
             self.assertFalse(download_file("https://example.com/x", dest, dry_run=False))
+            self.assertEqual(dest.read_bytes(), b"original")
+            self.assertEqual(list(Path(tmpdir).iterdir()), [dest])
 
     @patch("subprocess.run", side_effect=FileNotFoundError("curl"))
     @patch("urllib.request.urlopen", side_effect=urllib.error.URLError("nope"))
