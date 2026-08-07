@@ -344,6 +344,17 @@ BOOTSTRAP_CHECKS: list[Check] = [
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
     # ... and the file propagates to $WEATHER_LOCATION via shell init.
     check_command_output_matches(["bash", "-lc", "echo $WEATHER_LOCATION"], "Seattle"),
+    # XDG per-machine overrides are loaded by the full interactive config path.
+    check_command_output_matches(
+        [
+            "env",
+            "DOTFILE_CI_TEST_MODE=1",
+            "bash",
+            "-lc",
+            "echo $DOTFILES_TEST_OVERRIDE",
+        ],
+        "loaded",
+    ),
     # A fresh bootstrap configures Codex's native status line.
     check_file_contains(
         f"{_HOME}/.codex/config.toml",

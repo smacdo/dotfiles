@@ -255,21 +255,24 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         ):
             return False
 
-        # Seed pre-existing user content in ~/.bashrc so bootstrap has
-        # something to back up. The .bashrc.ORIGINAL check in BOOTSTRAP_CHECKS
-        # verifies safe_symlink() preserved this content before symlinking —
-        # the "bootstrap never destroys user data" invariant.
+        # Seed pre-existing user files for the backup-preservation and
+        # per-machine override checks in BOOTSTRAP_CHECKS.
         seed_cmd = [
             "bash",
             "-c",
-            f"echo '{BACKUP_SENTINEL}' > /home/testuser/.bashrc",
+            (
+                "mkdir -p /home/testuser/.config/dotfiles && "
+                f"echo '{BACKUP_SENTINEL}' > /home/testuser/.bashrc && "
+                "echo 'export DOTFILES_TEST_OVERRIDE=loaded' > "
+                "/home/testuser/.config/dotfiles/my_shell_profile.sh"
+            ),
         ]
         if not run_exec(
             runtime,
             container_name,
             seed_cmd,
             timeout=10,
-            label="seed pre-bootstrap ~/.bashrc (backup test)",
+            label="seed pre-bootstrap user files",
         ):
             return False
 
