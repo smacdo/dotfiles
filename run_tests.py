@@ -217,6 +217,44 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         return False
 
     try:
+        dry_run_cmd = [
+            "bash",
+            "-c",
+            (
+                "cd /home/testuser/.dotfiles && "
+                "python3 bootstrap.py -v --dry-run "
+                "--git-name 'Testy McTestFace' "
+                "--git-email 'testy@test.com' "
+                "--weather-location 'Seattle' "
+                "< /dev/null"
+            ),
+        ]
+        if not run_exec(
+            runtime,
+            container_name,
+            dry_run_cmd,
+            timeout=BOOTSTRAP_TIMEOUT_SECS,
+            label="bootstrap.py --dry-run",
+        ):
+            return False
+
+        dry_run_check_cmd = [
+            "bash",
+            "-c",
+            (
+                "test -z \"$(find /home/testuser -mindepth 1 "
+                "-path /home/testuser/.dotfiles -prune -o -print -quit)\""
+            ),
+        ]
+        if not run_exec(
+            runtime,
+            container_name,
+            dry_run_check_cmd,
+            timeout=10,
+            label="bootstrap.py --dry-run leaves home unchanged",
+        ):
+            return False
+
         # Seed pre-existing user content in ~/.bashrc so bootstrap has
         # something to back up. The .bashrc.ORIGINAL check in BOOTSTRAP_CHECKS
         # verifies safe_symlink() preserved this content before symlinking —
