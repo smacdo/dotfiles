@@ -398,6 +398,23 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # tmux loads the config under this distro's tmux version (catches option
     # drift across versions). source-file surfaces errors that `tmux -f` swallows.
     check_tmux_config(f"{_HOME}/.tmux.conf"),
+    # tmux does not surface command-not-found errors from nested status commands,
+    # so verify every helper referenced by the config resolves independently.
+    check_command_succeeds(
+        ["env", "DOTFILE_CI_TEST_MODE=1", "bash", "-lc", "command -v shostname"]
+    ),
+    check_command_succeeds(
+        ["env", "DOTFILE_CI_TEST_MODE=1", "bash", "-lc", "command -v print-status"]
+    ),
+    check_command_succeeds(
+        [
+            "env",
+            "DOTFILE_CI_TEST_MODE=1",
+            "bash",
+            "-lc",
+            "command -v tmux-right-status",
+        ]
+    ),
     # Downloaded artifacts (plug.vim for vim and nvim).
     check_file_contains(f"{_XDG_DATA}/vim/site/autoload/plug.vim", "plug#begin"),
     check_file_contains(f"{_XDG_DATA}/nvim/site/autoload/plug.vim", "plug#begin"),
