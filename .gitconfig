@@ -84,11 +84,3 @@
 
 [include]
   path = ~/.my_gitconfig
-[http "https://git.internal.tfbnw.net"]
-	sslCert = /var/facebook/credentials/smacdonald/x509/smacdonald.pem
-	sslKey = /var/facebook/credentials/smacdonald/x509/smacdonald.pem
-[http "https://mononoke-git-lfs.internal.tfbnw.net"]
-	sslCert = /var/facebook/credentials/smacdonald/x509/smacdonald.pem
-	sslKey = /var/facebook/credentials/smacdonald/x509/smacdonald.pem
-[http "https://manifold.c2p.facebook.net"]
-	sslCert = /var/facebook/credentials/smacdonald/x509/smacdonald.pem
