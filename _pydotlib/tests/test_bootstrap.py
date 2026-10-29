@@ -684,9 +684,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             self.assertEqual(settings["statusLine"], {"type": "command", "command": "claude-status"})
             self.assertIsNone(settings["hooks"])
 
-    def test_non_list_hook_event_is_skipped(self):
-        # An event whose value isn't a list must be skipped, not crash; other
-        # events still get their hooks merged.
+    def test_does_not_merge_tmux_hooks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_path = Path(tmpdir) / "settings.json"
             settings_path.write_text(json.dumps({"hooks": {"Stop": "bogus"}}))
@@ -694,9 +692,7 @@ class TestConfigureClaudeCode(unittest.TestCase):
             configure_claude_code(settings_path, dry_run=False)
 
             settings = json.loads(settings_path.read_text())
-            self.assertEqual(settings["hooks"]["Stop"], "bogus")  # left untouched
-            # a different event still got its tmux hook merged
-            self.assertIn("SessionStart", settings["hooks"])
+            self.assertEqual(settings["hooks"], {"Stop": "bogus"})
 
     def test_backs_up_existing_settings_once(self):
         # First modification of an existing file captures the pre-dotfiles
