@@ -5,6 +5,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from run_tests import (
+    _log_subprocess_failure,
+    _make_timeout_exec_fn,
     detect_runtime,
     discover_bin_test_scripts,
     discover_flavors,
@@ -215,3 +217,34 @@ class RunBinScriptTestsTests(unittest.TestCase):
         ]
         self.assertFalse(run_bin_script_tests(Path("/repo")))
         self.assertEqual(mock_run.call_count, 2)  # did not abort after first failure
+
+
+class LogSubprocessFailureTests(unittest.TestCase):
+    def test_bytes_output_is_decoded(self):
+        # TimeoutExpired carries captured output as bytes even with text=True.
+        with self.assertLogs(level="ERROR") as logs:
+            _log_subprocess_failure("timed out", b"out\xff\n", b"err\n")
+        message = logs.output[0]
+        self.assertIn("stdout:\nout\ufffd", message)
+        self.assertIn("stderr:\nerr", message)
+        self.assertNotIn("b'", message)
+
+    def test_str_output_unchanged(self):
+        with self.assertLogs(level="ERROR") as logs:
+            _log_subprocess_failure("failed", "out\n", None)
+        self.assertIn("stdout:\nout", logs.output[0])
+        self.assertNotIn("stderr", logs.output[0])
+
+
+class TimeoutExecFnTests(unittest.TestCase):
+    @patch("run_tests.subprocess.run")
+    def test_timeout_with_bytes_output_returns_124(self, mock_run):
+        # TimeoutExpired output is bytes even with text=True; this used to
+        # raise TypeError (bytes + str) instead of reporting the timeout.
+        mock_run.side_effect = subprocess.TimeoutExpired(
+            cmd="x", timeout=1, output=b"partial out", stderr=b"partial err"
+        )
+        result = _make_timeout_exec_fn(["docker", "exec", "c"])(["true"])
+        self.assertEqual(result.returncode, 124)
+        self.assertEqual(result.stdout, "partial out")
+        self.assertTrue(result.stderr.startswith("partial err\n<timed out after"))

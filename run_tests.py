@@ -94,10 +94,25 @@ def discover_flavors(repo_root: Path) -> list[str]:
     return flavors
 
 
+def _as_text(output: str | bytes | None) -> str:
+    """Normalize captured subprocess output to str.
+
+    `subprocess.TimeoutExpired` carries captured output as bytes even when the
+    call used `text=True`.
+    """
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode(errors="replace")
+    return output
+
+
 def _log_subprocess_failure(
-    header: str, stdout: str | None, stderr: str | None
+    header: str, stdout: str | bytes | None, stderr: str | bytes | None
 ) -> None:
     """Log a single ERROR record with header and any stdout/stderr collated together."""
+    stdout = _as_text(stdout)
+    stderr = _as_text(stderr)
     parts = [header]
     if stdout:
         parts.append(f"stdout:\n{stdout.rstrip()}")
@@ -336,8 +351,8 @@ def _make_timeout_exec_fn(base_cmd: list[str]) -> ExecFn:
             return subprocess.CompletedProcess(
                 args=full_cmd,
                 returncode=124,
-                stdout=e.stdout or "",
-                stderr=(e.stderr or "") + f"\n<timed out after {CHECK_TIMEOUT_SECS}s>",
+                stdout=_as_text(e.stdout),
+                stderr=_as_text(e.stderr) + f"\n<timed out after {CHECK_TIMEOUT_SECS}s>",
             )
 
     return exec_fn
