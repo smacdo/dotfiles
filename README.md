@@ -65,10 +65,12 @@ your platform's package manager (Homebrew, apt, dnf). The optional helpers in
 ```
 ./tools/install_uv.sh             # uv (used by lint_all.py)
 ./tools/install_rust.sh           # rustup
-./tools/install_nerd_fonts.sh     # JetBrainsMono Nerd Font
+./tools/install_nerd_fonts.sh     # JetBrainsMono Nerd Font (macOS/Linux)
 ./tools/install_powerlevel10k.sh  # zsh powerlevel10k theme
 sudo ./tools/install_vscode.sh    # VS Code (Debian/Ubuntu, Fedora/RHEL/CentOS)
 ```
+
+Under WSL, install the Nerd Font in Windows so the terminal application can use it.
 
 Don't forget to tell (neo)vim to install plugins the first time you start it up
 by running `:PlugInstall`.
@@ -80,7 +82,7 @@ configuration yet. Maybe I'll do that someday.
 ## MacOS
 * Settings -> Security & Privacy -> Full Disk Access -> + "Visual Studio Code"
 * Configure Terminal
-  * Profiles -> Basic -> Font -> JetBrains Mono 11
+  * Profiles -> Basic -> Font -> JetBrainsMono Nerd Font 11
 * Install iTerm2
 * Configure iTerm2
   * General -> Startup -> Window restoration policy -> Only Restore Hotkey Window
@@ -90,7 +92,7 @@ configuration yet. Maybe I'll do that someday.
   * Keys -> Hotkey -> Create a dedicated hotkey window...
   * General -> Profiles -> Default
     * Colors -> Color Presets (Smoooooth)
-    * Text -> Font -> JetBrains Mono Regular 12
+    * Text -> Font -> JetBrainsMono Nerd Font Regular 12
     * Text -> Use built-in Powerline glyphs [x]
     * Terminal -> Scrollback lines unlimited scrollback [x]
     * Terminal -> Flash visual bell [x]
