@@ -418,7 +418,7 @@ def configure_claude_code(settings_path: Path, dry_run: bool) -> None:
 
     Sets `env.EDITOR` to `claude-editor` and `env.REAL_EDITOR` to whatever
     `_detect_real_editor()` resolves to, adds a `statusLine` pointing at the
-    `claude-status` script, and merges the `claude-tmux-state` window-icon hooks.
+    `claude-status` script. The `claude-tmux-state` hooks are no longer merged.
     Existing keys (including a custom `statusLine`) and unrelated hooks are
     preserved.  Malformed JSON, a non-object top level, or wrong-shaped
     `env`/`hooks` values are left untouched rather than crashing the bootstrap.
@@ -466,12 +466,6 @@ def configure_claude_code(settings_path: Path, dry_run: bool) -> None:
         changed = True
     else:
         logging.debug(f"{dry_text}Claude Code statusLine already configured")
-
-    if _merge_claude_tmux_hooks(settings):
-        logging.info(f"{dry_text}Merging Claude Code tmux state-icon hooks")
-        changed = True
-    else:
-        logging.debug(f"{dry_text}Claude Code tmux state-icon hooks already configured")
 
     if changed:
         try:
