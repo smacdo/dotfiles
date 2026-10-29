@@ -36,6 +36,10 @@ BOOTSTRAP_TIMEOUT_SECS = 30
 # at ~1s; 15s catches hangs (e.g. an interactive prompt firing on a shell
 # whose init misbehaved) without false positives.
 CHECK_TIMEOUT_SECS = 15
+# Per-script budget for a bin/ script's own --run-tests suite. Generous for
+# subprocess spawn plus a small unittest run; catches a hung or stdin-blocked
+# self-test without wedging the whole runner.
+BIN_TEST_TIMEOUT_SECS = 60
 
 
 def detect_runtime(preferred: str | None = None) -> str:
@@ -471,9 +475,12 @@ def run_pydotlib_tests(verbose: bool = False) -> bool:
 def discover_bin_test_scripts(repo_root: Path) -> list[Path]:
     """Return bin/ Python scripts that expose a `--run-tests` self-test hook.
 
-    Discovered by content, not a hardcoded list: a testable script has a
-    python shebang and contains the `--run-tests` marker (see the `bin/`
-    self-test convention in AGENTS.md).
+    Discovered by content, not a hardcoded list: a testable script has a python
+    shebang (`#!...python...`) and its source contains both the `--run-tests`
+    marker and a `unittest.main` call — the shape of the self-test hook
+    documented in AGENTS.md. Requiring `unittest.main` (not just the bare flag)
+    avoids matching a script that merely mentions `--run-tests` in a comment or
+    argparse help string, which would then be run for real and fail.
     """
     scripts: list[Path] = []
     bin_dir = repo_root / "bin"
@@ -487,7 +494,8 @@ def discover_bin_test_scripts(repo_root: Path) -> list[Path]:
         except (UnicodeDecodeError, PermissionError):
             continue
         first_line = text.split("\n", 1)[0]
-        if "python" in first_line and "--run-tests" in text:
+        has_python_shebang = first_line.startswith("#!") and "python" in first_line
+        if has_python_shebang and "--run-tests" in text and "unittest.main" in text:
             scripts.append(entry)
     return scripts
 
@@ -512,9 +520,26 @@ def run_bin_script_tests(repo_root: Path, verbose: bool = False) -> bool:
             cmd.append("-v")
         # In verbose mode stream the script's own unittest output; otherwise
         # capture it and surface only on failure (matches the container path).
-        result = subprocess.run(
-            cmd, capture_output=not verbose, text=True, check=False
-        )
+        # stdin is closed so a stray interactive read fails fast, and a timeout
+        # stops one hung suite from wedging the whole runner.
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=not verbose,
+                text=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=BIN_TEST_TIMEOUT_SECS,
+            )
+        except subprocess.TimeoutExpired as e:
+            _log_subprocess_failure(
+                f"  ✗ {script.name} self-tests timed out after {BIN_TEST_TIMEOUT_SECS}s",
+                e.stdout,
+                e.stderr,
+            )
+            all_passed = False
+            continue
+
         if result.returncode == 0:
             # unittest writes its "Ran N tests" summary to stderr.
             match = re.search(r"Ran (\d+) test", result.stderr or "")
@@ -523,6 +548,12 @@ def run_bin_script_tests(repo_root: Path, verbose: bool = False) -> bool:
                 n = match.group(1)
                 count = f" ({n} test{'' if n == '1' else 's'})"
             logging.info(f"  ✓ {script.name}{count}")
+        elif result.returncode == 5:
+            # unittest exit 5 = "NO TESTS RAN": the hook is wired but collected
+            # no tests (e.g. mid-TDD). Surface it, but don't fail the suite.
+            logging.warning(
+                f"  ⚠ {script.name}: --run-tests hook ran but collected no tests"
+            )
         else:
             _log_subprocess_failure(
                 f"  ✗ {script.name} self-tests failed (exit {result.returncode})",
