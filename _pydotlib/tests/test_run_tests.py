@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,15 @@ from run_tests import (
     detect_runtime,
     discover_bin_test_scripts,
     discover_flavors,
+    run_bin_script_tests,
+)
+
+# A minimal conforming self-test hook: python shebang + --run-tests + unittest.main.
+_HOOK = (
+    "#!/usr/bin/env python3\n"
+    "import sys, unittest\n"
+    'if "--run-tests" in sys.argv:\n'
+    "    unittest.main()\n"
 )
 
 
@@ -94,12 +104,35 @@ class DiscoverBinTestScriptsTests(unittest.TestCase):
             self._make_bin(
                 root,
                 {
-                    "withtests": '#!/usr/bin/env python3\nif "--run-tests" in sys.argv:\n    pass\n',
+                    "withtests": _HOOK,
                     "notests": "#!/usr/bin/env python3\nprint('hi')\n",
                 },
             )
             found = [p.name for p in discover_bin_test_scripts(root)]
             self.assertEqual(found, ["withtests"])
+
+    def test_marker_without_unittest_main_is_skipped(self):
+        # Mentions the flag in a comment but wires no real hook — must NOT be
+        # discovered, else it gets run for real and fails.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(
+                root,
+                {
+                    "mentions": '#!/usr/bin/env python3\n# supports --run-tests someday\nprint("hi")\n',
+                },
+            )
+            self.assertEqual(discover_bin_test_scripts(root), [])
+
+    def test_requires_shebang_line(self):
+        # First line contains "python" and the markers but is not a #! shebang.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._make_bin(
+                root,
+                {"notshebang": 'x = "python --run-tests unittest.main"\n'},
+            )
+            self.assertEqual(discover_bin_test_scripts(root), [])
 
     def test_ignores_non_python_shebang(self):
         # A shell script that only mentions the marker in a comment is skipped.
@@ -124,12 +157,61 @@ class DiscoverBinTestScriptsTests(unittest.TestCase):
     def test_results_are_sorted(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            self._make_bin(
-                root,
-                {
-                    "bbb": '#!/usr/bin/env python3\n"--run-tests"\n',
-                    "aaa": '#!/usr/bin/env python3\n"--run-tests"\n',
-                },
-            )
+            self._make_bin(root, {"bbb": _HOOK, "aaa": _HOOK})
             found = [p.name for p in discover_bin_test_scripts(root)]
             self.assertEqual(found, ["aaa", "bbb"])
+
+
+class RunBinScriptTestsTests(unittest.TestCase):
+    def _completed(self, returncode: int, stderr: str = "") -> subprocess.CompletedProcess:
+        return subprocess.CompletedProcess(
+            args=[], returncode=returncode, stdout="", stderr=stderr
+        )
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_passing_suite_returns_true(self, mock_discover, mock_run):
+        mock_discover.return_value = [Path("bin/newline")]
+        mock_run.return_value = self._completed(0, "Ran 5 tests in 0.0s\n\nOK\n")
+        self.assertTrue(run_bin_script_tests(Path("/repo")))
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_failing_suite_returns_false(self, mock_discover, mock_run):
+        mock_discover.return_value = [Path("bin/newline")]
+        mock_run.return_value = self._completed(1, "FAILED (failures=1)\n")
+        self.assertFalse(run_bin_script_tests(Path("/repo")))
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_no_tests_collected_warns_but_passes(self, mock_discover, mock_run):
+        # unittest exit 5 = "NO TESTS RAN": hook wired but no tests yet (mid-TDD)
+        # is a warning, not a suite failure.
+        mock_discover.return_value = [Path("bin/newline")]
+        mock_run.return_value = self._completed(5, "NO TESTS RAN\n")
+        self.assertTrue(run_bin_script_tests(Path("/repo")))
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_timeout_returns_false(self, mock_discover, mock_run):
+        mock_discover.return_value = [Path("bin/newline")]
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="newline", timeout=1)
+        self.assertFalse(run_bin_script_tests(Path("/repo")))
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_empty_discovery_skips_without_running(self, mock_discover, mock_run):
+        mock_discover.return_value = []
+        self.assertTrue(run_bin_script_tests(Path("/repo")))
+        mock_run.assert_not_called()
+
+    @patch("run_tests.subprocess.run")
+    @patch("run_tests.discover_bin_test_scripts")
+    def test_one_failure_still_runs_remaining_scripts(self, mock_discover, mock_run):
+        mock_discover.return_value = [Path("bin/a"), Path("bin/b")]
+        mock_run.side_effect = [
+            self._completed(1, "boom"),
+            self._completed(0, "Ran 1 test\nOK\n"),
+        ]
+        self.assertFalse(run_bin_script_tests(Path("/repo")))
+        self.assertEqual(mock_run.call_count, 2)  # did not abort after first failure
