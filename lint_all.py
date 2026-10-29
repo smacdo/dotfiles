@@ -22,6 +22,11 @@ DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
 END_OF_CONFIG_SENTINEL = "### end of config - there should be no lines below this one! ###"
 END_OF_CONFIG_FILES = [".bashrc", ".zshrc"]
 
+# Pinned so a new release can't change the default rule set under us (ruff
+# 0.16.0 enabled hundreds of new default rules). Bump deliberately.
+RUFF_SPEC = "ruff@0.15.22"
+TY_SPEC = "ty@0.0.95"
+
 
 ################################################################################
 # Lint a list of shell scripts, and return a list of files that failed a linter
@@ -57,7 +62,7 @@ def lint_sh_files(file_paths: list[str], shell: str | None = None) -> list[str]:
 # TODO: documentation
 def typecheck_py_file(file_path: str) -> tuple[bool, str]:
     result = subprocess.run(
-        ["uvx", "ty", "check", "--no-progress", "--color", "always", file_path],
+        ["uvx", TY_SPEC, "check", "--no-progress", "--color", "always", file_path],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -74,7 +79,7 @@ def ruff_lint_py_file(file_path: str, auto_fix=False) -> tuple[bool, str]:
     custom_env["FORCE_COLOR"] = "1"
 
     result = subprocess.run(
-        ["uvx", "ruff", "check", fix_arg, file_path],
+        ["uvx", RUFF_SPEC, "check", fix_arg, file_path],
         env=custom_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -261,7 +266,7 @@ def main() -> int:
     failed_py_files: list[str] = []
     py_lint_skipped = False
 
-    for tool in ("ty", "ruff"):
+    for tool in (TY_SPEC, RUFF_SPEC):
         ok, output = preflight_uvx_tool(tool)
         if not ok:
             py_lint_skipped = True
