@@ -2,6 +2,7 @@
 Utility functions for the bootstrap.py program.
 """
 
+import enum
 import functools
 import hashlib
 import json
@@ -525,6 +526,191 @@ def _validate_stub(stub: Path, repo_file: Path) -> bool:
         return _gitconfig_includes(stub, repo_file) and repo_file.is_file()
     except (FileNotFoundError, GitConfigError):
         return False
+
+
+class StubResult(enum.Enum):
+    READY = "ready"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+RECURSION_FIX = "GIT_CONFIG_GLOBAL=/dev/null git -C {repo} checkout -- .gitconfig"
+
+
+class _Prior(enum.Enum):
+    MISSING = "missing"
+    REPO_SYMLINK = "repo symlink"
+    FILE = "file"
+
+
+def _join_config_blocks(*blocks: str) -> str:
+    """Join config blocks with a blank line between them, each ending in a newline."""
+    parts = [b if b.endswith("\n") else b + "\n" for b in blocks if b]
+    return "\n".join(parts)
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Replace `path` with `content` via a temp file, keeping an existing regular file's mode."""
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text(content)
+        if path.is_file() and not path.is_symlink():
+            shutil.copymode(path, tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _restore_gitconfig(
+    stub_path: Path, prior: _Prior, backup: Path | None, link_target: str | None
+) -> None:
+    """Undo this run's write to `stub_path`, returning it to its pre-run state."""
+    if prior is _Prior.FILE and backup is not None:
+        tmp = stub_path.with_name(stub_path.name + ".tmp")
+        try:
+            shutil.copy2(backup, tmp)
+            os.replace(tmp, stub_path)
+        finally:
+            tmp.unlink(missing_ok=True)
+        logging.info(f"Restored {stub_path} from {backup}")
+    elif prior is _Prior.REPO_SYMLINK and link_target is not None:
+        stub_path.unlink(missing_ok=True)
+        stub_path.symlink_to(link_target)
+        logging.info(f"Restored symlink {stub_path} -> {link_target}")
+    elif prior is _Prior.MISSING:
+        stub_path.unlink(missing_ok=True)
+        logging.info(f"Removed {stub_path}")
+
+
+def _fold_legacy_gitconfig(
+    content: str, stub_path: Path, legacy_local: Path, dry_text: str
+) -> tuple[str, bool]:
+    """Append `legacy_local` with its marker unless its current hash is already marked.
+
+    Returns the (possibly extended) content and whether the legacy file's current
+    marker is in it.
+    """
+    if not legacy_local.exists():
+        return content, False
+    try:
+        marker = _legacy_marker(legacy_local)
+        legacy_text = legacy_local.read_text()
+    except (OSError, UnicodeDecodeError) as e:
+        logging.warning(f"{dry_text}Could not read {legacy_local} ({e}); not folding it into {stub_path}")
+        return content, False
+
+    if marker in content.splitlines():
+        return content, True
+
+    if not confirm(
+        message=f"{Colors.BOLD}Fold {legacy_local} into {stub_path}?{Colors.RESET}",
+        default=True,
+    ):
+        logging.info(f"{dry_text}Not folding {legacy_local} into {stub_path} (declined)")
+        return content, False
+
+    logging.info(f"{dry_text}Folding {legacy_local} into {stub_path}")
+    return _join_config_blocks(content, marker + "\n" + legacy_text), True
+
+
+def install_gitconfig_stub(
+    stub_path: Path,
+    repo_gitconfig: Path,
+    legacy_local: Path,
+    dry_run: bool = False,
+) -> StubResult:
+    """Make `stub_path` a local git config that includes `repo_gitconfig`.
+
+    Replaces a symlink to the repo file, converts (after a prompt and a backup) a
+    regular file that lacks the include, and folds in `legacy_local` once per
+    version of its content. Foreign or broken symlinks are left alone (SKIPPED).
+    The result is validated with git; on failure the pre-run state is restored
+    and FAILED is returned.
+    """
+    dry_text = "[DRY RUN] " if dry_run else ""
+
+    if shutil.which("git") is None:
+        logging.error(f"{dry_text}git not found on PATH; cannot install {stub_path}")
+        return StubResult.FAILED
+
+    try:
+        if _gitconfig_includes(repo_gitconfig, repo_gitconfig):
+            fix = RECURSION_FIX.format(repo=repo_gitconfig.parent)
+            logging.error(f"{dry_text}{repo_gitconfig} includes itself; restore it with: {fix}")
+            return StubResult.FAILED
+
+        include_path = _include_path_for(repo_gitconfig, stub_path.parent)
+        stub = _render_gitconfig_stub(include_path)
+        link_target: str | None = None
+        original: str | None = None
+
+        # Decide what the stub should contain, based on what is there now.
+        if stub_path.is_symlink():
+            link_target = os.readlink(stub_path)
+            if not (stub_path.exists() and stub_path.resolve() == repo_gitconfig.resolve()):
+                logging.warning(
+                    f"{dry_text}{stub_path} is a symlink to {link_target}, not {repo_gitconfig}; "
+                    "leaving it alone and skipping git setup"
+                )
+                return StubResult.SKIPPED
+            prior = _Prior.REPO_SYMLINK
+            content = stub
+            logging.info(f"{dry_text}Replacing symlink {stub_path} with a stub including {include_path}")
+        elif not stub_path.exists():
+            prior = _Prior.MISSING
+            content = stub
+            logging.info(f"{dry_text}Writing {stub_path} including {include_path}")
+        elif stub_path.is_file():
+            prior = _Prior.FILE
+            original = stub_path.read_text()
+            content = original
+            if _gitconfig_includes(stub_path, repo_gitconfig):
+                logging.info(f"{dry_text}{stub_path} already includes {repo_gitconfig}")
+            elif confirm(
+                message=f"{Colors.BOLD}Convert {stub_path} to a stub that includes {include_path}? "
+                f"(a backup is kept){Colors.RESET}",
+                default=True,
+            ):
+                content = _join_config_blocks(stub, original)
+                logging.info(f"{dry_text}Converting {stub_path} to a stub including {include_path}")
+            else:
+                logging.info(f"{dry_text}Skipping {stub_path} (declined conversion)")
+                return StubResult.SKIPPED
+        else:
+            logging.warning(f"{dry_text}{stub_path} is not a regular file; skipping git setup")
+            return StubResult.SKIPPED
+    except GitConfigError as e:
+        logging.error(f"{dry_text}Could not inspect git config: {e}")
+        return StubResult.FAILED
+
+    content, legacy_marked = _fold_legacy_gitconfig(content, stub_path, legacy_local, dry_text)
+    changed = content != original
+
+    if dry_run:
+        return StubResult.READY
+
+    # Write once, after at most one backup of the pre-run file.
+    backup: Path | None = None
+    if changed:
+        if prior is _Prior.FILE:
+            backup = create_backup_filename(stub_path)
+            shutil.copy2(stub_path, backup)
+            logging.info(f"Backed up {stub_path} to {backup}")
+        stub_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_text(stub_path, content)
+
+    if not _validate_stub(stub_path, repo_gitconfig):
+        logging.error(
+            f"Validation failed for {stub_path}: include cycle, syntax error, "
+            f"or the include of {repo_gitconfig} does not resolve"
+        )
+        if changed:
+            _restore_gitconfig(stub_path, prior, backup, link_target)
+        return StubResult.FAILED
+
+    if legacy_marked:
+        logging.info("~/.my_gitconfig is no longer used; `bin/dotfiles-cleanup` can remove it")
+    return StubResult.READY
 
 
 def _under(child: Path, parent: Path) -> bool:

@@ -13,6 +13,7 @@ from _pydotlib.bootstrap import (
     CLAUDE_TMUX_STATE_MARKER,
     LEGACY_MARKER_PREFIX,
     STUB_HEADER,
+    StubResult,
     _CTS,
     _detect_real_editor,
     _gitconfig_include_paths,
@@ -34,6 +35,7 @@ from _pydotlib.bootstrap import (
     git_clone_repos,
     find_dotfiles_root,
     initialize_vim_plugin_manager,
+    install_gitconfig_stub,
     is_dotfiles_root,
     safe_symlink,
 )
@@ -1193,3 +1195,310 @@ class TestGitconfigHelpers(unittest.TestCase):
         repo_file = self._write("repo/.gitconfig", "[user]\n\tname = x\n")
         stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
         self.assertTrue(_validate_stub(stub, repo_file))
+
+
+class TestInstallGitconfigStub(unittest.TestCase):
+    REPO_CONTENT = "[log]\n\tdate = relative\n"
+    LEGACY_CONTENT = "[user]\n\tname = Old\n[x]\n\ty = 1\n"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.home = Path(self._tmp.name).resolve()
+        self.repo = self.home / "repo" / ".gitconfig"
+        self.repo.parent.mkdir()
+        self.repo.write_text(self.REPO_CONTENT)
+        self.stub = self.home / ".gitconfig"
+        self.legacy = self.home / ".my_gitconfig"
+        self.rendered = _render_gitconfig_stub("~/repo/.gitconfig")
+
+        patcher = patch("_pydotlib.bootstrap.confirm")
+        self.confirm = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.confirm.side_effect = AssertionError("unexpected prompt")
+
+    def _answer(self, *answers: bool) -> None:
+        self.confirm.side_effect = list(answers)
+
+    def _run(self, dry_run: bool = False) -> StubResult:
+        return install_gitconfig_stub(self.stub, self.repo, self.legacy, dry_run=dry_run)
+
+    def _git(self, *args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=self.home,
+            env=_hermetic_git_env(self.home),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def _snapshot(self) -> dict[str, bytes | str]:
+        snap: dict[str, bytes | str] = {}
+        for path in sorted(self.home.iterdir()):
+            if path.is_symlink():
+                snap[path.name] = "-> " + os.readlink(path)
+            elif path.is_file():
+                snap[path.name] = path.read_bytes()
+            else:
+                snap[path.name] = "dir"
+        return snap
+
+    def test_missing_writes_stub(self):
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), self.rendered)
+
+    def test_symlink_to_repo_replaced(self):
+        self.stub.symlink_to(self.repo)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertFalse(self.stub.is_symlink())
+        self.assertEqual(self.stub.read_text(), self.rendered)
+        self.assertEqual(self.repo.read_text(), self.REPO_CONTENT)
+
+    def test_already_stub_is_noop(self):
+        self.assertIs(self._run(), StubResult.READY)
+        os.utime(self.stub, (1_000_000_000, 1_000_000_000))
+        before = self.stub.stat().st_mtime_ns
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), self.rendered)
+        self.assertEqual(self.stub.stat().st_mtime_ns, before)
+
+    def test_regular_file_converted_with_backup(self):
+        original = b"[alias]\n\tst = status"
+        self.stub.write_bytes(original)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(
+            self.stub.read_text(), self.rendered + "\n" + original.decode() + "\n"
+        )
+        backup = self.home / ".gitconfig.ORIGINAL"
+        self.assertTrue(backup.exists())
+        self.assertEqual(backup.read_bytes(), original)
+
+    def test_conversion_preserves_file_mode(self):
+        self.stub.write_text("[alias]\n\tst = status\n")
+        self.stub.chmod(0o600)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.stat().st_mode & 0o777, 0o600)
+
+    def test_regular_file_declined_skipped(self):
+        original = b"[alias]\n\tst = status\n"
+        self.stub.write_bytes(original)
+        self._answer(False)
+        self.assertIs(self._run(), StubResult.SKIPPED)
+        self.assertEqual(self.stub.read_bytes(), original)
+        self.assertFalse((self.home / ".gitconfig.ORIGINAL").exists())
+
+    def test_foreign_symlink_skipped(self):
+        other = self.home / "other"
+        other.write_text("[core]\n\tpager = less\n")
+        self.stub.symlink_to(other)
+        with self.assertLogs(level="WARNING"):
+            self.assertIs(self._run(), StubResult.SKIPPED)
+        self.assertEqual(os.readlink(self.stub), str(other))
+        self.assertEqual(other.read_text(), "[core]\n\tpager = less\n")
+
+    def test_broken_symlink_skipped(self):
+        target = self.home / "missing"
+        self.stub.symlink_to(target)
+        with self.assertLogs(level="WARNING"):
+            self.assertIs(self._run(), StubResult.SKIPPED)
+        self.assertEqual(os.readlink(self.stub), str(target))
+        self.assertFalse(target.exists())
+
+    def test_recursion_guard_fails_without_changes(self):
+        self.repo.write_text(f"[include]\n\tpath = {self.repo}\n")
+        self.stub.symlink_to(self.repo)
+        with self.assertLogs(level="ERROR") as logs:
+            self.assertIs(self._run(), StubResult.FAILED)
+        self.assertIn("GIT_CONFIG_GLOBAL=/dev/null git -C", "\n".join(logs.output))
+        self.assertTrue(self.stub.is_symlink())
+        self.assertEqual(os.readlink(self.stub), str(self.repo))
+
+    def test_legacy_folded_once(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        marker = _legacy_marker(self.legacy)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        folded = self.stub.read_text()
+        self.assertEqual(
+            folded, self.rendered + "\n" + marker + "\n" + self.LEGACY_CONTENT
+        )
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), folded)
+        self.assertEqual(self.confirm.call_count, 1)
+
+    def test_legacy_not_refolded_after_value_rewrite(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self._git("config", "--file", str(self.stub), "user.name", "New")
+        rewritten = self.stub.read_text()
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), rewritten)
+        self.assertEqual(
+            self._git("config", "--file", str(self.stub), "--includes", "--get", "user.name"),
+            "New",
+        )
+
+    def test_legacy_refolded_after_legacy_edit(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        old_marker = _legacy_marker(self.legacy)
+        self._answer(True, True)
+        self.assertIs(self._run(), StubResult.READY)
+        first = self.stub.read_text()
+        self.legacy.write_text("[user]\n\tname = Edited\n")
+        new_marker = _legacy_marker(self.legacy)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(
+            self.stub.read_text(),
+            first + "\n" + new_marker + "\n" + "[user]\n\tname = Edited\n",
+        )
+        self.assertIn(old_marker, self.stub.read_text().splitlines())
+
+    def test_synced_stub_with_other_marker_still_folds(self):
+        other = LEGACY_MARKER_PREFIX + "0" * 64
+        synced = self.rendered + "\n" + other + "\n[user]\n\tname = Elsewhere\n"
+        self.stub.write_text(synced)
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        marker = _legacy_marker(self.legacy)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(
+            self.stub.read_text(), synced + "\n" + marker + "\n" + self.LEGACY_CONTENT
+        )
+
+    def test_legacy_left_on_disk(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertTrue(self.legacy.exists())
+        self.assertEqual(self.legacy.read_text(), self.LEGACY_CONTENT)
+
+    def test_old_file_including_legacy_still_folds(self):
+        old = "[include]\n\tpath = ~/.my_gitconfig\n"
+        self.stub.write_text(old)
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        marker = _legacy_marker(self.legacy)
+        self._answer(True, True)
+        self.assertIs(self._run(), StubResult.READY)
+        content = self.stub.read_text()
+        self.assertEqual(
+            content,
+            self.rendered + "\n" + old + "\n" + marker + "\n" + self.LEGACY_CONTENT,
+        )
+        self.assertIn("\tpath = ~/.my_gitconfig", content.splitlines())
+        self.assertEqual((self.home / ".gitconfig.ORIGINAL").read_text(), old)
+        self.assertEqual(list(self.home.glob(".gitconfig_*")), [])
+
+    def test_dry_run_returns_ready_without_validation(self):
+        with patch("_pydotlib.bootstrap._validate_stub") as validate:
+            self.assertIs(self._run(dry_run=True), StubResult.READY)
+        validate.assert_not_called()
+        self.assertFalse(self.stub.exists())
+        self.assertFalse(self.stub.is_symlink())
+
+    def test_validation_failure_restores(self):
+        original = b"[alias]\n\tst = status\n"
+        self.stub.write_bytes(original)
+        self._answer(True)
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+            with self.assertLogs(level="ERROR"):
+                self.assertIs(self._run(), StubResult.FAILED)
+        self.assertEqual(self.stub.read_bytes(), original)
+
+    def test_validation_failure_restores_symlink(self):
+        self.stub.symlink_to(self.repo)
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+            with self.assertLogs(level="ERROR"):
+                self.assertIs(self._run(), StubResult.FAILED)
+        self.assertTrue(self.stub.is_symlink())
+        self.assertEqual(os.readlink(self.stub), str(self.repo))
+
+    def test_validation_failure_removes_new_stub(self):
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+            with self.assertLogs(level="ERROR"):
+                self.assertIs(self._run(), StubResult.FAILED)
+        self.assertFalse(self.stub.exists())
+
+    def test_validation_failure_without_write_leaves_file(self):
+        self.stub.write_text(self.rendered)
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+            with self.assertLogs(level="ERROR"):
+                self.assertIs(self._run(), StubResult.FAILED)
+        self.assertEqual(self.stub.read_text(), self.rendered)
+        self.assertEqual(list(self.home.glob(".gitconfig*.ORIGINAL")), [])
+
+    def test_git_missing_fails_cleanly(self):
+        with self.subTest("git errors with FileNotFoundError"):
+            with patch(
+                "_pydotlib.bootstrap.subprocess.run", side_effect=FileNotFoundError("git")
+            ):
+                with self.assertLogs(level="ERROR"):
+                    self.assertIs(self._run(), StubResult.FAILED)
+            self.assertFalse(self.stub.exists())
+        with self.subTest("git not on PATH"):
+            with patch("_pydotlib.bootstrap.shutil.which", return_value=None):
+                with self.assertLogs(level="ERROR") as logs:
+                    self.assertIs(self._run(), StubResult.FAILED)
+            self.assertIn("git", "\n".join(logs.output))
+            self.assertFalse(self.stub.exists())
+
+    def test_unreadable_legacy_warns_and_continues(self):
+        if os.geteuid() == 0:
+            self.skipTest("root can read a mode-000 file")
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        self.legacy.chmod(0)
+        self.addCleanup(self.legacy.chmod, 0o600)
+        with self.assertLogs(level="WARNING") as logs:
+            self.assertIs(self._run(), StubResult.READY)
+        self.assertTrue(any("WARNING" in line for line in logs.output))
+        self.assertEqual(self.stub.read_text(), self.rendered)
+        self.assertNotIn(LEGACY_MARKER_PREFIX, self.stub.read_text())
+
+    def test_existing_backup_preserved(self):
+        older = self.home / ".gitconfig.ORIGINAL"
+        older.write_bytes(b"older backup\n")
+        original = b"[alias]\n\tst = status\n"
+        self.stub.write_bytes(original)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(older.read_bytes(), b"older backup\n")
+        backups = list(self.home.glob(".gitconfig_*.ORIGINAL"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), original)
+
+    def test_dry_run_writes_nothing(self):
+        self.stub.write_text("[alias]\n\tst = status\n")
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        before = self._snapshot()
+        self._answer(True, True)
+        self.assertIs(self._run(dry_run=True), StubResult.READY)
+        self.assertEqual(self._snapshot(), before)
+
+    def test_empty_legacy_appends_marker_only(self):
+        self.legacy.write_text("")
+        marker = _legacy_marker(self.legacy)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), self.rendered + "\n" + marker + "\n")
+
+    def test_legacy_log_line_once_when_marked(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        self._answer(True)
+        with self.assertLogs(level="INFO") as logs:
+            self.assertIs(self._run(), StubResult.READY)
+        lines = [line for line in logs.output if "is no longer used" in line]
+        self.assertEqual(len(lines), 1)
+        self.assertIn("INFO", lines[0])
+        self.assertIn("bin/dotfiles-cleanup", lines[0])
+
+    def test_legacy_declined_not_folded_and_no_log_line(self):
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        self._answer(False)
+        with self.assertLogs(level="INFO") as logs:
+            self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(self.stub.read_text(), self.rendered)
+        self.assertFalse(any("is no longer used" in line for line in logs.output))
