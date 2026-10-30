@@ -88,7 +88,7 @@ Supports **zsh** (primary) and **bash**. Shared vendor-neutral modules live in `
 
 ### Bootstrap System
 
-`bootstrap.py` creates symlinks from repo files into `$HOME` and `~/.config/`. Uses `_pydotlib/bootstrap.py`:`safe_symlink()`, which backs up existing files to `.ORIGINAL`. The repo root is identified by `.__dotfiles_root__`; `S_DOTFILE_ROOT` (defaults to `~/.dotfiles`) is used throughout configs to locate the repo.
+`bootstrap.py` creates symlinks from repo files into `$HOME` and `~/.config/`, except `~/.gitconfig`, which is a local stub (not a symlink) that includes the repo `.gitconfig`. Uses `_pydotlib/bootstrap.py`:`safe_symlink()`, which backs up existing files to `.ORIGINAL`. The repo root is identified by `.__dotfiles_root__`; `S_DOTFILE_ROOT` (defaults to `~/.dotfiles`) is used throughout configs to locate the repo.
 
 ### Per-Machine Overrides
 
@@ -97,7 +97,7 @@ Not checked in. Loaded automatically at shell startup:
 - `~/.config/dotfiles/0_my_shell_profile.sh` or `~/.0_my_shell_profile.sh` — pre-load, both shells
 - `~/.config/dotfiles/my_bashrc.sh` or `~/.my_bashrc.sh` — bash-specific post-load
 - `~/.config/dotfiles/my_zshrc.sh` or `~/.my_zshrc.sh` — zsh-specific post-load
-- `~/.my_gitconfig` — machine-specific git author name/email
+- `~/.gitconfig` — local stub that includes the repo `.gitconfig`; holds machine-specific git author name/email and anything tools write via `git config --global`
 
 ### Platform Detection
 
@@ -189,8 +189,8 @@ When moving where bootstrap puts a generated artifact (e.g. `~/.vim/plugged/` �
 1. Add the new code path; stop referencing the old one. Don't touch old data on disk.
 2. If bootstrap can detect an old artifact at the prior path, log one line naming the new location and noting the old is safe to remove.
 3. Add a `CHANGELOG.md` entry (format below).
-4. Add a stanza to `bin/dotfiles-cleanup` for the orphaned path (create the script if it doesn't exist).
-5. Add a container test under `tests/docker/upgrade_from_v<N>/` that pre-creates the old layout and asserts bootstrap completes cleanly. Same suite covers idempotency: run bootstrap twice from clean → second run is no-op-or-quiet.
+4. Add a stanza to `bin/dotfiles-cleanup` for the orphaned path.
+5. Add a pre-bootstrap seed step in `run_tests.py` that recreates the old layout, and assert bootstrap completes cleanly. Same suite covers idempotency: run bootstrap twice from clean → second run is no-op-or-quiet.
 
 Any change a user with an existing install would notice → `CHANGELOG.md` entry.
 
