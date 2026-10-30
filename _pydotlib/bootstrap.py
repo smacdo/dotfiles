@@ -11,7 +11,9 @@ import os
 import shutil
 import socket
 import ssl
+import stat
 import subprocess
+import tempfile
 import urllib.request
 import urllib.error
 
@@ -92,7 +94,13 @@ def configure_vcs_author(
     dry_text = "[DRY RUN] " if dry_run else ""
 
     if gitconfig_path.is_symlink():
-        logging.warning(f"{gitconfig_path} is a symlink; not writing git author config to it")
+        if dry_run:
+            logging.info(
+                f"{dry_text}{gitconfig_path} is still a symlink; would write git author "
+                "config after the stub is installed"
+            )
+        else:
+            logging.warning(f"{gitconfig_path} is a symlink; not writing git author config to it")
         return
 
     if gitconfig_path.exists():
@@ -453,8 +461,21 @@ def _hermetic_git_env(home: Path) -> dict[str, str]:
     env["HOME"] = str(home)
     env["GIT_CONFIG_GLOBAL"] = "/dev/null"
     env["GIT_CONFIG_NOSYSTEM"] = "1"
-    env.pop("XDG_CONFIG_HOME", None)
+    for var in ("XDG_CONFIG_HOME", "GIT_DIR", "GIT_WORK_TREE"):
+        env.pop(var, None)
     return env
+
+
+def _run_hermetic_git(args: list[str], home: Path) -> subprocess.CompletedProcess[str]:
+    """Run git outside any repository, so a broken `.git` near the inspected file can't abort it."""
+    return subprocess.run(
+        ["git", *args],
+        cwd=tempfile.gettempdir(),
+        env=_hermetic_git_env(home),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def _gitconfig_include_paths(path: Path, home: Path | None = None) -> list[Path]:
@@ -463,14 +484,11 @@ def _gitconfig_include_paths(path: Path, home: Path | None = None) -> list[Path]
     `~` expands against `home` (default: the file's directory); relative entries
     resolve against the file's directory.
     """
+    path = path.absolute()
     try:
-        result = subprocess.run(
-            ["git", "config", "--file", str(path), "--type=path", "--get-all", "include.path"],
-            cwd=path.parent,
-            env=_hermetic_git_env(home if home is not None else path.parent),
-            capture_output=True,
-            text=True,
-            check=False,
+        result = _run_hermetic_git(
+            ["config", "--file", str(path), "--type=path", "--get-all", "include.path"],
+            home if home is not None else path.parent,
         )
     except FileNotFoundError as e:
         raise GitConfigError(f"git not found: {e}") from e
@@ -514,26 +532,33 @@ def _render_gitconfig_stub(include_path: str) -> str:
     return STUB_HEADER + "[include]\n\tpath = " + include_path + "\n"
 
 
+def _legacy_marker_for(data: bytes) -> str:
+    return LEGACY_MARKER_PREFIX + hashlib.sha256(data).hexdigest()
+
+
 def _legacy_marker(legacy: Path) -> str:
-    return LEGACY_MARKER_PREFIX + hashlib.sha256(legacy.read_bytes()).hexdigest()
+    return _legacy_marker_for(legacy.read_bytes())
 
 
-def _validate_stub(stub: Path, repo_file: Path) -> bool:
-    """Check that git can load the stub, it includes repo_file, and repo_file exists."""
+def _validate_stub(stub: Path, repo_file: Path) -> tuple[bool, str]:
+    """Check that git can load the stub, it includes repo_file, and repo_file exists.
+
+    Returns (ok, reason); `reason` explains a failure and is empty on success.
+    """
+    stub = stub.absolute()
     try:
-        result = subprocess.run(
-            ["git", "config", "--file", str(stub), "--includes", "--list"],
-            cwd=stub.parent,
-            env=_hermetic_git_env(stub.parent),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        result = _run_hermetic_git(["config", "--file", str(stub), "--includes", "--list"], stub.parent)
         if result.returncode != 0:
-            return False
-        return _gitconfig_includes(stub, repo_file) and repo_file.is_file()
-    except (FileNotFoundError, GitConfigError):
-        return False
+            return False, f"git config exited {result.returncode}: {result.stderr.strip()}"
+        if not _gitconfig_includes(stub, repo_file):
+            return False, f"{stub} does not include {repo_file}"
+        if not repo_file.is_file():
+            return False, f"{repo_file} is not a file"
+        return True, ""
+    except FileNotFoundError as e:
+        return False, f"git not found: {e}"
+    except GitConfigError as e:
+        return False, str(e)
 
 
 class StubResult(enum.Enum):
@@ -557,16 +582,33 @@ def _join_config_blocks(*blocks: str) -> str:
     return "\n".join(parts)
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
-    """Replace `path` with `content` via a temp file, keeping an existing regular file's mode."""
-    tmp = path.with_name(path.name + ".tmp")
+def _atomic_write_bytes(path: Path, data: bytes, mode: int) -> None:
+    """Replace `path` with `data` at `mode`, via a uniquely named temp file beside it.
+
+    Only the temp file this call created is removed on failure.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
     try:
-        tmp.write_text(content)
-        if path.is_file() and not path.is_symlink():
-            shutil.copymode(path, tmp)
-        os.replace(tmp, path)
-    finally:
-        tmp.unlink(missing_ok=True)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            os.fchmod(f.fileno(), mode)
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Replace `path` with `content`, keeping an existing regular file's mode (else 0600)."""
+    try:
+        st = os.lstat(path)
+        mode = stat.S_IMODE(st.st_mode) if stat.S_ISREG(st.st_mode) else 0o600
+    except FileNotFoundError:
+        mode = 0o600
+    _atomic_write_bytes(path, content.encode("utf-8"), mode)
 
 
 def _restore_gitconfig(
@@ -574,12 +616,7 @@ def _restore_gitconfig(
 ) -> None:
     """Undo this run's write to `stub_path`, returning it to its pre-run state."""
     if prior is _Prior.FILE and backup is not None:
-        tmp = stub_path.with_name(stub_path.name + ".tmp")
-        try:
-            shutil.copy2(backup, tmp)
-            os.replace(tmp, stub_path)
-        finally:
-            tmp.unlink(missing_ok=True)
+        _atomic_write_bytes(stub_path, backup.read_bytes(), stat.S_IMODE(backup.stat().st_mode))
         logging.info(f"Restored {stub_path} from {backup}")
     elif prior is _Prior.REPO_SYMLINK and link_target is not None:
         stub_path.unlink(missing_ok=True)
@@ -601,11 +638,12 @@ def _fold_legacy_gitconfig(
     if not legacy_local.exists():
         return content, False
     try:
-        marker = _legacy_marker(legacy_local)
-        legacy_text = legacy_local.read_text()
+        legacy_bytes = legacy_local.read_bytes()
+        legacy_text = legacy_bytes.decode("utf-8")
     except (OSError, UnicodeDecodeError) as e:
         logging.warning(f"{dry_text}Could not read {legacy_local} ({e}); not folding it into {stub_path}")
         return content, False
+    marker = _legacy_marker_for(legacy_bytes)
 
     if marker in content.splitlines():
         return content, True
@@ -670,7 +708,7 @@ def install_gitconfig_stub(
             logging.info(f"{dry_text}Writing {stub_path} including {include_path}")
         elif stub_path.is_file():
             prior = _Prior.FILE
-            original = stub_path.read_text()
+            original = stub_path.read_text(encoding="utf-8")
             content = original
             if _gitconfig_includes(stub_path, repo_gitconfig):
                 logging.info(f"{dry_text}{stub_path} already includes {repo_gitconfig}")
@@ -707,10 +745,11 @@ def install_gitconfig_stub(
         stub_path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_write_text(stub_path, content)
 
-    if not _validate_stub(stub_path, repo_gitconfig):
+    ok, reason = _validate_stub(stub_path, repo_gitconfig)
+    if not ok:
         logging.error(
             f"Validation failed for {stub_path}: include cycle, syntax error, "
-            f"or the include of {repo_gitconfig} does not resolve"
+            f"or the include of {repo_gitconfig} does not resolve ({reason})"
         )
         if changed:
             _restore_gitconfig(stub_path, prior, backup, link_target)

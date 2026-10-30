@@ -256,6 +256,21 @@ class BootstrapChecksSmokeTests(unittest.TestCase):
             self.assertIsInstance(result, CheckResult)
 
 
+class BootstrapChecksGitconfigTests(unittest.TestCase):
+    def test_gitconfig_must_not_be_a_symlink(self):
+        stub_cmd = ["test", "!", "-L", "/home/testuser/.gitconfig"]
+        [check] = [
+            c for c in BOOTSTRAP_CHECKS
+            if c(MagicMock(return_value=_completed(0))).name == f"`{' '.join(stub_cmd)}` succeeds"
+        ]
+        exec_fn = MagicMock(return_value=_completed(0))
+        self.assertTrue(check(exec_fn).passed)
+        exec_fn.assert_called_once_with(stub_cmd)
+        result = check(MagicMock(return_value=_completed(1)))
+        self.assertFalse(result.passed)
+        self.assertIn("exit 1", result.detail)
+
+
 class CheckTmuxConfigTests(unittest.TestCase):
     # Call sequence is: pre-kill (clear leftovers), new-session, source-file,
     # post-kill (cleanup).
@@ -343,6 +358,19 @@ class NativeChecksSmokeTests(unittest.TestCase):
             names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
             self.assertFalse(any("symlink /h/.gitconfig" in n for n in names))
             self.assertTrue(any("--includes --get log.date" in n for n in names))
+
+    def test_gitconfig_must_not_be_a_symlink(self):
+        stub_cmd = ["test", "!", "-L", "/h/.gitconfig"]
+        for platform in ("linux", "darwin"):
+            checks = build_native_checks("/h", "/h/.dotfiles", platform=platform)
+            [check] = [
+                c for c in checks
+                if c(MagicMock(return_value=_completed(0))).name == f"`{' '.join(stub_cmd)}` succeeds"
+            ]
+            exec_fn = MagicMock(return_value=_completed(0))
+            self.assertTrue(check(exec_fn).passed)
+            exec_fn.assert_called_once_with(stub_cmd)
+            self.assertFalse(check(MagicMock(return_value=_completed(1))).passed)
 
     def test_darwin_includes_macos_specific_checks(self):
         checks = build_native_checks("/Users/user", "/Users/user/.dotfiles", platform="darwin")

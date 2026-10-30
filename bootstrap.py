@@ -135,6 +135,9 @@ def main() -> int:
             home_dir / ".my_gitconfig",
             dry_run=args.dry_run,
         )
+    except UnicodeDecodeError as e:
+        logging.error(f"Failed to install ~/.gitconfig stub: it is not valid UTF-8 ({e})")
+        return 1
     except OSError as e:
         logging.error(f"Failed to install ~/.gitconfig stub: {e}")
         return 1
