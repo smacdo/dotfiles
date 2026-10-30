@@ -3,6 +3,7 @@ Utility functions for the bootstrap.py program.
 """
 
 import functools
+import hashlib
 import json
 import logging
 import os
@@ -429,6 +430,101 @@ def create_backup_filename(target: Path) -> Path:
         backup_path = Path(f"{name}_{timestamp}{ext}")
 
     return backup_path
+
+
+STUB_HEADER = (
+    "# Local git config for this machine. Not tracked: tools such as `git config --global`\n"
+    "# write here, and so can you. Shared settings come from the dotfiles repo via the include.\n"
+)
+LEGACY_MARKER_PREFIX = "# migrated from ~/.my_gitconfig sha256="
+
+
+class GitConfigError(Exception):
+    """Raised when a git config query fails for a reason other than a missing key."""
+
+
+def _hermetic_git_env(home: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    env["HOME"] = str(home)
+    env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env.pop("XDG_CONFIG_HOME", None)
+    return env
+
+
+def _gitconfig_include_paths(path: Path) -> list[Path]:
+    """Return the resolved include.path targets of a git config file."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--file", str(path), "--type=path", "--get-all", "include.path"],
+            cwd=path.parent,
+            env=_hermetic_git_env(path.parent),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as e:
+        raise GitConfigError(f"git not found: {e}") from e
+
+    if result.returncode == 1:
+        return []
+    if result.returncode != 0:
+        raise GitConfigError(
+            f"git config failed for {path} (exit {result.returncode}): {result.stderr.strip()}"
+        )
+
+    paths = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        include = Path(line)
+        if not include.is_absolute():
+            include = path.parent / include
+        paths.append(include.resolve())
+    return paths
+
+
+def _gitconfig_includes(path: Path, repo_file: Path) -> bool:
+    return repo_file.resolve() in _gitconfig_include_paths(path)
+
+
+def _include_path_for(repo_gitconfig: Path, home: Path) -> str:
+    """Return the include path to write in the stub, using `~/` when it round-trips."""
+    resolved = repo_gitconfig.resolve()
+    for base in (home, home.resolve()):
+        try:
+            rel = repo_gitconfig.relative_to(base)
+        except ValueError:
+            continue
+        if (home / rel).resolve() == resolved:
+            return f"~/{rel}"
+    return str(resolved)
+
+
+def _render_gitconfig_stub(include_path: str) -> str:
+    return STUB_HEADER + "[include]\n\tpath = " + include_path + "\n"
+
+
+def _legacy_marker(legacy: Path) -> str:
+    return LEGACY_MARKER_PREFIX + hashlib.sha256(legacy.read_bytes()).hexdigest()
+
+
+def _validate_stub(stub: Path, repo_file: Path) -> bool:
+    """Check that git can load the stub, it includes repo_file, and repo_file exists."""
+    try:
+        result = subprocess.run(
+            ["git", "config", "--file", str(stub), "--includes", "--list"],
+            cwd=stub.parent,
+            env=_hermetic_git_env(stub.parent),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return False
+        return _gitconfig_includes(stub, repo_file) and repo_file.is_file()
+    except (FileNotFoundError, GitConfigError):
+        return False
 
 
 def _under(child: Path, parent: Path) -> bool:
