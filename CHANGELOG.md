@@ -14,6 +14,10 @@ Entry format:
 - **Removed** support for X. Safe to `rm path/to/x` locally.
 ```
 
+## 2026-10-30
+- **Changed** `~/.gitconfig` from a symlink to a local stub that includes the repo file. `~/.my_gitconfig` is folded into it. Re-run `bootstrap.py` right after pulling. A machine that receives the new stub by file sync needs no action if its `~/.my_gitconfig` matches the one folded in; otherwise re-run `bootstrap.py` there so it folds in its own. Tools may have written machine-specific settings into the repo `.gitconfig` through the old symlink: first check `git diff .gitconfig` and copy anything you want to keep into `~/.gitconfig`, then run `git checkout -- .gitconfig` to drop those sections from the repo copy.
+- **Added** `bin/dotfiles-cleanup`, which removes `~/.my_gitconfig` once it's folded in. It is opt-in and asks before removing anything.
+
 ## 2026-08-06
 - **Fixed** bootstrap downloads replacing destination files before the download completed. Downloads now use a temporary sibling and atomically replace the destination only after success; failed downloads leave existing files unchanged.
 
