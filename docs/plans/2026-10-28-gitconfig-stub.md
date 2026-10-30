@@ -247,8 +247,8 @@ git commit -m "add install_gitconfig_stub to replace the ~/.gitconfig symlink"
 - [ ] **Step 2: Remove the include block** at the end of `.gitconfig`. `git diff .gitconfig` should show only those two lines (plus a blank line, if any) removed.
 - [ ] **Step 3: Docs.**
   - `CHANGELOG.md` gets a new dated entry:
-    - **Changed** `~/.gitconfig` from a symlink to a local stub that includes the repo file. `~/.my_gitconfig` is folded into it. Re-run `bootstrap.py` right after pulling; machines that receive the change by file sync need no action. Then run `git checkout -- .gitconfig` to drop any machine-specific sections from the repo copy.
-    - **Added** `bin/dotfiles-cleanup`, which removes `~/.my_gitconfig` once it's folded in.
+    - **Changed** `~/.gitconfig` from a symlink to a local stub that includes the repo file. `~/.my_gitconfig` is folded into it. Re-run `bootstrap.py` right after pulling. A machine that receives the new stub by file sync needs no action if its `~/.my_gitconfig` matches the one folded in; otherwise re-run `bootstrap.py` there so it folds in its own. Tools may have written machine-specific settings into the repo `.gitconfig` through the old symlink: first check `git diff .gitconfig` and copy anything you want to keep into `~/.gitconfig`, then run `git checkout -- .gitconfig` to drop those sections from the repo copy.
+    - **Added** `bin/dotfiles-cleanup`, which removes `~/.my_gitconfig` once it's folded in. It is opt-in and asks before removing anything.
   - `CLAUDE.md`:
     - "Bootstrap System": `~/.gitconfig` is a local stub, not a symlink.
     - "Per-Machine Overrides": replace the `~/.my_gitconfig` bullet with `~/.gitconfig`.
@@ -281,7 +281,7 @@ git commit -m "fold ~/.my_gitconfig into the local ~/.gitconfig stub"
   - `test ! -L ~/.gitconfig`
   - `git config --global --includes --get log.date` prints `relative`
   - `git config user.name` prints your name
-- [ ] **Step 3: Clean the repo working copy** with `git -C ~/.dotfiles checkout -- .gitconfig`. Then `git -C ~/.dotfiles status --short .gitconfig` should be empty. Re-login so the login hook rewrites its settings into the stub.
+- [ ] **Step 3: Clean the repo working copy.** First check `git -C ~/.dotfiles diff .gitconfig` and copy anything you want to keep into `~/.gitconfig`. Then run `git -C ~/.dotfiles checkout -- .gitconfig`. Then `git -C ~/.dotfiles status --short .gitconfig` should be empty. Re-login so the login hook rewrites its settings into the stub.
 - [ ] **Step 4: Check that tool writes land in the stub.** Run `git config --global http.https://example.invalid.proxy ""`. The new section appears in `~/.gitconfig` and the repo `.gitconfig` is unchanged. Then remove it with `git config --global --unset http.https://example.invalid.proxy`.
 - [ ] **Step 5: Resume the sync timer.** After the next sync, spot-check one other devserver:
   - `~/.gitconfig` is a regular file with the include

@@ -97,7 +97,8 @@ Not checked in. Loaded automatically at shell startup:
 - `~/.config/dotfiles/0_my_shell_profile.sh` or `~/.0_my_shell_profile.sh` — pre-load, both shells
 - `~/.config/dotfiles/my_bashrc.sh` or `~/.my_bashrc.sh` — bash-specific post-load
 - `~/.config/dotfiles/my_zshrc.sh` or `~/.my_zshrc.sh` — zsh-specific post-load
-- `~/.gitconfig` — local stub that includes the repo `.gitconfig`; holds machine-specific git author name/email and anything tools write via `git config --global`
+
+Git reads `~/.gitconfig` itself (not at shell startup): a local stub that includes the repo `.gitconfig` and holds machine-specific git author name/email plus anything tools write via `git config --global`.
 
 ### Platform Detection
 

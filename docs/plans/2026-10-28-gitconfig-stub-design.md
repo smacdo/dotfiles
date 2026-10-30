@@ -133,6 +133,7 @@ with the legacy file's current SHA-256 (`sha256sum` on Linux, `shasum -a 256` on
 says to re-run bootstrap otherwise.
 
 **This devserver after migration.** Bootstrap never edits the repo file. Afterwards the user
+first checks `git diff .gitconfig` and copies anything worth keeping into `~/.gitconfig`, then
 runs `git checkout -- .gitconfig` once to drop the injected sections from the working copy.
 Until the login hook next runs (re-login), its cert settings may be missing from the effective
 config.
@@ -156,9 +157,11 @@ directory holds nothing for these paths. A later bootstrap run there folds that 
 
 **Docs.** CHANGELOG entry: `~/.gitconfig` is now a local stub and `~/.my_gitconfig` is folded
 into it; re-run bootstrap right after pulling (machines that receive the change by file sync
-need no action); then `git checkout -- .gitconfig`; the old file is removable via
-`bin/dotfiles-cleanup`. CLAUDE.md: "Bootstrap System" and "Per-Machine Overrides" (drop
-`~/.my_gitconfig`, add `~/.gitconfig`); migration policy step 5 names the runner's pre-seed
+need no action if their `~/.my_gitconfig` matches the one folded in; otherwise re-run bootstrap
+there to fold in their own); first check `git diff .gitconfig` and copy anything worth keeping
+into `~/.gitconfig`, then `git checkout -- .gitconfig`; the old file is removable via the opt-in
+`bin/dotfiles-cleanup`, which asks before removing. CLAUDE.md: "Bootstrap System" and
+"Per-Machine Overrides" (drop `~/.my_gitconfig`, add `~/.gitconfig`); migration policy step 5 names the runner's pre-seed
 mechanism instead of `tests/docker/upgrade_from_v<N>/` (which conflicts with the flat
 `tests/docker/` rule). README references. `TODO.md`: stub item narrowed to `.bashrc`/`.zshrc`
 with a note that the stub logic is ready to extract; "move `~/.my_gitconfig` into XDG" removed
