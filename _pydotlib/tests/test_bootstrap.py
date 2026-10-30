@@ -1133,6 +1133,17 @@ class TestGitconfigHelpers(unittest.TestCase):
             [self.tmp / "sub/x", self.tmp / "abs/y"],
         )
 
+    def test_include_paths_home_override(self):
+        cfg = self._write("repo/.gitconfig", "[include]\n\tpath = ~/repo/.gitconfig\n")
+        self.assertEqual(
+            _gitconfig_include_paths(cfg), [self.tmp / "repo/repo/.gitconfig"]
+        )
+        self.assertEqual(
+            _gitconfig_include_paths(cfg, home=self.tmp), [self.tmp / "repo/.gitconfig"]
+        )
+        self.assertTrue(_gitconfig_includes(cfg, cfg, home=self.tmp))
+        self.assertFalse(_gitconfig_includes(cfg, cfg))
+
     def test_include_paths_none_returns_empty(self):
         cfg = self._write("stub", "[user]\n\tname = x\n")
         self.assertEqual(_gitconfig_include_paths(cfg), [])
@@ -1316,6 +1327,19 @@ class TestInstallGitconfigStub(unittest.TestCase):
         self.assertIn("GIT_CONFIG_GLOBAL=/dev/null git -C", "\n".join(logs.output))
         self.assertTrue(self.stub.is_symlink())
         self.assertEqual(os.readlink(self.stub), str(self.repo))
+
+    def test_recursion_guard_detects_tilde_form(self):
+        self.repo.write_text(self.rendered)
+        repo_bytes = self.repo.read_bytes()
+        self.stub.symlink_to(self.repo)
+        with patch("_pydotlib.bootstrap._atomic_write_text") as write:
+            with self.assertLogs(level="ERROR") as logs:
+                self.assertIs(self._run(), StubResult.FAILED)
+        write.assert_not_called()
+        self.assertIn("GIT_CONFIG_GLOBAL=/dev/null git -C", "\n".join(logs.output))
+        self.assertTrue(self.stub.is_symlink())
+        self.assertEqual(os.readlink(self.stub), str(self.repo))
+        self.assertEqual(self.repo.read_bytes(), repo_bytes)
 
     def test_legacy_folded_once(self):
         self.legacy.write_text(self.LEGACY_CONTENT)
