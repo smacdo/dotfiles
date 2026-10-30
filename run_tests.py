@@ -254,6 +254,25 @@ def run_container_test(runtime: str, repo_root: Path, flavor: str) -> bool:
         ):
             return False
 
+        # Seed the pre-stub layout: ~/.gitconfig as a symlink into the repo and
+        # a legacy ~/.my_gitconfig. Bootstrap must replace the symlink with a
+        # stub and fold the legacy file in (checked via LEGACY_GITCONFIG_SENTINEL).
+        # The repo mount is read-only, so a write-through bug fails loudly.
+        if not run_exec(
+            runtime,
+            container_name,
+            [
+                "bash",
+                "-c",
+                "ln -s /home/testuser/.dotfiles/.gitconfig /home/testuser/.gitconfig && "
+                "printf '[user]\\n\\tname = Old Name\\n[dotfilestest]\\n\\tmigrated = yes\\n' "
+                "> /home/testuser/.my_gitconfig",
+            ],
+            timeout=10,
+            label="seed pre-bootstrap ~/.gitconfig symlink and ~/.my_gitconfig (upgrade test)",
+        ):
+            return False
+
         bootstrap_cmd = [
             "bash",
             "-c",

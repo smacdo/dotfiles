@@ -336,6 +336,14 @@ class NativeChecksSmokeTests(unittest.TestCase):
             any("/h/.bashrc -> /h/.dotfiles/.bashrc" in n for n in names)
         )
 
+    def test_gitconfig_is_checked_via_include_not_symlink(self):
+        # ~/.gitconfig is a local stub now, not a symlink into the repo.
+        for platform in ("linux", "darwin"):
+            checks = build_native_checks("/h", "/h/.dotfiles", platform=platform)
+            names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
+            self.assertFalse(any("symlink /h/.gitconfig" in n for n in names))
+            self.assertTrue(any("--includes --get log.date" in n for n in names))
+
     def test_darwin_includes_macos_specific_checks(self):
         checks = build_native_checks("/Users/user", "/Users/user/.dotfiles", platform="darwin")
         names = [c(MagicMock(return_value=_completed(0, stdout=""))).name for c in checks]
