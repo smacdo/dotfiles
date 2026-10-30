@@ -188,12 +188,12 @@ All tests that run git use the hermetic environment above (`HOME=<tmp>`,
   with `check_command_output_matches(["git", "config", "--global", "--includes", "--get",
   "log.date"], "relative")` (proves the include resolves; `log.date` is defined only in the repo
   file). The two existing `~/.my_gitconfig` content checks repoint to `~/.gitconfig`.
-- Upgrade path: one container flavor's runner pre-seeds `~/.gitconfig` as a symlink to the repo
+- Upgrade path: the runner pre-seeds (in every flavor) `~/.gitconfig` as a symlink to the repo
   file and a `~/.my_gitconfig` containing a sentinel key (`[dotfilestest] migrated = yes`;
   `--git-name` would overwrite a seeded identity). Checks: the sentinel resolves from
   `~/.gitconfig`, and `~/.my_gitconfig` still exists. A second seeded line uses a key that
   `configure_vcs_author` rewrites (`user.name`), so the runner's second bootstrap pass proves
-  no re-fold resurrects the old value. Other flavors keep covering the
+  no re-fold resurrects the old value. Unit tests cover the
   fresh-install row. The read-only repo mount makes any write-through bug fail loudly.
 - Manual on this devserver: after bootstrap, a tool-style write
   (`git config --global http.https://example.invalid.proxy ""`) lands in the stub, not the repo.

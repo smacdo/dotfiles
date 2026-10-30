@@ -247,6 +247,11 @@ _XDG_DATA = f"{_HOME}/.local/share"
 # never destroys user data" check below.
 BACKUP_SENTINEL = "SENTINEL_BACKUP_TEST_PRE_BOOTSTRAP"
 
+# Git config key the runner seeds into the legacy ~/.my_gitconfig (value "yes")
+# before bootstrap. After bootstrap it must resolve from ~/.gitconfig, proving
+# the legacy file was folded into the stub.
+LEGACY_GITCONFIG_SENTINEL = "dotfilestest.migrated"
+
 
 def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Check]:
     """Build a check list for native (non-container) host testing.
@@ -263,7 +268,10 @@ def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Chec
     checks: list[Check] = [
         check_symlink(f"{home}/.bashrc", f"{dotfiles}/.bashrc"),
         check_symlink(f"{home}/.bash_profile", f"{dotfiles}/.bash_profile"),
-        check_symlink(f"{home}/.gitconfig", f"{dotfiles}/.gitconfig"),
+        check_command_output_matches(
+            ["git", "config", "--global", "--includes", "--get", "log.date"],
+            "relative",
+        ),
         check_symlink(f"{home}/.tmux.conf", f"{dotfiles}/.tmux.conf"),
         check_symlink(f"{home}/.vimrc", f"{dotfiles}/settings/nvim/init.vim"),
         check_symlink(f"{home}/.vim", f"{dotfiles}/.vim"),
@@ -323,23 +331,32 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # moved the original content to ~/.bashrc.ORIGINAL before symlinking.
     check_file_contains(f"{_HOME}/.bashrc.ORIGINAL", BACKUP_SENTINEL),
     check_symlink(f"{_HOME}/.bash_profile", f"{_DOTFILES}/.bash_profile"),
-    check_symlink(f"{_HOME}/.gitconfig", f"{_DOTFILES}/.gitconfig"),
+    # ~/.gitconfig is a local stub that includes the repo file; log.date lives
+    # only in the repo file, so this proves the include resolves.
+    check_command_output_matches(
+        ["git", "config", "--global", "--includes", "--get", "log.date"],
+        "relative",
+    ),
     check_symlink(f"{_HOME}/.tmux.conf", f"{_DOTFILES}/.tmux.conf"),
     check_symlink(f"{_HOME}/.vimrc", f"{_DOTFILES}/settings/nvim/init.vim"),
     check_symlink(f"{_HOME}/.vim", f"{_DOTFILES}/.vim"),
     # XDG state dirs created by bootstrap.
     check_dir_exists(f"{_HOME}/.local/state/vim/backups"),
     check_dir_exists(f"{_HOME}/.local/state/vim/tmp"),
-    # --git-name / --git-email values written to ~/.my_gitconfig...
-    check_file_contains(f"{_HOME}/.my_gitconfig", "Testy McTestFace"),
-    check_file_contains(f"{_HOME}/.my_gitconfig", "testy@test.com"),
-    # ... and git reads them via the .gitconfig [include] chain. NOT using
-    # `--global` here: `git config --global` defaults to `--no-includes`
-    # ("--includes... Defaults to off when a specific file is given"), which
-    # would correctly show the literal `include.path` directive but miss the
-    # included user.name/email — the exact bug we hit before this fix.
+    # --git-name / --git-email values written to ~/.gitconfig (the stub)...
+    check_file_contains(f"{_HOME}/.gitconfig", "Testy McTestFace"),
+    check_file_contains(f"{_HOME}/.gitconfig", "testy@test.com"),
+    # ... and git resolves them (the seeded legacy "Old Name" must not win
+    # after the second bootstrap pass).
     check_command_output_matches(["git", "config", "user.name"], "Testy McTestFace"),
     check_command_output_matches(["git", "config", "user.email"], "testy@test.com"),
+    # Upgrade path: the runner seeds the old layout (~/.gitconfig symlink plus
+    # a legacy ~/.my_gitconfig). The legacy file's sentinel must be folded
+    # into the stub, and the legacy file itself kept (bootstrap never deletes).
+    check_command_output_matches(
+        ["git", "config", "--get", LEGACY_GITCONFIG_SENTINEL], "yes"
+    ),
+    check_command_succeeds(["test", "-f", f"{_HOME}/.my_gitconfig"]),
     # --weather-location 'Seattle' → file written
     check_file_contains(f"{_HOME}/.config/dotfiles/weather_location", "Seattle"),
     # ... and the file propagates to $WEATHER_LOCATION via shell init.
