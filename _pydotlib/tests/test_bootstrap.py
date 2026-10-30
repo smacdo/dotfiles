@@ -2,6 +2,7 @@ import importlib
 import json
 import os
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ except ModuleNotFoundError:
 
 TOMLLIB_AVAILABLE = tomllib is not None
 
+from _pydotlib import bootstrap
 from _pydotlib.bootstrap import (
     _CTS,
     CLAUDE_TMUX_STATE_HOOKS,
@@ -153,6 +155,23 @@ class TestConfigureVcsAuthor(unittest.TestCase):
 
             self.assertFalse(target.exists())
             self.assertTrue(link.is_symlink())
+
+    def test_dry_run_symlink_logs_info_not_warning(self):
+        # On the upgrade path a dry run leaves ~/.gitconfig a symlink, though the
+        # real run would have replaced it with the stub before this step.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "target"
+            target.write_text("[user]\n\tname = Keep\n")
+            link = Path(tmpdir) / ".gitconfig"
+            link.symlink_to(target)
+
+            with self.assertLogs(level="INFO") as logs:
+                configure_vcs_author(link, name="A", email="a@x", dry_run=True)
+
+            self.assertFalse(any(line.startswith("WARNING") for line in logs.output))
+            self.assertIn("would write git author config", "\n".join(logs.output))
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(target.read_text(), "[user]\n\tname = Keep\n")
 
     def test_dry_run_does_not_create_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1742,6 +1761,34 @@ class TestGitconfigHelpers(unittest.TestCase):
         self.assertEqual(env["HOME"], str(self.tmp))
         self.assertNotIn("XDG_CONFIG_HOME", env)
 
+    def test_hermetic_env_drops_git_dir_and_work_tree(self):
+        with patch.dict(os.environ, {"GIT_DIR": "/x/.git", "GIT_WORK_TREE": "/x"}):
+            env = _hermetic_git_env(self.tmp)
+        self.assertFalse("GIT_DIR" in env)
+        self.assertFalse("GIT_WORK_TREE" in env)
+
+    def test_helpers_work_next_to_broken_gitfile(self):
+        (self.tmp / "repo").mkdir()
+        (self.tmp / "repo/.git").write_text("gitdir: /nonexistent/path\n")
+        repo_file = self._write("repo/.gitconfig", "[user]\n\tname = x\n")
+        self._write("repo/rel.inc", "[core]\n\tpager = less\n")
+        cfg = self._write("repo/stub", f"[include]\n\tpath = rel.inc\n\tpath = {repo_file}\n")
+        self.assertEqual(
+            _gitconfig_include_paths(cfg), [self.tmp / "repo/rel.inc", repo_file]
+        )
+        self.assertTrue(_validate_stub(cfg, repo_file)[0])
+
+    def test_include_paths_relative_file_argument(self):
+        # A relative `path` argument still resolves against the process cwd,
+        # even though git itself runs from outside any repo.
+        self._write("sub/x", "")
+        self._write("cfg", "[include]\n\tpath = sub/x\n")
+        old = os.getcwd()
+        os.chdir(self.tmp)
+        self.addCleanup(os.chdir, old)
+        self.assertEqual(_gitconfig_include_paths(Path("cfg")), [self.tmp / "sub/x"])
+        self.assertEqual(_validate_stub(Path("cfg"), Path("sub/x")), (True, ""))
+
     def test_include_paths_expands_tilde_and_case(self):
         self._write("repo/.gitconfig", "")
         cfg = self._write(
@@ -1823,17 +1870,28 @@ class TestGitconfigHelpers(unittest.TestCase):
         repo_file = self._write("repo/.gitconfig", "")
         repo_file.write_text(f"[include]\n\tpath = {repo_file}\n")
         stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
-        self.assertFalse(_validate_stub(stub, repo_file))
+        ok, reason = _validate_stub(stub, repo_file)
+        self.assertFalse(ok)
+        self.assertIn("exceeded maximum include depth", reason)
 
     def test_validate_stub_detects_missing_include_target(self):
         repo_file = self.tmp / "repo/.gitconfig"
         stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
-        self.assertFalse(_validate_stub(stub, repo_file))
+        ok, reason = _validate_stub(stub, repo_file)
+        self.assertFalse(ok)
+        self.assertIn(str(repo_file), reason)
+
+    def test_validate_stub_reports_missing_include(self):
+        repo_file = self._write("repo/.gitconfig", "")
+        stub = self._write("stub", "[user]\n\tname = x\n")
+        self.assertEqual(
+            _validate_stub(stub, repo_file), (False, f"{stub} does not include {repo_file}")
+        )
 
     def test_validate_stub_ok(self):
         repo_file = self._write("repo/.gitconfig", "[user]\n\tname = x\n")
         stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
-        self.assertTrue(_validate_stub(stub, repo_file))
+        self.assertEqual(_validate_stub(stub, repo_file), (True, ""))
 
 
 class TestInstallGitconfigStub(unittest.TestCase):
@@ -1906,12 +1964,23 @@ class TestInstallGitconfigStub(unittest.TestCase):
     def test_regular_file_converted_with_backup(self):
         original = b"[alias]\n\tst = status"
         self.stub.write_bytes(original)
+        backup = self.home / ".gitconfig.ORIGINAL"
+        real_write = bootstrap._atomic_write_text
+
+        def write_after_backup(path: Path, content: str) -> None:
+            self.assertEqual(backup.read_bytes(), original)
+            self.assertEqual(path.read_bytes(), original)
+            real_write(path, content)
+
         self._answer(True)
-        self.assertIs(self._run(), StubResult.READY)
+        with patch(
+            "_pydotlib.bootstrap._atomic_write_text", side_effect=write_after_backup
+        ) as write:
+            self.assertIs(self._run(), StubResult.READY)
+        write.assert_called_once()
         self.assertEqual(
             self.stub.read_text(), self.rendered + "\n" + original.decode() + "\n"
         )
-        backup = self.home / ".gitconfig.ORIGINAL"
         self.assertTrue(backup.exists())
         self.assertEqual(backup.read_bytes(), original)
 
@@ -1981,6 +2050,26 @@ class TestInstallGitconfigStub(unittest.TestCase):
         self.assertIs(self._run(), StubResult.READY)
         self.assertEqual(self.stub.read_text(), folded)
         self.assertEqual(self.confirm.call_count, 1)
+
+    def test_legacy_fold_hashes_the_bytes_it_folds(self):
+        # The legacy file changes right after it is read: the marker and the
+        # folded content must both come from that one read.
+        self.legacy.write_text(self.LEGACY_CONTENT)
+        marker = _legacy_marker(self.legacy)
+        real_read_bytes = Path.read_bytes
+
+        def read_then_edit(path: Path) -> bytes:
+            data = real_read_bytes(path)
+            if path == self.legacy:
+                path.write_text("[user]\n\tname = Concurrent\n")
+            return data
+
+        self._answer(True)
+        with patch.object(Path, "read_bytes", autospec=True, side_effect=read_then_edit):
+            self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(
+            self.stub.read_text(), self.rendered + "\n" + marker + "\n" + self.LEGACY_CONTENT
+        )
 
     def test_legacy_not_refolded_after_value_rewrite(self):
         self.legacy.write_text(self.LEGACY_CONTENT)
@@ -2056,28 +2145,36 @@ class TestInstallGitconfigStub(unittest.TestCase):
         original = b"[alias]\n\tst = status\n"
         self.stub.write_bytes(original)
         self._answer(True)
-        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
             with self.assertLogs(level="ERROR"):
                 self.assertIs(self._run(), StubResult.FAILED)
         self.assertEqual(self.stub.read_bytes(), original)
 
+    def test_validation_failure_logs_git_reason(self):
+        self.stub.write_text(self.rendered + "[include]\n\tpath = ~/.gitconfig\n")
+        with self.assertLogs(level="ERROR") as logs:
+            self.assertIs(self._run(), StubResult.FAILED)
+        output = "\n".join(logs.output)
+        self.assertIn("include cycle, syntax error", output)
+        self.assertIn("exceeded maximum include depth", output)
+
     def test_validation_failure_restores_symlink(self):
         self.stub.symlink_to(self.repo)
-        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
             with self.assertLogs(level="ERROR"):
                 self.assertIs(self._run(), StubResult.FAILED)
         self.assertTrue(self.stub.is_symlink())
         self.assertEqual(os.readlink(self.stub), str(self.repo))
 
     def test_validation_failure_removes_new_stub(self):
-        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
             with self.assertLogs(level="ERROR"):
                 self.assertIs(self._run(), StubResult.FAILED)
         self.assertFalse(self.stub.exists())
 
     def test_validation_failure_without_write_leaves_file(self):
         self.stub.write_text(self.rendered)
-        with patch("_pydotlib.bootstrap._validate_stub", return_value=False):
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
             with self.assertLogs(level="ERROR"):
                 self.assertIs(self._run(), StubResult.FAILED)
         self.assertEqual(self.stub.read_text(), self.rendered)
@@ -2147,6 +2244,107 @@ class TestInstallGitconfigStub(unittest.TestCase):
         self.assertIn("INFO", lines[0])
         self.assertIn("bin/dotfiles-cleanup", lines[0])
 
+    def _stray_temps(self) -> list[Path]:
+        return sorted(self.home.glob(".gitconfig.*.tmp"))
+
+    def test_preexisting_tmp_file_survives(self):
+        user_tmp = self.home / ".gitconfig.tmp"
+        user_tmp.write_bytes(b"user data, not ours\n")
+        with self.subTest("fresh stub"):
+            self.assertIs(self._run(), StubResult.READY)
+            self.assertEqual(user_tmp.read_bytes(), b"user data, not ours\n")
+        with self.subTest("conversion"):
+            self.stub.write_text("[alias]\n\tst = status\n")
+            self._answer(True)
+            self.assertIs(self._run(), StubResult.READY)
+            self.assertEqual(user_tmp.read_bytes(), b"user data, not ours\n")
+        with self.subTest("restore after validation failure"):
+            self.stub.write_text("[alias]\n\tst = status\n")
+            self._answer(True)
+            with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
+                with self.assertLogs(level="ERROR"):
+                    self.assertIs(self._run(), StubResult.FAILED)
+            self.assertEqual(self.stub.read_text(), "[alias]\n\tst = status\n")
+            self.assertEqual(user_tmp.read_bytes(), b"user data, not ours\n")
+        self.assertEqual(self._stray_temps(), [])
+
+    def _with_umask(self, mask: int) -> None:
+        old = os.umask(mask)
+        self.addCleanup(os.umask, old)
+
+    def test_new_stub_is_private(self):
+        self._with_umask(0o022)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(stat.S_IMODE(self.stub.lstat().st_mode), 0o600)
+
+    def test_stub_replacing_symlink_is_private(self):
+        self._with_umask(0o022)
+        self.repo.chmod(0o644)
+        self.stub.symlink_to(self.repo)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertFalse(self.stub.is_symlink())
+        self.assertEqual(stat.S_IMODE(self.stub.lstat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(self.repo.stat().st_mode), 0o644)
+
+    def test_conversion_keeps_0640(self):
+        self.stub.write_text("[alias]\n\tst = status\n")
+        self.stub.chmod(0o640)
+        self._answer(True)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertEqual(stat.S_IMODE(self.stub.stat().st_mode), 0o640)
+
+    def test_restore_keeps_original_mode(self):
+        self.stub.write_text("[alias]\n\tst = status\n")
+        self.stub.chmod(0o640)
+        self._answer(True)
+        with patch("_pydotlib.bootstrap._validate_stub", return_value=(False, "boom")):
+            with self.assertLogs(level="ERROR"):
+                self.assertIs(self._run(), StubResult.FAILED)
+        self.assertEqual(stat.S_IMODE(self.stub.stat().st_mode), 0o640)
+
+    def test_replace_failure_leaves_no_temp_file(self):
+        for label, setup in (
+            ("missing", lambda: None),
+            ("symlink", lambda: self.stub.symlink_to(self.repo)),
+        ):
+            with self.subTest(label):
+                setup()
+                before = self._snapshot()
+                with patch(
+                    "_pydotlib.bootstrap.os.replace", side_effect=OSError("replace failed")
+                ):
+                    with self.assertRaises(OSError):
+                        self._run()
+                self.assertEqual(self._stray_temps(), [])
+                self.assertEqual(self._snapshot(), before)
+                self.stub.unlink(missing_ok=True)
+        # The user's pre-existing temp-named file is never the one cleaned up.
+        user_tmp = self.home / ".gitconfig.tmp"
+        user_tmp.write_bytes(b"keep\n")
+        with patch("_pydotlib.bootstrap.os.replace", side_effect=OSError("replace failed")):
+            with self.assertRaises(OSError):
+                self._run()
+        self.assertEqual(user_tmp.read_bytes(), b"keep\n")
+        self.assertEqual(self._stray_temps(), [])
+
+    def test_broken_gitfile_in_repo_dir(self):
+        # A worktree's .git gitfile can point at a host path that doesn't exist
+        # (e.g. inside a container); git run with cwd there exits 128.
+        (self.repo.parent / ".git").write_text("gitdir: /nonexistent/path\n")
+        self.stub.symlink_to(self.repo)
+        self.assertIs(self._run(), StubResult.READY)
+        self.assertFalse(self.stub.is_symlink())
+        self.assertEqual(self.stub.read_text(), self.rendered)
+
+    def test_broken_gitfile_recursion_guard_still_fires(self):
+        (self.repo.parent / ".git").write_text("gitdir: /nonexistent/path\n")
+        self.repo.write_text(f"[include]\n\tpath = {self.repo}\n")
+        self.stub.symlink_to(self.repo)
+        with self.assertLogs(level="ERROR") as logs:
+            self.assertIs(self._run(), StubResult.FAILED)
+        self.assertIn("includes itself", "\n".join(logs.output))
+        self.assertTrue(self.stub.is_symlink())
+
     def test_legacy_declined_not_folded_and_no_log_line(self):
         self.legacy.write_text(self.LEGACY_CONTENT)
         self._answer(False)
@@ -2154,3 +2352,30 @@ class TestInstallGitconfigStub(unittest.TestCase):
             self.assertIs(self._run(), StubResult.READY)
         self.assertEqual(self.stub.read_text(), self.rendered)
         self.assertFalse(any("is no longer used" in line for line in logs.output))
+
+
+class TestBootstrapMain(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    def test_non_utf8_gitconfig_fails_cleanly(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            gitconfig = home / ".gitconfig"
+            gitconfig.write_bytes(b"[user]\n\tname = \xff\xfe\n")
+            env = dict(os.environ, HOME=str(home))
+            for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"):
+                env.pop(var, None)
+            result = subprocess.run(
+                [sys.executable, str(self.REPO_ROOT / "bootstrap.py")],
+                cwd=self.REPO_ROOT,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertIn("not valid UTF-8", result.stdout)
+            self.assertEqual(gitconfig.read_bytes(), b"[user]\n\tname = \xff\xfe\n")

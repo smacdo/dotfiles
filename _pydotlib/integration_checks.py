@@ -268,6 +268,7 @@ def build_native_checks(home: str, dotfiles: str, *, platform: str) -> list[Chec
     checks: list[Check] = [
         check_symlink(f"{home}/.bashrc", f"{dotfiles}/.bashrc"),
         check_symlink(f"{home}/.bash_profile", f"{dotfiles}/.bash_profile"),
+        check_command_succeeds(["test", "!", "-L", f"{home}/.gitconfig"]),
         check_command_output_matches(
             ["git", "config", "--global", "--includes", "--get", "log.date"],
             "relative",
@@ -331,8 +332,10 @@ BOOTSTRAP_CHECKS: list[Check] = [
     # moved the original content to ~/.bashrc.ORIGINAL before symlinking.
     check_file_contains(f"{_HOME}/.bashrc.ORIGINAL", BACKUP_SENTINEL),
     check_symlink(f"{_HOME}/.bash_profile", f"{_DOTFILES}/.bash_profile"),
-    # ~/.gitconfig is a local stub that includes the repo file; log.date lives
-    # only in the repo file, so this proves the include resolves.
+    # ~/.gitconfig is a local stub (the seeded symlink was replaced) that
+    # includes the repo file; log.date lives only in the repo file, so this
+    # proves the include resolves.
+    check_command_succeeds(["test", "!", "-L", f"{_HOME}/.gitconfig"]),
     check_command_output_matches(
         ["git", "config", "--global", "--includes", "--get", "log.date"],
         "relative",
