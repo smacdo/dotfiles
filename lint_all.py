@@ -302,7 +302,7 @@ def main() -> int:
     #       are no linting errors, even if other files failed.
 
     # Report if all tests passed or not.
-    if len(failed_sh_files) + len(failed_py_files) == 0:
+    if len(failed_sh_files) + len(failed_py_files) == 0 and not has_fatal_lints:
         logging.info("all lint checks passed!")
     else:
         is_fatal_text = "fatal" if has_fatal_lints else "non-fatal"
