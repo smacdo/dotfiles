@@ -17,7 +17,7 @@ PY_SHEBANGS = ["#!/usr/bin/env python3"]
 
 BASH_CONFIG_FILES = [".bash_profile", ".bashrc"]
 DOTFILES_SH_SCRIPTS: list[str] = []
-DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py"]
+DOTFILES_PY_SCRIPTS = [os.path.basename(__file__), "bootstrap.py", "run_tests.py"]
 
 END_OF_CONFIG_SENTINEL = "### end of config - there should be no lines below this one! ###"
 END_OF_CONFIG_FILES = [".bashrc", ".zshrc"]
