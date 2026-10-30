@@ -26,10 +26,19 @@ from _pydotlib.bootstrap import (
     CODEX_STATUS_LINE,
     _ConfigMergeError,
     _ConfigWriteError,
+    LEGACY_MARKER_PREFIX,
+    STUB_HEADER,
     _detect_real_editor,
+    _gitconfig_include_paths,
+    _gitconfig_includes,
+    _hermetic_git_env,
+    _include_path_for,
+    _legacy_marker,
     _merge_claude_tmux_hooks,
     _merge_codex_config,
     _write_config_text,
+    _render_gitconfig_stub,
+    _validate_stub,
     configure_claude_code,
     configure_codex,
     configure_vcs_author,
@@ -1682,3 +1691,106 @@ class TestDetectRealEditor(unittest.TestCase):
     @patch.dict(os.environ, {}, clear=True)
     def test_falls_back_to_vi(self, _):
         self.assertEqual(_detect_real_editor(), "vi")
+
+
+class TestGitconfigHelpers(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name).resolve()
+
+    def _write(self, rel: str, text: str) -> Path:
+        path = self.tmp / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        return path
+
+    def test_hermetic_env_strips_xdg_and_global(self):
+        with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/somewhere/else"}):
+            env = _hermetic_git_env(self.tmp)
+        self.assertEqual(env["GIT_CONFIG_GLOBAL"], "/dev/null")
+        self.assertEqual(env["GIT_CONFIG_NOSYSTEM"], "1")
+        self.assertEqual(env["HOME"], str(self.tmp))
+        self.assertNotIn("XDG_CONFIG_HOME", env)
+
+    def test_include_paths_expands_tilde_and_case(self):
+        self._write("repo/.gitconfig", "")
+        cfg = self._write(
+            "stub", "[Include]\n\tPath = ~/repo/.gitconfig ; comment\n"
+        )
+        self.assertEqual(
+            _gitconfig_include_paths(cfg), [self.tmp / "repo/.gitconfig"]
+        )
+
+    def test_include_paths_multiple_and_relative(self):
+        cfg = self._write(
+            "stub",
+            f"[include]\n\tpath = sub/x\n\tpath = {self.tmp}/abs/y\n",
+        )
+        self.assertEqual(
+            _gitconfig_include_paths(cfg),
+            [self.tmp / "sub/x", self.tmp / "abs/y"],
+        )
+
+    def test_include_paths_none_returns_empty(self):
+        cfg = self._write("stub", "[user]\n\tname = x\n")
+        self.assertEqual(_gitconfig_include_paths(cfg), [])
+
+    def test_includes_true_for_absolute_or_tilde_form(self):
+        repo_file = self._write("repo/.gitconfig", "")
+        tilde = self._write("tilde", "[include]\n\tpath = ~/repo/.gitconfig\n")
+        absolute = self._write(
+            "absolute", f"[include]\n\tpath = {repo_file}\n"
+        )
+        self.assertTrue(_gitconfig_includes(tilde, repo_file))
+        self.assertTrue(_gitconfig_includes(absolute, repo_file))
+
+    def test_include_path_for_under_home(self):
+        repo = self._write("repo/.gitconfig", "")
+        self.assertEqual(_include_path_for(repo, self.tmp), "~/repo/.gitconfig")
+
+    def test_include_path_for_symlinked_home(self):
+        real = self.tmp / "real"
+        real.mkdir()
+        link = self.tmp / "link"
+        link.symlink_to(real)
+        repo = self._write("real/repo/.gitconfig", "")
+        self.assertEqual(_include_path_for(repo, link), "~/repo/.gitconfig")
+
+    def test_include_path_for_outside_home(self):
+        home = self.tmp / "home"
+        home.mkdir()
+        repo = self._write("elsewhere/.gitconfig", "")
+        self.assertEqual(_include_path_for(repo, home), str(repo.resolve()))
+
+    def test_render_stub_exact(self):
+        self.assertEqual(
+            _render_gitconfig_stub("~/repo/.gitconfig"),
+            STUB_HEADER + "[include]\n\tpath = ~/repo/.gitconfig\n",
+        )
+
+    def test_legacy_marker_changes_with_content(self):
+        a = self.tmp / "a"
+        b = self.tmp / "b"
+        a.write_bytes(b"one")
+        b.write_bytes(b"two")
+        self.assertNotEqual(_legacy_marker(a), _legacy_marker(b))
+        b.write_bytes(b"one")
+        self.assertEqual(_legacy_marker(a), _legacy_marker(b))
+        self.assertTrue(_legacy_marker(a).startswith(LEGACY_MARKER_PREFIX))
+
+    def test_validate_stub_detects_cycle(self):
+        repo_file = self._write("repo/.gitconfig", "")
+        repo_file.write_text(f"[include]\n\tpath = {repo_file}\n")
+        stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
+        self.assertFalse(_validate_stub(stub, repo_file))
+
+    def test_validate_stub_detects_missing_include_target(self):
+        repo_file = self.tmp / "repo/.gitconfig"
+        stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
+        self.assertFalse(_validate_stub(stub, repo_file))
+
+    def test_validate_stub_ok(self):
+        repo_file = self._write("repo/.gitconfig", "[user]\n\tname = x\n")
+        stub = self._write("stub", f"[include]\n\tpath = {repo_file}\n")
+        self.assertTrue(_validate_stub(stub, repo_file))
