@@ -22,13 +22,15 @@ from _pydotlib.bootstrap import (
     download_files,
     find_dotfiles_root,
     git_clone_repos,
+    StubResult,
     initialize_vim_plugin_manager,
+    install_gitconfig_stub,
     safe_symlink,
 )
 from _pydotlib.cli import ColoredLogFormatter
 from _pydotlib.xdg import xdg_config_dir, xdg_data_dir, xdg_state_dir
 
-MY_GITCONFIG_PATH = Path.home() / ".my_gitconfig"
+GITCONFIG_PATH = Path.home() / ".gitconfig"
 WEATHER_LOCATION_PATH = xdg_config_dir() / "dotfiles" / "weather_location"
 
 
@@ -59,10 +61,10 @@ def main() -> int:
         help="Print actions but do not perform any changes",
     )
     args_parser.add_argument(
-        "--git-name", type=str, help="Name to use when initializing .my_gitconfig"
+        "--git-name", type=str, help="Name to use for git user.name in ~/.gitconfig"
     )
     args_parser.add_argument(
-        "--git-email", type=str, help="Email to use when initializing .my_gitconfig"
+        "--git-email", type=str, help="Email to use for git user.email in ~/.gitconfig"
     )
     args_parser.add_argument(
         "--weather-location",
@@ -105,7 +107,6 @@ def main() -> int:
         dotfiles_dir=dotfiles_root,
         dry_run=args.dry_run,
         files=[
-            (".gitconfig", home_dir / ".gitconfig"),
             (".vim", home_dir / ".vim"),
             (".bash_profile", home_dir / ".bash_profile"),
             (".bashrc", home_dir / ".bashrc"),
@@ -126,6 +127,19 @@ def main() -> int:
             ("settings/wezterm/wezterm.lua", xdg_config_dir() / "wezterm/wezterm.lua"),
         ],
     )
+
+    try:
+        stub_result = install_gitconfig_stub(
+            home_dir / ".gitconfig",
+            dotfiles_root / ".gitconfig",
+            home_dir / ".my_gitconfig",
+            dry_run=args.dry_run,
+        )
+    except OSError as e:
+        logging.error(f"Failed to install ~/.gitconfig stub: {e}")
+        return 1
+    if stub_result is StubResult.FAILED:
+        return 1
 
     download_files(
         dry_run=args.dry_run,
@@ -153,12 +167,13 @@ def main() -> int:
     )
 
     initialize_vim_plugin_manager(dry_run=args.dry_run)
-    configure_vcs_author(
-        gitconfig_path=MY_GITCONFIG_PATH,
-        name=args.git_name,
-        email=args.git_email,
-        dry_run=args.dry_run,
-    )
+    if stub_result is StubResult.READY:
+        configure_vcs_author(
+            gitconfig_path=GITCONFIG_PATH,
+            name=args.git_name,
+            email=args.git_email,
+            dry_run=args.dry_run,
+        )
     configure_weather_location(
         location_path=WEATHER_LOCATION_PATH,
         location=args.weather_location,

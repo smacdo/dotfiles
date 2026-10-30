@@ -91,6 +91,10 @@ def configure_vcs_author(
     gitconfig_path = Path(gitconfig_path)
     dry_text = "[DRY RUN] " if dry_run else ""
 
+    if gitconfig_path.is_symlink():
+        logging.warning(f"{gitconfig_path} is a symlink; not writing git author config to it")
+        return
+
     if gitconfig_path.exists():
         if dry_run:
             logging.info(f"{dry_text}{gitconfig_path} already exists")

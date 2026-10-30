@@ -109,6 +109,33 @@ class TestConfigureVcsAuthor(unittest.TestCase):
             self.assertIn("name = Bob", content)
             self.assertIn("email = bob@example.com", content)
 
+    def test_refuses_symlink(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "target"
+            target.write_text("[user]\n\tname = Keep\n")
+            link = Path(tmpdir) / ".gitconfig"
+            link.symlink_to(target)
+
+            with self.assertLogs(level="WARNING") as logs:
+                configure_vcs_author(link, name="A", email="a@x")
+
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(link.readlink(), target)
+            self.assertEqual(target.read_text(), "[user]\n\tname = Keep\n")
+            self.assertIn(str(link), "\n".join(logs.output))
+
+    def test_refuses_broken_symlink_creates_nothing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "missing"
+            link = Path(tmpdir) / ".gitconfig"
+            link.symlink_to(target)
+
+            with self.assertLogs(level="WARNING"):
+                configure_vcs_author(link, name="A", email="a@x")
+
+            self.assertFalse(target.exists())
+            self.assertTrue(link.is_symlink())
+
     def test_dry_run_does_not_create_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / ".my_gitconfig"
