@@ -650,13 +650,17 @@ def _hermetic_git_env(home: Path) -> dict[str, str]:
     return env
 
 
-def _gitconfig_include_paths(path: Path) -> list[Path]:
-    """Return the resolved include.path targets of a git config file."""
+def _gitconfig_include_paths(path: Path, home: Path | None = None) -> list[Path]:
+    """Return the resolved include.path targets of a git config file.
+
+    `~` expands against `home` (default: the file's directory); relative entries
+    resolve against the file's directory.
+    """
     try:
         result = subprocess.run(
             ["git", "config", "--file", str(path), "--type=path", "--get-all", "include.path"],
             cwd=path.parent,
-            env=_hermetic_git_env(path.parent),
+            env=_hermetic_git_env(home if home is not None else path.parent),
             capture_output=True,
             text=True,
             check=False,
@@ -682,8 +686,8 @@ def _gitconfig_include_paths(path: Path) -> list[Path]:
     return paths
 
 
-def _gitconfig_includes(path: Path, repo_file: Path) -> bool:
-    return repo_file.resolve() in _gitconfig_include_paths(path)
+def _gitconfig_includes(path: Path, repo_file: Path, home: Path | None = None) -> bool:
+    return repo_file.resolve() in _gitconfig_include_paths(path, home)
 
 
 def _include_path_for(repo_gitconfig: Path, home: Path) -> str:
@@ -831,7 +835,7 @@ def install_gitconfig_stub(
         return StubResult.FAILED
 
     try:
-        if _gitconfig_includes(repo_gitconfig, repo_gitconfig):
+        if _gitconfig_includes(repo_gitconfig, repo_gitconfig, home=stub_path.parent):
             fix = RECURSION_FIX.format(repo=repo_gitconfig.parent)
             logging.error(f"{dry_text}{repo_gitconfig} includes itself; restore it with: {fix}")
             return StubResult.FAILED
